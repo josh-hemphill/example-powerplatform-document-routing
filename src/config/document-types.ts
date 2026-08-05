@@ -2,11 +2,9 @@
  * Document types and default approval chains.
  * Supports named assignees and pool/self-assign steps with SLA elevation.
  */
-export interface ApproverPerson {
-  displayName: string
-  email: string
-  role?: string
-}
+import type { ApproverPerson } from '../domain/approval-queue'
+
+export type { ApproverPerson }
 
 export interface NamedApprovalStepTemplate {
   mode: 'named'

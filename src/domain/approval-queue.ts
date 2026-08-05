@@ -11,7 +11,7 @@ export type ApprovalStepStatus =
 export interface ApproverPerson {
   email: string
   displayName: string
-  role?: string | null
+  role?: string
 }
 
 /**

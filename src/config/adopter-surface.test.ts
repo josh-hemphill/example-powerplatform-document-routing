@@ -42,7 +42,7 @@ describe('inbox personas', () => {
     ).toBe(true)
   })
 
-  it('matches waiting_on_me only for pending assignees', () => {
+  it('matches waiting_on_me for pending assignees', () => {
     expect(
       matchesInboxPersona(
         {
@@ -55,6 +55,36 @@ describe('inbox personas', () => {
         'me@contoso.com',
       ),
     ).toBe(true)
+  })
+
+  it('matches waiting_on_me when status is omitted but assignee is set', () => {
+    expect(
+      matchesInboxPersona(
+        {
+          status: 'in_review',
+          requesterEmail: 'a@contoso.com',
+          currentApproverEmail: 'me@contoso.com',
+        },
+        'waiting_on_me',
+        'me@contoso.com',
+      ),
+    ).toBe(true)
+  })
+
+  it('does not match waiting_on_me for queued pool membership', () => {
+    expect(
+      matchesInboxPersona(
+        {
+          status: 'in_review',
+          requesterEmail: 'a@contoso.com',
+          currentApproverEmail: 'me@contoso.com',
+          currentStepStatus: 'queued',
+          currentPoolEmails: ['me@contoso.com'],
+        },
+        'waiting_on_me',
+        'me@contoso.com',
+      ),
+    ).toBe(false)
   })
 
   it('matches ready_to_publish for approved docs', () => {

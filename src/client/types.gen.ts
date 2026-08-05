@@ -15,8 +15,14 @@ export type SubmitForApprovalRequest = {
     comment?: string;
 };
 
-export type ApprovalStepInput = {
-    assignmentMode: ApprovalAssignmentMode;
+export type ApprovalStepInput = ({
+    assignmentMode: 'named';
+} & NamedApprovalStepInput) | ({
+    assignmentMode: 'pool';
+} & PoolApprovalStepInput);
+
+export type NamedApprovalStepInput = {
+    assignmentMode: 'named';
     /**
      * Display role for the step (Legal, Compliance, …)
      */
@@ -25,14 +31,27 @@ export type ApprovalStepInput = {
      * Hours until SLA timeout from activation/claim
      */
     slaHours?: number;
+    assignee: Approver;
     /**
-     * Required when assignmentMode is named
+     * Extra members merged into the pool after SLA timeout
      */
-    assignee?: Approver;
+    elevationPool?: Array<Approver>;
+};
+
+export type PoolApprovalStepInput = {
+    assignmentMode: 'pool';
     /**
-     * Eligible claimers when assignmentMode is pool
+     * Display role for the step (Legal, Compliance, …)
      */
-    pool?: Array<Approver>;
+    role?: string;
+    /**
+     * Hours until SLA timeout from queue activation/claim
+     */
+    slaHours?: number;
+    /**
+     * Eligible claimers for this pool step
+     */
+    pool: Array<Approver>;
     /**
      * Extra members merged into the pool after SLA timeout
      */

@@ -1,6 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import { appConfig } from '../config/app.config.ts'
-import { addHoursIso } from '../domain/approval-queue.ts'
+import {
+  addHoursIso,
+  type ApproverPerson,
+} from '../domain/approval-queue.ts'
 import { syncCurrentApprovalFields } from './approval-engine.ts'
 
 export type MockDocumentStatus =
@@ -19,8 +22,8 @@ export interface MockApprovalStep {
   approverDisplayName: string | null
   role: string | null
   status: 'waiting' | 'queued' | 'pending' | 'approved' | 'rejected' | 'skipped'
-  pool: Array<{ email: string; displayName: string; role?: string | null }>
-  elevationPool: Array<{ email: string; displayName: string; role?: string | null }>
+  pool: ApproverPerson[]
+  elevationPool: ApproverPerson[]
   slaHours: number | null
   dueAt: string | null
   claimedAt: string | null

@@ -73,8 +73,10 @@ export function matchesInboxPersona(
     case 'waiting_on_me':
       return Boolean(
         email &&
-          document.currentStepStatus === 'pending' &&
-          document.currentApproverEmail?.toLowerCase() === email,
+          document.currentApproverEmail?.toLowerCase() === email &&
+          // Treat missing status as pending for older/partial payloads; never match queued.
+          (document.currentStepStatus == null ||
+            document.currentStepStatus === 'pending'),
       )
     case 'available_in_pool':
       return Boolean(
