@@ -222,7 +222,7 @@ async function onPublish(): Promise<void> {
       libraryName: publishForm.libraryName,
       folderPath: publishForm.folderPath,
       fileName: publishForm.fileName || `${draftForm.title || 'document'}.pdf`,
-      contentBase64: btoa(draftForm.bodyMarkdown || document.value?.freeformRequest || ''),
+      contentBase64: btoa(unescape(encodeURIComponent(draftForm.bodyMarkdown || document.value?.freeformRequest || ''))),
       contentType: 'application/pdf',
     })
 
