@@ -29,6 +29,11 @@ paths:
           in: query
           schema:
             $ref: '#/components/schemas/DocumentStatus'
+        - name: documentType
+          in: query
+          description: Filter by configured document type id (policy, sop, …)
+          schema:
+            type: string
         - name: q
           in: query
           description: Free-text search across title and request body
@@ -223,12 +228,15 @@ components:
         - skipped
     CreateDocumentRequest:
       type: object
-      required: [title, freeformRequest, requesterEmail]
+      required: [title, freeformRequest, requesterEmail, documentType]
       properties:
         title:
           type: string
           minLength: 3
           maxLength: 200
+        documentType:
+          type: string
+          description: Document type id from the app config (drives approval chain + draft template)
         freeformRequest:
           type: string
           minLength: 10
@@ -320,6 +328,7 @@ components:
         - id
         - title
         - status
+        - documentType
         - requesterEmail
         - createdAt
         - updatedAt
@@ -328,6 +337,8 @@ components:
           type: string
           format: uuid
         title:
+          type: string
+        documentType:
           type: string
         status:
           $ref: '#/components/schemas/DocumentStatus'
