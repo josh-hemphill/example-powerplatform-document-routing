@@ -4,6 +4,8 @@ Example Power Platform **Code App** that routes freeform document requests throu
 
 **Adopting for your org?** Start with [`SETUP.md`](./SETUP.md) — config in `src/config/*`, deploy scaffolding in [`deploy/`](./deploy/README.md).
 
+**Hardening / Dataverse-first roadmap:** see [`docs/remediation-roadmap.md`](./docs/remediation-roadmap.md) (phased plan: tooling → schema → identity & collaborative drafts → workflow/Flows → admin → publish → app polish).
+
 Stack:
 
 - **Vue 3 + Vite + TypeScript** hosted as a Power Apps Code App (`@microsoft/power-apps` + `@microsoft/power-apps-vite`)
