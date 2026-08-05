@@ -1,0 +1,16 @@
+{
+  "name": "Document Routing (Vue Power Apps Code App)",
+  "install": "corepack pnpm install --frozen-lockfile && corepack pnpm generate:api",
+  "terminals": [
+    {
+      "name": "dev",
+      "command": "corepack pnpm dev --host 0.0.0.0 --port 5173"
+    }
+  ],
+  "ports": [
+    {
+      "name": "vite",
+      "port": 5173
+    }
+  ]
+}
