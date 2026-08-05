@@ -18,17 +18,20 @@ Stack:
 ## Workflow
 
 ```text
-Freeform request → Author draft → Approval chain → Approved → Publish PDF → SharePoint
+Freeform request ⇄ Author draft → Approval chain → Approved → Publish PDF → SharePoint
+                      ↑                │
+                      └─ withdraw/revise (invalidates steps)
+                                       └→ rejected → optional revise
 ```
 
 1. **Request** — pick a document type, capture unstructured text + SharePoint target
-2. **Draft** — type-specific Markdown scaffold; author fleshes it out
-3. **Approvals** — default chain from the document type (optionally editable)
-4. **Publish** — HTML template hook + SharePoint stub / OpenAPI publish API
+2. **Draft** — type-specific Markdown scaffold; collaborative authors co-edit before submit
+3. **Approvals** — chain materializes from the document type (override only when enabled); claim/release preserve SLA; named overdue → elevated pool
+4. **Publish** — HTML template hook + SharePoint stub / OpenAPI publish API (Flow in Phase 5)
 
 Inbox personas: All · Waiting on me · Available in my pool · My requests · Needs draft · Ready to publish.
 
-Approvals support **named** steps and **pool** queues with claim/release, SLA timers, and elevation pools (`document-types.ts`).
+Approvals support **named** steps and **pool** queues with claim/release, immutable `activateDueAt` SLA, and elevation pools (`document-types.ts`). Flow stubs: [`deploy/flows/`](./deploy/flows/README.md).
 
 ## Quick start (local)
 

@@ -3,7 +3,7 @@ import type { Plugin } from 'vite';
 import type { MockDocumentRecord } from './seed-documents.ts';
 import { randomUUID } from 'node:crypto';
 import { appConfig } from '../config/app.config.ts';
-import { getDocumentType } from '../config/document-types.ts';
+import { findDocumentType, toApprovalStepInputs } from '../config/document-types.ts';
 import {
 	canActorAccessDocument,
 	canActorMutateDraft,
@@ -11,14 +11,16 @@ import {
 } from '../domain/document-access.ts';
 import { buildSharePointDocumentUrl } from '../publishing/sharepoint-paths.ts';
 import {
-	activateStep,
 	claimStep,
 	createStepFromInput,
+	decideStep,
 	processStepSla,
 	releaseStep,
 	syncCurrentApprovalFields,
+	withdrawAndRevise,
 } from './approval-engine.ts';
 import { createSeedDocuments } from './seed-documents.ts';
+import { resolveSlaClock } from './sla-clock.ts';
 
 const ACTOR_HEADER = 'x-document-routing-actor';
 
@@ -88,6 +90,8 @@ function toSummary(document: MockDocumentRecord) {
 		currentPoolEmails: document.currentPoolEmails,
 		createdAt: document.createdAt,
 		updatedAt: document.updatedAt,
+		contentRevision: document.contentRevision,
+		submittedContentRevision: document.submittedContentRevision,
 	};
 }
 
@@ -189,7 +193,14 @@ export function documentRoutingMockPlugin(): Plugin {
 							requestedLibraryName?: string;
 						}>(req);
 
-						const type = getDocumentType(body.documentType);
+						const type = findDocumentType(body.documentType);
+						if (!type) {
+							sendJson(res, 400, {
+								message: `Unknown document type: ${body.documentType}`,
+								code: 'unknown_document_type',
+							});
+							return;
+						}
 						const id = randomUUID();
 						const createdAt = stamp();
 						const collaboratorEmails = uniqueEmails([
@@ -199,7 +210,7 @@ export function documentRoutingMockPlugin(): Plugin {
 						const document: MockDocumentRecord = {
 							id,
 							title: body.title,
-							documentType: body.documentType,
+							documentType: type.id,
 							status: 'requested',
 							requesterEmail: actor,
 							collaboratorEmails,
@@ -215,6 +226,8 @@ export function documentRoutingMockPlugin(): Plugin {
 							draftBodyMarkdown: null,
 							draftSummary: null,
 							authorEmail: null,
+							contentRevision: 0,
+							submittedContentRevision: null,
 							approvalSteps: [],
 							history: [],
 							publishedPdfUrl: null,
@@ -287,11 +300,12 @@ export function documentRoutingMockPlugin(): Plugin {
 						document.draftSummary = body.summary ?? null;
 						document.authorEmail = document.authorEmail ?? actor;
 						document.status = 'drafting';
+						document.contentRevision += 1;
 						pushHistory(
 							document,
 							actor,
 							'draft_updated',
-							'Draft content saved',
+							`Draft content saved (revision ${document.contentRevision})`,
 						);
 						sendJson(res, 200, document);
 						return;
@@ -307,6 +321,13 @@ export function documentRoutingMockPlugin(): Plugin {
 							sendJson(res, 404, { message: 'Document not found', code: 'not_found' });
 							return;
 						}
+						if (!canActorMutateDraft(document, actor)) {
+							sendJson(res, 403, {
+								message: 'Only shared authors/requesters can submit for approval',
+								code: 'forbidden',
+							});
+							return;
+						}
 						if (document.status !== 'drafting' || !document.draftBodyMarkdown) {
 							sendJson(res, 409, {
 								message: 'Document must be drafted before approval',
@@ -315,8 +336,17 @@ export function documentRoutingMockPlugin(): Plugin {
 							return;
 						}
 
+						const type = findDocumentType(document.documentType);
+						if (!type) {
+							sendJson(res, 400, {
+								message: `Unknown document type: ${document.documentType}`,
+								code: 'unknown_document_type',
+							});
+							return;
+						}
+
 						const body = await readJson<{
-							steps: Array<{
+							steps?: Array<{
 								assignmentMode: 'named' | 'pool';
 								role?: string;
 								slaHours?: number;
@@ -331,17 +361,77 @@ export function documentRoutingMockPlugin(): Plugin {
 							comment?: string;
 						}>(req);
 
+						const allowOverride = appConfig.features.allowApproverOverride;
+						const stepsInput
+							= allowOverride && body.steps && body.steps.length > 0
+								? body.steps
+								: toApprovalStepInputs(type.approvalChain);
+
+						if (stepsInput.length === 0) {
+							sendJson(res, 400, {
+								message: 'Approval chain cannot be empty',
+								code: 'empty_approval_chain',
+							});
+							return;
+						}
+
 						const clock = new Date();
-						document.approvalSteps = body.steps.map((step, index) =>
-							createStepFromInput(step, index + 1, clock, index === 0),
-						);
+						const revision = document.contentRevision;
+						try {
+							document.approvalSteps = stepsInput.map((step, index) =>
+								createStepFromInput(step, index + 1, clock, index === 0, revision),
+							);
+						}
+						catch(error) {
+							sendJson(res, 400, {
+								message: error instanceof Error ? error.message : 'Invalid approval steps',
+								code: 'validation_error',
+							});
+							return;
+						}
+						document.submittedContentRevision = revision;
 						document.status = 'in_review';
 						syncCurrentApprovalFields(document);
 						pushHistory(
 							document,
 							actor,
 							'submitted_for_approval',
-							body.comment ?? 'Submitted to approval chain',
+							body.comment ?? `Submitted to approval chain (revision ${revision})`,
+						);
+						sendJson(res, 200, document);
+						return;
+					}
+
+					const withdrawMatch = matchRoute(
+						path,
+						/^\/api\/documents\/([^/]+)\/withdraw-and-revise$/,
+					);
+					if (method === 'POST' && withdrawMatch) {
+						const document = store.get(withdrawMatch[1]);
+						if (!document) {
+							sendJson(res, 404, { message: 'Document not found', code: 'not_found' });
+							return;
+						}
+						const body = await readJson<{ comment?: string }>(req);
+						try {
+							withdrawAndRevise(document, actor);
+						}
+						catch(error) {
+							const code
+								= error instanceof Error && 'code' in error
+									? String((error as { code: string }).code)
+									: 'invalid_state';
+							sendJson(res, code === 'forbidden' ? 403 : 409, {
+								message: error instanceof Error ? error.message : 'Withdraw failed',
+								code,
+							});
+							return;
+						}
+						pushHistory(
+							document,
+							actor,
+							'withdrawn_for_revise',
+							body.comment ?? 'Withdrawn for revise; approval steps cleared',
 						);
 						sendJson(res, 200, document);
 						return;
@@ -358,7 +448,17 @@ export function documentRoutingMockPlugin(): Plugin {
 							return;
 						}
 						const body = await readJson<{ now?: string }>(req);
-						const clock = body.now ? new Date(body.now) : new Date();
+						let clock: Date;
+						try {
+							clock = resolveSlaClock(body.now);
+						}
+						catch(error) {
+							sendJson(res, 400, {
+								message: error instanceof Error ? error.message : 'Invalid now',
+								code: 'validation_error',
+							});
+							return;
+						}
 						const step = activeStep(document);
 						if (step) {
 							const result = processStepSla(step, clock);
@@ -507,69 +607,59 @@ export function documentRoutingMockPlugin(): Plugin {
 						}
 
 						const body = await readJson<{
-							decision: 'approve' | 'reject';
+							decision: string;
 							comment?: string;
 						}>(req);
 
-						if (body.decision !== 'approve' && body.decision !== 'reject') {
-							sendJson(res, 400, {
-								message: 'decision must be approve or reject',
-								code: 'validation_error',
-							});
-							return;
-						}
-
-						const isAssignee
-							= step.approverEmail?.toLowerCase() === actor.toLowerCase();
-						if (!isAssignee) {
-							sendJson(res, 403, {
-								message: 'Only the assigned/claimed approver can decide this step',
-								code: 'forbidden',
-							});
-							return;
-						}
-
-						step.comment = body.comment ?? null;
-						step.decidedAt = stamp();
-
-						if (body.decision === 'reject') {
-							step.status = 'rejected';
-							document.status = 'rejected';
-							syncCurrentApprovalFields(document);
-							pushHistory(
-								document,
-								actor,
-								'rejected',
-								body.comment ?? 'Rejected in approval chain',
-							);
-							sendJson(res, 200, document);
-							return;
-						}
-
-						step.status = 'approved';
-						const next = document.approvalSteps.find(
+						const isLastStep = !document.approvalSteps.some(
 							(item) => item.order === step.order + 1,
 						);
-						if (next) {
-							activateStep(next, new Date());
-							pushHistory(
+
+						try {
+							decideStep(
 								document,
+								step,
 								actor,
-								'step_approved',
-								body.comment ?? `Approved step ${step.order}`,
+								body.decision,
+								new Date(),
+								body.comment,
 							);
 						}
-						else {
-							document.status = 'approved';
-							pushHistory(
-								document,
-								actor,
-								'fully_approved',
-								body.comment ?? 'All approval steps completed',
-							);
+						catch(error) {
+							const code
+								= error instanceof Error && 'code' in error
+									? String((error as { code: string }).code)
+									: 'invalid_state';
+							const status
+								= code === 'forbidden'
+									? 403
+									: code === 'validation_error'
+										? 400
+										: 409;
+							sendJson(res, status, {
+								message: error instanceof Error ? error.message : 'Decision failed',
+								code,
+							});
+							return;
 						}
 
-						syncCurrentApprovalFields(document);
+						const historyAction
+							= body.decision === 'reject'
+								? 'rejected'
+								: isLastStep
+									? 'fully_approved'
+									: 'step_approved';
+						pushHistory(
+							document,
+							actor,
+							historyAction,
+							body.comment
+							?? (body.decision === 'reject'
+								? 'Rejected in approval chain'
+								: isLastStep
+									? 'All approval steps completed'
+									: `Approved step ${step.order}`),
+						);
 						sendJson(res, 200, document);
 						return;
 					}

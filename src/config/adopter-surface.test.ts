@@ -14,7 +14,9 @@ import {
 } from '@/publishing/html-pdf-template';
 
 describe('document types', () => {
-	it('returns the default type for unknown ids', () => {
+	it('returns undefined from findDocumentType for unknown ids', async() => {
+		const { findDocumentType, getDocumentType } = await import('@/config/document-types');
+		expect(findDocumentType('missing')).toBeUndefined();
 		expect(getDocumentType('missing').id).toBe('policy');
 	});
 

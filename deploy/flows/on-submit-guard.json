@@ -1,0 +1,34 @@
+{
+	"$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+	"metadata": {
+		"flowName": "Document Routing — On submit guard",
+		"description": "Optional guard when status becomes in_review: ensure at least one approval step exists for the document type policy version.",
+		"trigger": "When dr_document status becomes in_review",
+		"tables": ["dr_document", "dr_approvalstep", "dr_documenttype", "dr_approvalchainstep"]
+	},
+	"definition": {
+		"triggers": {
+			"When_submitted_for_review": {
+				"type": "OpenApiConnectionWebhook",
+				"inputs": {
+					"host": { "connectionName": "shared_commondataserviceforapps" },
+					"parameters": {
+						"entityName": "dr_documents",
+						"filterExpression": "dr_status eq 'in_review'"
+					}
+				}
+			}
+		},
+		"actions": {
+			"Count_runtime_steps": {
+				"type": "OpenApiConnection",
+				"description": "List related dr_approvalstep rows"
+			},
+			"If_empty_chain": {
+				"type": "If",
+				"description": "If no steps: materialize from dr_approvalchainstep for document type policy version, or set status back to drafting and write history error"
+			}
+		},
+		"outputs": {}
+	}
+}

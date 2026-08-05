@@ -11,7 +11,12 @@ export type ApprovalStepStatus = 'waiting' | 'queued' | 'pending' | 'approved' |
 export type ApprovalAssignmentMode = 'named' | 'pool';
 
 export type SubmitForApprovalRequest = {
-    steps: Array<ApprovalStepInput>;
+    /**
+     * Optional when the server materializes the chain from document-type
+     * control data. Required only when `allowApproverOverride` is enabled.
+     *
+     */
+    steps?: Array<ApprovalStepInput>;
     comment?: string;
 };
 
@@ -28,12 +33,12 @@ export type NamedApprovalStepInput = {
      */
     role?: string;
     /**
-     * Hours until SLA timeout from activation/claim
+     * Hours until SLA timeout from step activation (not reset on claim)
      */
     slaHours?: number;
     assignee: Approver;
     /**
-     * Extra members merged into the pool after SLA timeout
+     * Extra members merged into the pool after SLA timeout (named → elevated pool)
      */
     elevationPool?: Array<Approver>;
 };
@@ -45,7 +50,7 @@ export type PoolApprovalStepInput = {
      */
     role?: string;
     /**
-     * Hours until SLA timeout from queue activation/claim
+     * Hours until SLA timeout from queue activation (not reset on claim)
      */
     slaHours?: number;
     /**
@@ -84,7 +89,9 @@ export type ApprovalDecisionRequest = {
 
 export type ProcessSlaRequest = {
     /**
-     * Override clock for tests/local demos; production schedulers omit this
+     * DEV/test clock override only. Production Cloud Flows omit this.
+     * Invalid timestamps are rejected; non-DEV mocks ignore the field.
+     *
      */
     now?: string;
 };
@@ -153,6 +160,14 @@ export type DocumentSummary = {
     currentPoolEmails?: Array<string>;
     createdAt: string;
     updatedAt: string;
+    /**
+     * Incremented on each draft save
+     */
+    contentRevision?: number;
+    /**
+     * contentRevision frozen at submit-for-approval
+     */
+    submittedContentRevision?: number;
 };
 
 export type ApprovalStep = {
@@ -166,12 +181,27 @@ export type ApprovalStep = {
     pool: Array<Approver>;
     elevationPool?: Array<Approver>;
     slaHours?: number;
+    /**
+     * Immutable SLA deadline set when the step activates
+     */
+    activateDueAt?: string;
+    /**
+     * Denormalized mirror of activateDueAt for inbox filters
+     */
     dueAt?: string;
     claimedAt?: string;
     elevated: boolean;
     elevatedAt?: string;
     comment?: string;
     decidedAt?: string;
+    /**
+     * Document contentRevision at submit
+     */
+    submittedRevision?: number;
+    /**
+     * contentRevision recorded when this step approved
+     */
+    approvedRevision?: number;
 };
 
 export type Document = DocumentSummary & {
@@ -179,6 +209,8 @@ export type Document = DocumentSummary & {
     draftBodyMarkdown?: string;
     draftSummary?: string;
     authorEmail?: string;
+    contentRevision: number;
+    submittedContentRevision?: number;
     approvalSteps: Array<ApprovalStep>;
     history: Array<HistoryEvent>;
     publishedPdfUrl?: string;
@@ -245,6 +277,15 @@ export type CreateDocumentRequestData = {
     url: '/documents';
 };
 
+export type CreateDocumentRequestErrors = {
+    /**
+     * Validation error
+     */
+    400: Error;
+};
+
+export type CreateDocumentRequestError = CreateDocumentRequestErrors[keyof CreateDocumentRequestErrors];
+
 export type CreateDocumentRequestResponses = {
     /**
      * Created request
@@ -264,6 +305,10 @@ export type GetDocumentData = {
 };
 
 export type GetDocumentErrors = {
+    /**
+     * Caller is not allowed to perform this action
+     */
+    403: Error;
     /**
      * Resource not found
      */
@@ -291,6 +336,10 @@ export type UpdateDocumentDraftData = {
 };
 
 export type UpdateDocumentDraftErrors = {
+    /**
+     * Caller is not allowed to perform this action
+     */
+    403: Error;
     /**
      * Resource not found
      */
@@ -323,6 +372,14 @@ export type SubmitForApprovalData = {
 
 export type SubmitForApprovalErrors = {
     /**
+     * Validation error
+     */
+    400: Error;
+    /**
+     * Caller is not allowed to perform this action
+     */
+    403: Error;
+    /**
      * Resource not found
      */
     404: Error;
@@ -343,6 +400,41 @@ export type SubmitForApprovalResponses = {
 
 export type SubmitForApprovalResponse = SubmitForApprovalResponses[keyof SubmitForApprovalResponses];
 
+export type WithdrawAndReviseData = {
+    body?: ApprovalActorRequest;
+    path: {
+        documentId: string;
+    };
+    query?: never;
+    url: '/documents/{documentId}/withdraw-and-revise';
+};
+
+export type WithdrawAndReviseErrors = {
+    /**
+     * Caller is not allowed to perform this action
+     */
+    403: Error;
+    /**
+     * Resource not found
+     */
+    404: Error;
+    /**
+     * Invalid state transition
+     */
+    409: Error;
+};
+
+export type WithdrawAndReviseError = WithdrawAndReviseErrors[keyof WithdrawAndReviseErrors];
+
+export type WithdrawAndReviseResponses = {
+    /**
+     * Document returned to drafting
+     */
+    200: Document;
+};
+
+export type WithdrawAndReviseResponse = WithdrawAndReviseResponses[keyof WithdrawAndReviseResponses];
+
 export type DecideApprovalStepData = {
     body: ApprovalDecisionRequest;
     path: {
@@ -354,6 +446,14 @@ export type DecideApprovalStepData = {
 };
 
 export type DecideApprovalStepErrors = {
+    /**
+     * Validation error
+     */
+    400: Error;
+    /**
+     * Caller is not allowed to perform this action
+     */
+    403: Error;
     /**
      * Resource not found
      */
@@ -387,6 +487,10 @@ export type ClaimApprovalStepData = {
 
 export type ClaimApprovalStepErrors = {
     /**
+     * Caller is not allowed to perform this action
+     */
+    403: Error;
+    /**
      * Resource not found
      */
     404: Error;
@@ -419,6 +523,10 @@ export type ReleaseApprovalStepData = {
 
 export type ReleaseApprovalStepErrors = {
     /**
+     * Caller is not allowed to perform this action
+     */
+    403: Error;
+    /**
      * Resource not found
      */
     404: Error;
@@ -449,6 +557,10 @@ export type ProcessApprovalSlaData = {
 };
 
 export type ProcessApprovalSlaErrors = {
+    /**
+     * Validation error
+     */
+    400: Error;
     /**
      * Resource not found
      */

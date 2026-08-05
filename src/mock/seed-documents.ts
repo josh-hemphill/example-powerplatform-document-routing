@@ -26,12 +26,19 @@ export interface MockApprovalStep {
 	pool: ApproverPerson[];
 	elevationPool: ApproverPerson[];
 	slaHours: number | null;
+	/** Immutable SLA deadline set when the step activates (claim/release must not move). */
+	activateDueAt: string | null;
+	/** Denormalized mirror of activateDueAt for inbox filters. */
 	dueAt: string | null;
 	claimedAt: string | null;
 	elevated: boolean;
 	elevatedAt: string | null;
 	comment: string | null;
 	decidedAt: string | null;
+	/** Document contentRevision frozen at submit. */
+	submittedRevision: number | null;
+	/** Set when this step approves. */
+	approvedRevision: number | null;
 }
 
 export interface MockDocumentRecord {
@@ -54,6 +61,10 @@ export interface MockDocumentRecord {
 	draftBodyMarkdown: string | null;
 	draftSummary: string | null;
 	authorEmail: string | null;
+	/** Incremented on each draft save. */
+	contentRevision: number;
+	/** Revision frozen at submit-for-approval. */
+	submittedContentRevision: number | null;
 	approvalSteps: MockApprovalStep[];
 	history: Array<{
 		id: string;
@@ -97,6 +108,8 @@ export function createSeedDocuments(): MockDocumentRecord[] {
 		draftBodyMarkdown: null,
 		draftSummary: null,
 		authorEmail: null,
+		contentRevision: 0,
+		submittedContentRevision: null,
 		approvalSteps: [],
 		history: [
 			{
@@ -142,6 +155,8 @@ Document the 36-month laptop refresh process for corporate devices.
 `,
 		draftSummary: 'Corporate laptop refresh procedure',
 		authorEmail: appConfig.localDemoUser.email,
+		contentRevision: 1,
+		submittedContentRevision: null,
 		approvalSteps: [],
 		history: [
 			{
@@ -190,6 +205,8 @@ Meal caps for customer visits are $75 / person.
 `,
 		draftSummary: 'Meal cap clarification',
 		authorEmail: appConfig.localDemoUser.email,
+		contentRevision: 2,
+		submittedContentRevision: 2,
 		approvalSteps: [
 			{
 				id: randomUUID(),
@@ -217,12 +234,15 @@ Meal caps for customer visits are $75 / person.
 					},
 				],
 				slaHours: 8,
+				activateDueAt: overdueDueAt,
 				dueAt: overdueDueAt,
 				claimedAt: null,
 				elevated: false,
 				elevatedAt: null,
 				comment: null,
 				decidedAt: null,
+				submittedRevision: 2,
+				approvedRevision: null,
 			},
 			{
 				id: randomUUID(),
@@ -246,12 +266,15 @@ Meal caps for customer visits are $75 / person.
 					},
 				],
 				slaHours: 24,
+				activateDueAt: null,
 				dueAt: null,
 				claimedAt: null,
 				elevated: false,
 				elevatedAt: null,
 				comment: null,
 				decidedAt: null,
+				submittedRevision: 2,
+				approvedRevision: null,
 			},
 		],
 		history: [

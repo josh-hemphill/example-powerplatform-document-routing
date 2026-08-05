@@ -13,6 +13,7 @@ import {
 	releaseApprovalStepMutation,
 	submitForApprovalMutation,
 	updateDocumentDraftMutation,
+	withdrawAndReviseMutation,
 } from '@/client/@pinia/colada.gen';
 import ApprovalStepper from '@/components/ApprovalStepper.vue';
 import DocumentStatusChip from '@/components/DocumentStatusChip.vue';
@@ -144,6 +145,13 @@ const { mutateAsync: processSlaAsync, isLoading: isProcessingSla } = useMutation
 	},
 });
 
+const { mutateAsync: withdrawAsync, isLoading: isWithdrawing } = useMutation({
+	...withdrawAndReviseMutation(),
+	async onSettled() {
+		await invalidateDocumentQueries();
+	},
+});
+
 const { mutateAsync: publishPdfAsync, isLoading: isPublishingPdf } = useMutation({
 	...publishDocumentPdfMutation(),
 	async onSettled() {
@@ -252,6 +260,24 @@ async function onProcessSla(): Promise<void> {
 	}
 }
 
+async function onWithdrawAndRevise(): Promise<void> {
+	actionError.value = null;
+	actionSuccess.value = null;
+	try {
+		await withdrawAsync({
+			path: { documentId: documentId.value },
+			body: {},
+		});
+		actionSuccess.value = 'Withdrawn for revise. Draft editing is available again.';
+	}
+	catch(withdrawError) {
+		actionError.value
+			= withdrawError instanceof Error
+				? withdrawError.message
+				: 'Failed to withdraw and revise';
+	}
+}
+
 async function onDecision(decision: 'approve' | 'reject'): Promise<void> {
 	actionError.value = null;
 	actionSuccess.value = null;
@@ -356,6 +382,23 @@ const canPublish = computed(
 const canProcessSla = computed(
 	() => Boolean(canAct.value) && document.value?.status === 'in_review',
 );
+const canWithdraw = computed(() => {
+	const status = document.value?.status;
+	const actor = (context.value.email || '').toLowerCase();
+	if (!canAct.value || !document.value || !actor) {
+		return false;
+	}
+	if (status !== 'in_review' && status !== 'rejected' && status !== 'approved') {
+		return false;
+	}
+	return (
+		document.value.requesterEmail.toLowerCase() === actor
+		|| document.value.authorEmail?.toLowerCase() === actor
+		|| (document.value.collaboratorEmails ?? []).some(
+			(email) => email.toLowerCase() === actor,
+		)
+	);
+});
 </script>
 
 <template>
@@ -533,6 +576,15 @@ const canProcessSla = computed(
 										@click="onProcessSla"
 									>
 										Process SLA
+									</v-btn>
+									<v-btn
+										variant="tonal"
+										color="secondary"
+										:disabled="!canWithdraw"
+										:loading="isWithdrawing"
+										@click="onWithdrawAndRevise"
+									>
+										Withdraw &amp; revise
 									</v-btn>
 								</div>
 							</div>
