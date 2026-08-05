@@ -45,8 +45,12 @@ export async function publishApprovedDocument(
   const pdfFileName = targets.fileName || buildPdfFileName(input.document.title)
 
   // Browser-safe stand-in for PDF bytes until a server renderer is wired.
-  const contentBase64 = btoa(unescape(encodeURIComponent(html)))
-
+  const bytes = new TextEncoder().encode(html)
+  let binary = ''
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]!)
+  }
+  const contentBase64 = btoa(binary)
   const connectorPreview = await SharePointPublishService.createFile({
     siteUrl: targets.siteUrl,
     libraryName: targets.libraryName,
