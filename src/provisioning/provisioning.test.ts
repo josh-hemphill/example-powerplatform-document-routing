@@ -10,6 +10,7 @@ import { validateConnectionProfile, type ConnectionProfile } from './connection-
 import { buildDataverseProvisionPlan } from './dataverse-provision-plan.ts'
 import { buildPaConnectCommands } from './pa-connect-commands.ts'
 import { buildDataverseSchema, prefixedLogicalName } from './dataverse-schema.ts'
+import { applyDataversePlan } from './write-artifacts.ts'
 
 const sampleProfile = (): ConnectionProfile => ({
   publisher: {
@@ -56,6 +57,18 @@ describe('connection URLs', () => {
     expect(dataverseWebApiRoot('https://data.fabrikam.internal')).toBe(
       'https://data.fabrikam.internal/api/data/v9.2',
     )
+  })
+
+  it('builds Web API root from origin and rejects org URLs with a path', () => {
+    expect(() =>
+      dataverseWebApiRoot('https://data.fabrikam.internal/foo'),
+    ).toThrow(/without a path/)
+  })
+
+  it('requires https for deployable endpoints', () => {
+    expect(() =>
+      assertDeployableEndpoint('http://docs.fabrikam.internal/sites/X', 'sharePoint.siteUrl'),
+    ).toThrow(/must use https/)
   })
 
   it('flags documentation placeholders without requiring *.sharepoint.com', () => {
@@ -110,6 +123,13 @@ describe('dataverse schema + provision plan', () => {
     )
   })
 
+  it('uses publisher optionValuePrefix for choice option values', () => {
+    const schema = buildDataverseSchema('dr', 81_200)
+    const status = schema.tables[0]!.columns.find((column) => column.schemaName === 'status')
+    expect(status?.options?.[0]).toEqual({ value: 812_000_000, label: 'requested' })
+    expect(status?.options?.[2]).toEqual({ value: 812_000_002, label: 'in_review' })
+  })
+
   it('builds web api plan and pa commands using profile hosts', () => {
     const profile = sampleProfile()
     const plan = buildDataverseProvisionPlan(profile)
@@ -135,5 +155,31 @@ describe('dataverse schema + provision plan', () => {
     expect(dataverse?.command).toContain(
       '--org-url "https://data.fabrikam.internal"',
     )
+  })
+})
+
+describe('applyDataversePlan', () => {
+  it('does not treat HTTP 404 as skipped when creating entities', async () => {
+    const profile = sampleProfile()
+    const plan = buildDataverseProvisionPlan(profile)
+    const createOnly = {
+      ...plan,
+      requests: plan.requests.filter((request) => request.path === '/EntityDefinitions').slice(0, 1),
+    }
+
+    const result = await applyDataversePlan(
+      createOnly,
+      'token',
+      async () =>
+        new Response('{"error":{"message":"Not Found"}}', {
+          status: 404,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    )
+
+    expect(result.applied).toBe(0)
+    expect(result.skipped).toBe(0)
+    expect(result.failed).toHaveLength(1)
+    expect(result.failed[0]?.error).toMatch(/HTTP 404/)
   })
 })

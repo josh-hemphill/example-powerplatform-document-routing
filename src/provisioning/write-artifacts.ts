@@ -200,12 +200,9 @@ async function executePlanRequest(
     body: request.body ? JSON.stringify(request.body) : undefined,
   })
 
-  if (response.status === 404 && request.skipIfExists) {
-    return 'skipped'
-  }
-
   if (!response.ok) {
     const text = await response.text()
+    // 404 means a missing route/prerequisite — never treat as "already exists".
     if (
       request.skipIfExists &&
       (response.status === 409 ||

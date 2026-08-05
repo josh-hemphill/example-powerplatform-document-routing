@@ -1,6 +1,7 @@
 import type { ConnectionProfile } from './connection-config.ts'
 import {
   buildDataverseSchema,
+  DEFAULT_OPTION_VALUE_PREFIX,
   prefixedLogicalName,
   type DataverseColumnDefinition,
   type DataverseSchema,
@@ -188,7 +189,10 @@ export function buildDataverseProvisionPlan(
   profile: ConnectionProfile,
 ): DataverseProvisionPlan {
   const prefix = profile.publisher.prefix.toLowerCase()
-  const schema = buildDataverseSchema(prefix)
+  const schema = buildDataverseSchema(
+    prefix,
+    profile.publisher.optionValuePrefix ?? DEFAULT_OPTION_VALUE_PREFIX,
+  )
   const apiRoot = dataverseWebApiRoot(
     profile.dataverse.environmentUrl,
     profile.dataverse.apiVersion ?? 'v9.2',

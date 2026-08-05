@@ -57,41 +57,67 @@ export interface DataverseSchema {
   environmentVariables: EnvironmentVariableDefinition[]
 }
 
-const documentStatuses: DataverseChoiceOption[] = [
-  { value: 727_000_000, label: 'requested' },
-  { value: 727_000_001, label: 'drafting' },
-  { value: 727_000_002, label: 'in_review' },
-  { value: 727_000_003, label: 'approved' },
-  { value: 727_000_004, label: 'rejected' },
-  { value: 727_000_005, label: 'published' },
-]
+export const DEFAULT_OPTION_VALUE_PREFIX = 72_700
 
-const priorities: DataverseChoiceOption[] = [
-  { value: 727_000_010, label: 'low' },
-  { value: 727_000_011, label: 'normal' },
-  { value: 727_000_012, label: 'high' },
-]
+/**
+ * Builds choice option values from a publisher option-value prefix (e.g. 72700 → 727000000+).
+ */
+export function choiceOptionsFromPrefix(
+  optionValuePrefix: number,
+  entries: Array<{ offset: number; label: string }>,
+): DataverseChoiceOption[] {
+  const base = optionValuePrefix * 10_000
+  return entries.map((entry) => ({
+    value: base + entry.offset,
+    label: entry.label,
+  }))
+}
 
-const stepStatuses: DataverseChoiceOption[] = [
-  { value: 727_000_020, label: 'waiting' },
-  { value: 727_000_021, label: 'queued' },
-  { value: 727_000_022, label: 'pending' },
-  { value: 727_000_023, label: 'approved' },
-  { value: 727_000_024, label: 'rejected' },
-  { value: 727_000_025, label: 'skipped' },
-]
-
-const assignmentModes: DataverseChoiceOption[] = [
-  { value: 727_000_030, label: 'named' },
-  { value: 727_000_031, label: 'pool' },
-]
+function buildChoiceSets(optionValuePrefix: number): {
+  documentStatuses: DataverseChoiceOption[]
+  priorities: DataverseChoiceOption[]
+  stepStatuses: DataverseChoiceOption[]
+  assignmentModes: DataverseChoiceOption[]
+} {
+  return {
+    documentStatuses: choiceOptionsFromPrefix(optionValuePrefix, [
+      { offset: 0, label: 'requested' },
+      { offset: 1, label: 'drafting' },
+      { offset: 2, label: 'in_review' },
+      { offset: 3, label: 'approved' },
+      { offset: 4, label: 'rejected' },
+      { offset: 5, label: 'published' },
+    ]),
+    priorities: choiceOptionsFromPrefix(optionValuePrefix, [
+      { offset: 10, label: 'low' },
+      { offset: 11, label: 'normal' },
+      { offset: 12, label: 'high' },
+    ]),
+    stepStatuses: choiceOptionsFromPrefix(optionValuePrefix, [
+      { offset: 20, label: 'waiting' },
+      { offset: 21, label: 'queued' },
+      { offset: 22, label: 'pending' },
+      { offset: 23, label: 'approved' },
+      { offset: 24, label: 'rejected' },
+      { offset: 25, label: 'skipped' },
+    ]),
+    assignmentModes: choiceOptionsFromPrefix(optionValuePrefix, [
+      { offset: 30, label: 'named' },
+      { offset: 31, label: 'pool' },
+    ]),
+  }
+}
 
 /**
  * Returns the Document Routing Dataverse schema for a publisher prefix.
  */
-export function buildDataverseSchema(prefix: string): DataverseSchema {
+export function buildDataverseSchema(
+  prefix: string,
+  optionValuePrefix: number = DEFAULT_OPTION_VALUE_PREFIX,
+): DataverseSchema {
   const p = prefix.toLowerCase()
-
+  const { documentStatuses, priorities, stepStatuses, assignmentModes } =
+    buildChoiceSets(optionValuePrefix)
   const tables: DataverseTableDefinition[] = [
     {
       schemaName: 'document',

@@ -17,7 +17,7 @@
           "pattern": "^[a-z]{2,8}$",
           "description": "Dataverse publisher prefix for custom tables/columns"
         },
-        "optionValuePrefix": { "type": "integer", "minimum": 10000 }
+        "optionValuePrefix": { "type": "integer", "minimum": 10000, "description": "Publisher option-value prefix (e.g. 72700 → choice values 727000000+)" }
       }
     },
     "solution": {

@@ -91,6 +91,7 @@ export function isPlaceholderHost(host: string): boolean {
 
 /**
  * Validates a connection endpoint without requiring Microsoft primary domains.
+ * Deployable endpoints must be HTTPS (except relative API paths like `/api`).
  */
 export function assertDeployableEndpoint(
   raw: string,
@@ -103,6 +104,11 @@ export function assertDeployableEndpoint(
   }
 
   const parsed = parseEndpointUrl(trimmed, fieldName)
+  if (parsed.protocol !== 'https:') {
+    throw new Error(
+      `${fieldName} must use https for deploy/apply (got ${parsed.protocol}). Refusing plaintext hosts so tokens are not sent over http.`,
+    )
+  }
   if (looksLikePlaceholder(parsed.href) || isPlaceholderHost(parsed.host)) {
     throw new Error(
       `${fieldName} still uses a placeholder host ("${parsed.host}"). Set your real tenant/custom domain in deploy/connections.json.`,
@@ -113,12 +119,20 @@ export function assertDeployableEndpoint(
 
 /**
  * Builds the Dataverse Web API root for any org URL (custom domains included).
+ * Uses the URL origin only — path segments on environmentUrl are ignored/rejected.
  */
 export function dataverseWebApiRoot(
   environmentUrl: string,
   apiVersion = 'v9.2',
 ): string {
   const parsed = parseEndpointUrl(environmentUrl, 'dataverse.environmentUrl')
+  const url = new URL(environmentUrl.trim())
+  const pathname = url.pathname.replace(/\/+$/, '')
+  if (pathname && pathname !== '') {
+    throw new Error(
+      `dataverse.environmentUrl must be an org root URL without a path (got "${pathname}"). Use https://host.example only.`,
+    )
+  }
   const version = apiVersion.replace(/^\/+/, '')
-  return `${parsed.href}/api/data/${version}`
+  return `${parsed.origin}/api/data/${version}`
 }

@@ -46,6 +46,10 @@ SharePoint remains the **PDF binary** target. Lists are not used as the workflow
 
 ## Auth for `provision:apply`
 
+Requires **Node.js 22+** (`engines.node`) for `node --experimental-strip-types`.
+
+Deployable hosts must be **HTTPS** (relative `/api` is allowed only for local mock API base URLs).
+
 Obtain a Dataverse Web API bearer token for your org URL (custom domain OK), then:
 
 ```bash
