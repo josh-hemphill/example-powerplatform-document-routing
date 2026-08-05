@@ -300,7 +300,7 @@ export function documentRoutingMockPlugin(): Plugin {
               approverEmail: approver.email,
               approverDisplayName: approver.displayName,
               role: approver.role ?? null,
-              status: index === 0 ? 'pending' : 'pending',
+              status: 'pending',
               comment: null,
               decidedAt: null,
             }))
