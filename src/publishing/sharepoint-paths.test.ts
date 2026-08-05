@@ -21,16 +21,16 @@ describe('normalizeSharePointFolderPath', () => {
 })
 
 describe('buildSharePointDocumentUrl', () => {
-  it('joins site, library, folder, and file without collapsing segments', () => {
+  it('joins site, library, folder, and file for any HTTPS host', () => {
     expect(
       buildSharePointDocumentUrl({
-        siteUrl: 'https://contoso.sharepoint.com/sites/Policies/',
+        siteUrl: 'https://docs.fabrikam.internal/sites/Policies/',
         libraryName: 'Published Documents',
         folderPath: 'Policies',
         fileName: 'travel.pdf',
       }),
     ).toBe(
-      'https://contoso.sharepoint.com/sites/Policies/Published%20Documents/Policies/travel.pdf',
+      'https://docs.fabrikam.internal/sites/Policies/Published%20Documents/Policies/travel.pdf',
     )
   })
 })
