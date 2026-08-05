@@ -40,18 +40,20 @@ const items = computed(() => {
 })
 
 watch(
-  () => context.value.email,
-  (email) => {
+  [() => context.value.email, () => data.value?.items],
+  ([email, items]) => {
     // Demo convenience: jump to "waiting on me" when signed in as an approver.
     if (
       email &&
-      (data.value?.items ?? []).some(
-        (item) => item.currentApproverEmail?.toLowerCase() === email.toLowerCase(),
+      (items ?? []).some(
+        (item) =>
+          item.currentApproverEmail?.toLowerCase() === email.toLowerCase(),
       )
     ) {
       persona.value = 'waiting_on_me'
     }
   },
+  { immediate: true },
 )
 </script>
 
