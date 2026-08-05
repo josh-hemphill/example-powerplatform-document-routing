@@ -92,3 +92,16 @@ Do not compile PDFs in the browser bundle.
 | Richer demo seed | `src/mock/seed-documents.ts` |
 
 When placeholders are gone, set `features.showSetupBanner: false` in `app.config.ts`.
+
+## 7. Approval queues, SLA, and elevation (not in v1)
+
+The current model is a **named sequential chain**: each step has one assignee at submit time. Pool / self-assign / SLA timeout / elevation is a natural extension, but needs API + scheduler changes:
+
+| Capability | Current | Needed |
+| --- | --- | --- |
+| Assignee | Fixed email on the step | Eligible **pool** (role/group) + optional claimer |
+| Self-assign | N/A | `claim` / `release` on a queued step |
+| SLA | N/A | `dueAt` on the step + scheduled check (Power Automate / Function) |
+| Elevation | N/A | On timeout: expand pool, reassign, or notify escalated role |
+
+UI hooks that already help: persona inbox filters can grow a “Available in my pool” tab once claim endpoints exist. Prefer implementing timeout elevation in a **server/flow job**, not in the Code App browser session.

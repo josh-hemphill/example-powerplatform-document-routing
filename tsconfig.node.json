@@ -18,6 +18,7 @@
   "include": [
     "vite.config.ts",
     "openapi-ts.config.ts",
-    "src/mock/**/*.ts"
+    "src/mock/**/*.ts",
+    "src/publishing/sharepoint-paths.ts"
   ]
 }

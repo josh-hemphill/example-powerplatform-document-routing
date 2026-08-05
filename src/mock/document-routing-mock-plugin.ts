@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Plugin } from 'vite'
 import { appConfig } from '../config/app.config.ts'
+import { buildSharePointDocumentUrl } from '../publishing/sharepoint-paths.ts'
 import {
   createSeedDocuments,
   type MockDocumentRecord,
@@ -384,9 +385,13 @@ export function documentRoutingMockPlugin(): Plugin {
             const pdfFileName =
               body.fileName ??
               `${document.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.pdf`
-            const folder = (body.folderPath ?? '/').replace(/\/+$/, '')
             const sharePointItemId = randomUUID()
-            const sharePointUrl = `${body.sharePointSiteUrl.replace(/\/$/, '')}/${encodeURIComponent(body.libraryName)}${folder}/${pdfFileName}`
+            const sharePointUrl = buildSharePointDocumentUrl({
+              siteUrl: body.sharePointSiteUrl,
+              libraryName: body.libraryName,
+              folderPath: body.folderPath,
+              fileName: pdfFileName,
+            })
 
             document.status = 'published'
             document.publishedPdfUrl = sharePointUrl

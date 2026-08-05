@@ -1,3 +1,5 @@
+import { buildSharePointDocumentUrl } from '@/publishing/sharepoint-paths'
+
 /**
  * Example of the typed SharePoint service shape produced by:
  * `pnpm exec pa app add data-source --connector shared_sharepointonline ...`
@@ -30,7 +32,12 @@ export const SharePointPublishService = {
     if (import.meta.env.DEV) {
       return {
         itemId: crypto.randomUUID(),
-        webUrl: `${request.siteUrl.replace(/\/$/, '')}/${encodeURIComponent(request.libraryName)}${request.folderPath}/${request.fileName}`,
+        webUrl: buildSharePointDocumentUrl({
+          siteUrl: request.siteUrl,
+          libraryName: request.libraryName,
+          folderPath: request.folderPath,
+          fileName: request.fileName,
+        }),
       }
     }
 
