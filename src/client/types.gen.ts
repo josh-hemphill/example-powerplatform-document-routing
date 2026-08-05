@@ -68,13 +68,17 @@ export type Approver = {
 };
 
 export type ApprovalActorRequest = {
-    actorEmail: string;
+    /**
+     * Optional comment; actor is the authenticated principal
+     */
     comment?: string;
 };
 
 export type ApprovalDecisionRequest = {
     decision: 'approve' | 'reject';
-    actorEmail: string;
+    /**
+     * Optional comment; actor is the authenticated principal
+     */
     comment?: string;
 };
 
@@ -108,7 +112,6 @@ export type CreateDocumentRequest = {
      * Unstructured request text that authors turn into a draft
      */
     freeformRequest: string;
-    requesterEmail: string;
     priority?: 'low' | 'normal' | 'high';
     /**
      * Target SharePoint site for the final PDF
@@ -123,7 +126,9 @@ export type CreateDocumentRequest = {
 export type UpdateDraftRequest = {
     title: string;
     bodyMarkdown: string;
-    authorEmail: string;
+    /**
+     * Optional summary; author is set from the authenticated principal
+     */
     summary?: string;
 };
 
@@ -133,6 +138,10 @@ export type DocumentSummary = {
     documentType: string;
     status: DocumentStatus;
     requesterEmail: string;
+    /**
+     * Author collaboration team shared on create for co-editing drafts
+     */
+    collaboratorEmails?: Array<string>;
     priority?: 'low' | 'normal' | 'high';
     currentApproverEmail?: string;
     currentStepStatus?: ApprovalStepStatus;

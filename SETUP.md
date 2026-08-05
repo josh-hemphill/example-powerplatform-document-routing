@@ -32,17 +32,18 @@ Details: [`deploy/README.md`](./deploy/README.md).
 
 ### `src/config/app.config.ts` / `.env`
 
-| Field / env                      | What to change                                    |
-| -------------------------------- | ------------------------------------------------- |
-| `brand.*`                        | Product name shown in the shell                   |
-| `VITE_SHAREPOINT_SITE_URL`       | Overrides SharePoint site (any HTTPS host)        |
-| `VITE_SHAREPOINT_LIBRARY_NAME`   | Library name                                      |
-| `VITE_SHAREPOINT_FOLDER_PATH`    | Default folder                                    |
-| `VITE_DATAVERSE_ENVIRONMENT_URL` | Optional org URL for adapters                     |
-| `VITE_DOCUMENT_API_BASE_URL`     | API / Custom Connector base                       |
-| `localDemoUser`                  | Fallback identity for local Vite play             |
-| `features.showSetupBanner`       | Set `false` once placeholders are gone            |
-| `features.allowApproverOverride` | Let authors edit the default chain at submit time |
+| Field / env                      | What to change                                                                                                                    |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `brand.*`                        | Product name shown in the shell                                                                                                   |
+| `VITE_SHAREPOINT_SITE_URL`       | Overrides SharePoint site (any HTTPS host)                                                                                        |
+| `VITE_SHAREPOINT_LIBRARY_NAME`   | Library name                                                                                                                      |
+| `VITE_SHAREPOINT_FOLDER_PATH`    | Default folder                                                                                                                    |
+| `VITE_DATAVERSE_ENVIRONMENT_URL` | Optional org URL for adapters                                                                                                     |
+| `VITE_DOCUMENT_API_BASE_URL`     | API / Custom Connector base                                                                                                       |
+| `localDemoUser`                  | Fallback identity for local Vite play only (`import.meta.env.DEV`)                                                                |
+| Runtime hosts                    | Prefer Dataverse/`dr_*` via `window.__DOCUMENT_ROUTING_ENV__`; `.env` `VITE_*` is local-only — see `src/config/runtime-config.ts` |
+| `features.showSetupBanner`       | Set `false` once placeholders are gone                                                                                            |
+| `features.allowApproverOverride` | Let authors edit the default chain at submit time                                                                                 |
 
 ### `src/config/document-types.ts`
 
@@ -170,7 +171,9 @@ Supported out of the box:
 | Elevation          | `elevationPool` merged into the pool when `process-sla` runs after `dueAt`         |
 | Inbox              | **Available in my pool** + **Waiting on me** personas                              |
 
-Local demo: open **Expense Policy Clarification**, set Acting as `jordan.legal@contoso.com`, click **Process SLA** (seed is already overdue), then **Claim from pool**.
+Local demo: open **Expense Policy Clarification**, switch the app-bar persona to
+`jordan.legal@contoso.com`, click **Process SLA** (seed is already overdue), then **Claim from pool**.
+Identity is the principal header — there is no per-form “Acting as” field.
 
 Production schedulers should call `POST /documents/{id}/approvals/process-sla` (or a batch job) from Power Automate / Azure Functions — not from the browser session alone.
 

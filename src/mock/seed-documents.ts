@@ -40,6 +40,8 @@ export interface MockDocumentRecord {
 	documentType: string;
 	status: MockDocumentStatus;
 	requesterEmail: string;
+	/** Author collaboration team shared for co-editing before submit. */
+	collaboratorEmails: string[];
 	priority: 'low' | 'normal' | 'high';
 	currentApproverEmail: string | null;
 	currentStepStatus: MockApprovalStep['status'] | null;
@@ -81,6 +83,7 @@ export function createSeedDocuments(): MockDocumentRecord[] {
 		documentType: 'policy',
 		status: 'requested',
 		requesterEmail: 'alex.requester@contoso.com',
+		collaboratorEmails: ['developer@example.com', 'casey.author@contoso.com', 'alex.requester@contoso.com'],
 		priority: 'high',
 		currentApproverEmail: null,
 		currentStepStatus: null,
@@ -116,6 +119,7 @@ export function createSeedDocuments(): MockDocumentRecord[] {
 		documentType: 'sop',
 		status: 'drafting',
 		requesterEmail: 'pat.manager@contoso.com',
+		collaboratorEmails: ['developer@example.com', 'casey.author@contoso.com', 'alex.requester@contoso.com'],
 		priority: 'normal',
 		currentApproverEmail: null,
 		currentStepStatus: null,
@@ -167,6 +171,7 @@ Document the 36-month laptop refresh process for corporate devices.
 		documentType: 'policy',
 		status: 'in_review',
 		requesterEmail: 'alex.requester@contoso.com',
+		collaboratorEmails: ['developer@example.com', 'casey.author@contoso.com', 'alex.requester@contoso.com'],
 		priority: 'high',
 		currentApproverEmail: null,
 		currentStepStatus: 'queued',

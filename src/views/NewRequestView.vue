@@ -16,14 +16,13 @@ import {
 
 const router = useRouter();
 const queryCache = useQueryCache();
-const { context } = usePowerAppsContext();
+const { context, canAct, isLoading: identityLoading } = usePowerAppsContext();
 const formError = ref<string | null>(null);
 
 const form = reactive({
 	title: '',
 	documentType: DEFAULT_DOCUMENT_TYPE_ID,
 	freeformRequest: '',
-	requesterEmail: '',
 	priority: 'normal' as 'low' | 'normal' | 'high',
 	requestedPublishSiteUrl: appConfig.sharePoint.siteUrl,
 	requestedLibraryName: appConfig.sharePoint.libraryName,
@@ -42,9 +41,12 @@ const { mutateAsync, isLoading } = useMutation({
 
 async function submit(): Promise<void> {
 	formError.value = null;
-	const requesterEmail = form.requesterEmail || context.value.email || '';
-	if (!form.title.trim() || form.freeformRequest.trim().length < 10 || !requesterEmail) {
-		formError.value = 'Title, requester email, and a freeform request (10+ chars) are required.';
+	if (!canAct.value || !context.value.email) {
+		formError.value = 'Sign-in identity is required before creating a request.';
+		return;
+	}
+	if (!form.title.trim() || form.freeformRequest.trim().length < 10) {
+		formError.value = 'Title and a freeform request (10+ chars) are required.';
 		return;
 	}
 
@@ -54,7 +56,6 @@ async function submit(): Promise<void> {
 				title: form.title.trim(),
 				documentType: form.documentType,
 				freeformRequest: form.freeformRequest.trim(),
-				requesterEmail,
 				priority: form.priority,
 				requestedPublishSiteUrl: form.requestedPublishSiteUrl,
 				requestedLibraryName: form.requestedLibraryName,
@@ -71,9 +72,9 @@ async function submit(): Promise<void> {
 <template>
 	<v-card class="pa-6">
 		<p class="text-body-2 text-medium-emphasis mb-6">
-			Capture an unstructured request. The selected document type chooses the draft
-			scaffold and default approval chain from
-			<code>src/config/document-types.ts</code>.
+			Capture an unstructured request. Requester is the signed-in principal
+			(<strong>{{ context.email ?? '…' }}</strong>). The document type chooses the draft
+			scaffold, author collaboration team, and default approval chain.
 		</p>
 
 		<v-alert
@@ -126,9 +127,10 @@ async function submit(): Promise<void> {
 				</v-col>
 				<v-col cols="12" md="6">
 					<v-text-field
-						v-model="form.requesterEmail"
-						:placeholder="context.email"
-						label="Requester email"
+						:model-value="context.email"
+						label="Requester (signed-in)"
+						readonly
+						disabled
 					/>
 				</v-col>
 				<v-col cols="12" md="6">
@@ -149,7 +151,12 @@ async function submit(): Promise<void> {
 				<v-btn variant="text" :to="{ name: 'inbox' }">
 					Cancel
 				</v-btn>
-				<v-btn color="primary" type="submit" :loading="isLoading">
+				<v-btn
+					color="primary"
+					type="submit"
+					:loading="isLoading || identityLoading"
+					:disabled="!canAct"
+				>
 					Submit request
 				</v-btn>
 			</div>

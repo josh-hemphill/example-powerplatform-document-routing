@@ -18,7 +18,6 @@ import ApprovalStepper from '@/components/ApprovalStepper.vue';
 import DocumentStatusChip from '@/components/DocumentStatusChip.vue';
 import WorkflowTimeline from '@/components/WorkflowTimeline.vue';
 import { usePowerAppsContext } from '@/composables/use-power-apps-context';
-import { appConfig } from '@/config/app.config';
 import {
 	buildDraftFromTemplate,
 	getDocumentType,
@@ -30,7 +29,7 @@ import { publishApprovedDocument } from '@/publishing/publish-document';
 
 const route = useRoute();
 const queryCache = useQueryCache();
-const { context } = usePowerAppsContext();
+const { context, canAct } = usePowerAppsContext();
 const actionError = ref<string | null>(null);
 const actionSuccess = ref<string | null>(null);
 
@@ -48,7 +47,6 @@ const draftForm = reactive({
 	title: '',
 	bodyMarkdown: '',
 	summary: '',
-	authorEmail: '',
 });
 
 const approvalForm = reactive({
@@ -57,7 +55,6 @@ const approvalForm = reactive({
 
 const decisionForm = reactive({
 	comment: '',
-	actorEmail: '',
 });
 
 const publishForm = reactive({
@@ -86,21 +83,11 @@ watch(
 			= value.draftBodyMarkdown
 				?? buildDraftFromTemplate(type, value.title, value.freeformRequest);
 		draftForm.summary = value.draftSummary ?? '';
-		draftForm.authorEmail = value.authorEmail ?? context.value.email ?? '';
 		const targets = resolvePublishTargets(value);
 		publishForm.sharePointSiteUrl = targets.siteUrl;
 		publishForm.libraryName = targets.libraryName;
 		publishForm.folderPath = targets.folderPath;
 		publishForm.fileName = targets.fileName;
-
-		const step = value.approvalSteps.find(
-			(item) => item.status === 'queued' || item.status === 'pending',
-		);
-		decisionForm.actorEmail
-			= step?.approverEmail
-				|| step?.pool?.[0]?.email
-				|| context.value.email
-				|| '';
 	},
 	{ immediate: true },
 );
@@ -167,16 +154,16 @@ const { mutateAsync: publishPdfAsync, isLoading: isPublishingPdf } = useMutation
 async function onSaveDraft(): Promise<void> {
 	actionError.value = null;
 	actionSuccess.value = null;
+	if (!canAct.value) {
+		actionError.value = 'Sign-in identity is required.';
+		return;
+	}
 	try {
 		await saveDraftAsync({
 			path: { documentId: documentId.value },
 			body: {
 				title: draftForm.title,
 				bodyMarkdown: draftForm.bodyMarkdown,
-				authorEmail:
-          draftForm.authorEmail
-          || context.value.email
-          || appConfig.localDemoUser.email,
 				summary: draftForm.summary || undefined,
 			},
 		});
@@ -218,9 +205,7 @@ async function onClaim(): Promise<void> {
 	try {
 		await claimStepAsync({
 			path: { documentId: documentId.value, stepId: step.id },
-			body: {
-				actorEmail: decisionForm.actorEmail || context.value.email || '',
-			},
+			body: {},
 		});
 		actionSuccess.value = 'Step claimed. You can approve or reject.';
 	}
@@ -241,9 +226,7 @@ async function onRelease(): Promise<void> {
 	try {
 		await releaseStepAsync({
 			path: { documentId: documentId.value, stepId: step.id },
-			body: {
-				actorEmail: decisionForm.actorEmail || step.approverEmail || '',
-			},
+			body: {},
 		});
 		actionSuccess.value = 'Returned to the pool queue.';
 	}
@@ -286,7 +269,6 @@ async function onDecision(decision: 'approve' | 'reject'): Promise<void> {
 			},
 			body: {
 				decision,
-				actorEmail: decisionForm.actorEmail || step.approverEmail || '',
 				comment: decisionForm.comment || undefined,
 			},
 		});
@@ -333,32 +315,47 @@ async function onPublish(): Promise<void> {
 
 const canDraft = computed(
 	() =>
-		document.value
-		&& ['requested', 'drafting', 'in_review', 'approved'].includes(document.value.status),
+		Boolean(canAct.value)
+		&& document.value
+		&& ['requested', 'drafting'].includes(document.value.status),
 );
 
-const canSubmitApproval = computed(() => document.value?.status === 'drafting');
+const canSubmitApproval = computed(
+	() => Boolean(canAct.value) && document.value?.status === 'drafting',
+);
 const canClaim = computed(() => {
 	const step = activeStep.value;
-	const actor = decisionForm.actorEmail || context.value.email;
+	const actor = context.value.email;
 	return Boolean(
-		step?.status === 'queued'
+		canAct.value
+		&& step?.status === 'queued'
 		&& actor
 		&& isEmailInPool(step.pool ?? [], actor),
 	);
 });
 const canRelease = computed(() => {
 	const step = activeStep.value;
-	const actor = (decisionForm.actorEmail || context.value.email || '').toLowerCase();
+	const actor = (context.value.email || '').toLowerCase();
 	return Boolean(
-		step?.status === 'pending'
+		canAct.value
+		&& step?.status === 'pending'
 		&& step.assignmentMode === 'pool'
 		&& step.approverEmail?.toLowerCase() === actor,
 	);
 });
-const canDecide = computed(() => activeStep.value?.status === 'pending');
-const canPublish = computed(() => document.value?.status === 'approved');
-const canProcessSla = computed(() => document.value?.status === 'in_review');
+const canDecide = computed(
+	() =>
+		Boolean(canAct.value)
+		&& activeStep.value?.status === 'pending'
+		&& activeStep.value.approverEmail?.toLowerCase()
+		=== (context.value.email || '').toLowerCase(),
+);
+const canPublish = computed(
+	() => Boolean(canAct.value) && document.value?.status === 'approved',
+);
+const canProcessSla = computed(
+	() => Boolean(canAct.value) && document.value?.status === 'in_review',
+);
 </script>
 
 <template>
@@ -426,8 +423,17 @@ const canProcessSla = computed(() => document.value?.status === 'in_review');
 						<div class="text-subtitle-1 font-weight-bold mb-3">
 							2. Author / draft
 						</div>
+						<p class="text-body-2 text-medium-emphasis mb-2">
+							Signed in as {{ context.email }}. Collaborative authors on this type can co-edit before submit.
+						</p>
 						<v-text-field v-model="draftForm.title" label="Document title" class="mb-2" />
-						<v-text-field v-model="draftForm.authorEmail" label="Author email" class="mb-2" />
+						<v-text-field
+							:model-value="document.authorEmail ?? '—'"
+							label="Author (from principal on first save)"
+							readonly
+							disabled
+							class="mb-2"
+						/>
 						<v-text-field v-model="draftForm.summary" label="Short summary" class="mb-2" />
 						<v-textarea
 							v-model="draftForm.bodyMarkdown"
@@ -481,13 +487,10 @@ const canProcessSla = computed(() => document.value?.status === 'in_review');
 						<template v-else>
 							<ApprovalStepper :steps="document.approvalSteps" />
 							<div class="mt-4">
-								<v-text-field
-									v-model="decisionForm.actorEmail"
-									label="Acting as (email)"
-									class="mb-2"
-									hint="Use a pool member email to claim, e.g. jordan.legal@contoso.com"
-									persistent-hint
-								/>
+								<p class="text-body-2 text-medium-emphasis mb-2">
+									Acting as signed-in principal: <strong>{{ context.email }}</strong>
+									(switch persona in the app bar for local demos).
+								</p>
 								<v-text-field v-model="decisionForm.comment" label="Comment" class="mb-3" />
 								<div class="d-flex flex-wrap ga-2">
 									<v-btn
