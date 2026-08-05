@@ -29,6 +29,11 @@ export function buildSharePointDocumentUrl(input: {
   const site = input.siteUrl.replace(/\/+$/, '')
   const library = encodeURIComponent(input.libraryName)
   const folder = normalizeSharePointFolderPath(input.folderPath)
-  const file = input.fileName.replace(/^\/+/, '')
-  return `${site}/${library}${folder}/${file}`
+  const encodedFolder = folder
+    .split('/')
+    .filter(Boolean)
+    .map((segment) => encodeURIComponent(segment))
+    .join('/')
+  const file = encodeURIComponent(input.fileName.replace(/^\/+/, ''))
+  return `${site}/${library}${encodedFolder ? `/${encodedFolder}` : ''}/${file}`
 }
