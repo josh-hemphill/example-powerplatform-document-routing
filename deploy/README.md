@@ -55,6 +55,8 @@ Environment variables (seeded from your connection profile):
 
 SharePoint remains the **PDF binary** target. Lists are not used as the workflow store.
 
+Security role sketch: [`SECURITY_ROLES.md`](./SECURITY_ROLES.md).
+
 ## Auth for `provision:apply`
 
 Requires **Node.js 22+** (`engines.node`) for `node --experimental-strip-types`.

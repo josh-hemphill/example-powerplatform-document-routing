@@ -147,6 +147,8 @@ Keep existing `document`, `approvalstep`, `historyevent`. Add control tables:
 
 ## Phase 2 — Identity, security roles, collaborative draft access
 
+**Status:** Implemented (identity store, principal header, mock collaboration, security roles doc).
+
 **Goal:** Host identity + Dataverse permissions replace client-trusted emails.
 
 ### Work

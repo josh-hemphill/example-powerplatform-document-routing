@@ -1,10 +1,13 @@
 /**
  * Resolves the Document Routing API base URL for local mock vs Power Platform.
+ * Prefer runtime injection (`window.__DOCUMENT_ROUTING_ENV__`) over Vite build-time env.
  */
+import { resolveRuntimeHostConfig } from '@/config/runtime-config';
+
 export function getApiBaseUrl(): string {
-	const fromEnv = import.meta.env.VITE_DOCUMENT_API_BASE_URL;
-	if (typeof fromEnv === 'string' && fromEnv.length > 0) {
-		return fromEnv;
+	const runtime = resolveRuntimeHostConfig();
+	if (runtime.documentApiBaseUrl) {
+		return runtime.documentApiBaseUrl;
 	}
 
 	return '/api';

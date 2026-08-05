@@ -1,11 +1,16 @@
 openapi: 3.1.0
 info:
   title: Document Routing API
-  version: 1.0.0
+  version: 1.1.0
   description: |
     Routes freeform document requests through drafting and a chain of approvals,
     then publishes an approved PDF to SharePoint. In Power Platform, this API is
     typically exposed as a Custom Connector or wrapped by a Power Automate flow.
+
+    **Identity:** The caller principal is derived from the Power Apps / Dataverse
+    security context in production. The local Vite mock accepts
+    `X-Document-Routing-Actor` as a stand-in. Request bodies must not carry
+    spoofable `actorEmail` / requester identity.
 servers:
   - url: /api
     description: Local Vite mock (development)
@@ -14,6 +19,8 @@ servers:
     variables:
       environment:
         default: contoso
+security:
+  - PrincipalHeader: []
 tags:
   - name: Documents
   - name: Approvals
@@ -270,6 +277,15 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
 components:
+  securitySchemes:
+    PrincipalHeader:
+      type: apiKey
+      in: header
+      name: X-Document-Routing-Actor
+      description: |
+        Local mock stand-in for the authenticated caller email/UPN.
+        Production Custom Connectors / Dataverse derive the principal from the
+        token — this header is not used as a trust boundary when hosted.
   parameters:
     DocumentId:
       name: documentId
@@ -393,25 +409,20 @@ components:
           description: e.g. Legal, Compliance, Department Head
     ApprovalActorRequest:
       type: object
-      required: [actorEmail]
       properties:
-        actorEmail:
-          type: string
-          format: email
         comment:
           type: string
+          description: Optional comment; actor is the authenticated principal
     ApprovalDecisionRequest:
       type: object
-      required: [decision, actorEmail]
+      required: [decision]
       properties:
         decision:
           type: string
           enum: [approve, reject]
-        actorEmail:
-          type: string
-          format: email
         comment:
           type: string
+          description: Optional comment; actor is the authenticated principal
     ProcessSlaRequest:
       type: object
       properties:
@@ -437,7 +448,7 @@ components:
           description: Overrides the default PDF file name
     CreateDocumentRequest:
       type: object
-      required: [title, freeformRequest, requesterEmail, documentType]
+      required: [title, freeformRequest, documentType]
       properties:
         title:
           type: string
@@ -450,9 +461,6 @@ components:
           type: string
           minLength: 10
           description: Unstructured request text that authors turn into a draft
-        requesterEmail:
-          type: string
-          format: email
         priority:
           type: string
           enum: [low, normal, high]
@@ -467,7 +475,7 @@ components:
           default: Published Documents
     UpdateDraftRequest:
       type: object
-      required: [title, bodyMarkdown, authorEmail]
+      required: [title, bodyMarkdown]
       properties:
         title:
           type: string
@@ -475,11 +483,9 @@ components:
         bodyMarkdown:
           type: string
           minLength: 1
-        authorEmail:
-          type: string
-          format: email
         summary:
           type: string
+          description: Optional summary; author is set from the authenticated principal
     DocumentSummary:
       type: object
       required:
@@ -503,6 +509,12 @@ components:
         requesterEmail:
           type: string
           format: email
+        collaboratorEmails:
+          type: array
+          items:
+            type: string
+            format: email
+          description: Author collaboration team shared on create for co-editing drafts
         priority:
           type: string
           enum: [low, normal, high]

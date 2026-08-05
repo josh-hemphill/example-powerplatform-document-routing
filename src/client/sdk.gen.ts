@@ -21,12 +21,17 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
 /**
  * List document routing cases
  */
-export const listDocuments = <ThrowOnError extends boolean = false>(options?: Options<ListDocumentsData, ThrowOnError>): RequestResult<ListDocumentsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListDocumentsResponses, unknown, ThrowOnError>({ url: '/documents', ...options });
+export const listDocuments = <ThrowOnError extends boolean = false>(options?: Options<ListDocumentsData, ThrowOnError>): RequestResult<ListDocumentsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListDocumentsResponses, unknown, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }],
+    url: '/documents',
+    ...options
+});
 
 /**
  * Submit a freeform document request
  */
 export const createDocumentRequest = <ThrowOnError extends boolean = false>(options: Options<CreateDocumentRequestData, ThrowOnError>): RequestResult<CreateDocumentRequestResponses, unknown, ThrowOnError> => (options.client ?? client).post<CreateDocumentRequestResponses, unknown, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }],
     url: '/documents',
     ...options,
     headers: {
@@ -38,12 +43,17 @@ export const createDocumentRequest = <ThrowOnError extends boolean = false>(opti
 /**
  * Get a document routing case
  */
-export const getDocument = <ThrowOnError extends boolean = false>(options: Options<GetDocumentData, ThrowOnError>): RequestResult<GetDocumentResponses, GetDocumentErrors, ThrowOnError> => (options.client ?? client).get<GetDocumentResponses, GetDocumentErrors, ThrowOnError>({ url: '/documents/{documentId}', ...options });
+export const getDocument = <ThrowOnError extends boolean = false>(options: Options<GetDocumentData, ThrowOnError>): RequestResult<GetDocumentResponses, GetDocumentErrors, ThrowOnError> => (options.client ?? client).get<GetDocumentResponses, GetDocumentErrors, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }],
+    url: '/documents/{documentId}',
+    ...options
+});
 
 /**
  * Author or update the draft content
  */
 export const updateDocumentDraft = <ThrowOnError extends boolean = false>(options: Options<UpdateDocumentDraftData, ThrowOnError>): RequestResult<UpdateDocumentDraftResponses, UpdateDocumentDraftErrors, ThrowOnError> => (options.client ?? client).put<UpdateDocumentDraftResponses, UpdateDocumentDraftErrors, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }],
     url: '/documents/{documentId}/draft',
     ...options,
     headers: {
@@ -56,6 +66,7 @@ export const updateDocumentDraft = <ThrowOnError extends boolean = false>(option
  * Move a draft into the approval chain
  */
 export const submitForApproval = <ThrowOnError extends boolean = false>(options: Options<SubmitForApprovalData, ThrowOnError>): RequestResult<SubmitForApprovalResponses, SubmitForApprovalErrors, ThrowOnError> => (options.client ?? client).post<SubmitForApprovalResponses, SubmitForApprovalErrors, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }],
     url: '/documents/{documentId}/submit-for-approval',
     ...options,
     headers: {
@@ -68,6 +79,7 @@ export const submitForApproval = <ThrowOnError extends boolean = false>(options:
  * Approve or reject the current claimed/named approval step
  */
 export const decideApprovalStep = <ThrowOnError extends boolean = false>(options: Options<DecideApprovalStepData, ThrowOnError>): RequestResult<DecideApprovalStepResponses, DecideApprovalStepErrors, ThrowOnError> => (options.client ?? client).post<DecideApprovalStepResponses, DecideApprovalStepErrors, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }],
     url: '/documents/{documentId}/approvals/{stepId}/decision',
     ...options,
     headers: {
@@ -80,6 +92,7 @@ export const decideApprovalStep = <ThrowOnError extends boolean = false>(options
  * Self-assign a queued pool approval step
  */
 export const claimApprovalStep = <ThrowOnError extends boolean = false>(options: Options<ClaimApprovalStepData, ThrowOnError>): RequestResult<ClaimApprovalStepResponses, ClaimApprovalStepErrors, ThrowOnError> => (options.client ?? client).post<ClaimApprovalStepResponses, ClaimApprovalStepErrors, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }],
     url: '/documents/{documentId}/approvals/{stepId}/claim',
     ...options,
     headers: {
@@ -92,6 +105,7 @@ export const claimApprovalStep = <ThrowOnError extends boolean = false>(options:
  * Return a claimed pool step to the queue
  */
 export const releaseApprovalStep = <ThrowOnError extends boolean = false>(options: Options<ReleaseApprovalStepData, ThrowOnError>): RequestResult<ReleaseApprovalStepResponses, ReleaseApprovalStepErrors, ThrowOnError> => (options.client ?? client).post<ReleaseApprovalStepResponses, ReleaseApprovalStepErrors, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }],
     url: '/documents/{documentId}/approvals/{stepId}/release',
     ...options,
     headers: {
@@ -104,6 +118,7 @@ export const releaseApprovalStep = <ThrowOnError extends boolean = false>(option
  * Process SLA timeouts and elevate overdue steps (scheduler / flow entrypoint)
  */
 export const processApprovalSla = <ThrowOnError extends boolean = false>(options: Options<ProcessApprovalSlaData, ThrowOnError>): RequestResult<ProcessApprovalSlaResponses, ProcessApprovalSlaErrors, ThrowOnError> => (options.client ?? client).post<ProcessApprovalSlaResponses, ProcessApprovalSlaErrors, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }],
     url: '/documents/{documentId}/approvals/process-sla',
     ...options,
     headers: {
@@ -116,6 +131,7 @@ export const processApprovalSla = <ThrowOnError extends boolean = false>(options
  * Render the approved document as PDF and publish to SharePoint
  */
 export const publishDocumentPdf = <ThrowOnError extends boolean = false>(options: Options<PublishDocumentPdfData, ThrowOnError>): RequestResult<PublishDocumentPdfResponses, PublishDocumentPdfErrors, ThrowOnError> => (options.client ?? client).post<PublishDocumentPdfResponses, PublishDocumentPdfErrors, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }],
     url: '/documents/{documentId}/publish',
     ...options,
     headers: {

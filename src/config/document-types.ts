@@ -44,6 +44,11 @@ export interface DocumentTypeDefinition {
 	requestHint: string;
 	draftTemplate: string;
 	folderPath?: string;
+	/**
+	 * Emails shared on create so peers can co-edit requested/drafting documents
+	 * (mirrors Dataverse author collaboration team).
+	 */
+	authorTeamEmails?: string[];
 	approvalChain: ApprovalStepTemplate[];
 }
 
@@ -69,6 +74,11 @@ Who and what this policy covers.
 {{request}}
 `,
 		folderPath: '/Policies',
+		authorTeamEmails: [
+			'developer@example.com',
+			'casey.author@contoso.com',
+			'alex.requester@contoso.com',
+		],
 		approvalChain: [
 			{
 				mode: 'pool',
@@ -129,6 +139,10 @@ Who and what this policy covers.
 - 
 `,
 		folderPath: '/SOPs',
+		authorTeamEmails: [
+			'developer@example.com',
+			'casey.author@contoso.com',
+		],
 		approvalChain: [
 			{
 				mode: 'pool',
@@ -174,6 +188,7 @@ Who and what this policy covers.
 - 
 `,
 		folderPath: '/Announcements',
+		authorTeamEmails: ['developer@example.com', 'casey.author@contoso.com'],
 		approvalChain: [
 			{
 				mode: 'named',

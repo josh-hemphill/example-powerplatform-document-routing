@@ -55,6 +55,7 @@ export interface PersonaFilterableDocument {
 	currentStepStatus?: ApprovalStepStatus | null;
 	currentPoolEmails?: string[] | null;
 	authorEmail?: string | null;
+	collaboratorEmails?: string[] | null;
 }
 
 /**
@@ -88,8 +89,22 @@ export function matchesInboxPersona(
 			);
 		case 'my_requests':
 			return Boolean(email && document.requesterEmail.toLowerCase() === email);
-		case 'needs_draft':
-			return document.status === 'requested';
+		case 'needs_draft': {
+			if (document.status !== 'requested' && document.status !== 'drafting') {
+				return false;
+			}
+			if (!email) {
+				return false;
+			}
+			const isCollaborator = document.collaboratorEmails?.some(
+				(member) => member.toLowerCase() === email,
+			);
+			return Boolean(
+				isCollaborator
+				|| document.requesterEmail.toLowerCase() === email
+				|| document.authorEmail?.toLowerCase() === email,
+			);
+		}
 		case 'ready_to_publish':
 			return document.status === 'approved';
 		default:

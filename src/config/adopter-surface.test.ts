@@ -87,6 +87,34 @@ describe('inbox personas', () => {
 		).toBe(false);
 	});
 
+	it('matches needs_draft for collaborators on drafting docs', () => {
+		expect(
+			matchesInboxPersona(
+				{
+					status: 'drafting',
+					requesterEmail: 'a@contoso.com',
+					collaboratorEmails: ['me@contoso.com'],
+				},
+				'needs_draft',
+				'me@contoso.com',
+			),
+		).toBe(true);
+	});
+
+	it('does not match needs_draft for unrelated users', () => {
+		expect(
+			matchesInboxPersona(
+				{
+					status: 'requested',
+					requesterEmail: 'a@contoso.com',
+					collaboratorEmails: ['other@contoso.com'],
+				},
+				'needs_draft',
+				'me@contoso.com',
+			),
+		).toBe(false);
+	});
+
 	it('matches ready_to_publish for approved docs', () => {
 		expect(
 			matchesInboxPersona(

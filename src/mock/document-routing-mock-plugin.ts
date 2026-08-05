@@ -3,6 +3,11 @@ import type { Plugin } from 'vite';
 import type { MockDocumentRecord } from './seed-documents.ts';
 import { randomUUID } from 'node:crypto';
 import { appConfig } from '../config/app.config.ts';
+import { getDocumentType } from '../config/document-types.ts';
+import {
+	canActorAccessDocument,
+	canActorEditDraft,
+} from '../domain/document-access.ts';
 import { buildSharePointDocumentUrl } from '../publishing/sharepoint-paths.ts';
 import {
 	activateStep,
@@ -12,10 +17,9 @@ import {
 	releaseStep,
 	syncCurrentApprovalFields,
 } from './approval-engine.ts';
-import {
-	createSeedDocuments,
+import { createSeedDocuments } from './seed-documents.ts';
 
-} from './seed-documents.ts';
+const ACTOR_HEADER = 'x-document-routing-actor';
 
 const store = new Map<string, MockDocumentRecord>();
 
@@ -45,6 +49,28 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
 	res.end(JSON.stringify(body));
 }
 
+function readActorEmail(req: IncomingMessage): string | null {
+	const raw = req.headers[ACTOR_HEADER];
+	const value = Array.isArray(raw) ? raw[0] : raw;
+	const email = value?.trim();
+	return email && email.includes('@') ? email : null;
+}
+
+function requireActor(
+	req: IncomingMessage,
+	res: ServerResponse,
+): string | null {
+	const actor = readActorEmail(req);
+	if (!actor) {
+		sendJson(res, 401, {
+			message: `Missing or invalid ${ACTOR_HEADER} (caller principal)`,
+			code: 'unauthorized',
+		});
+		return null;
+	}
+	return actor;
+}
+
 function toSummary(document: MockDocumentRecord) {
 	return {
 		id: document.id,
@@ -52,6 +78,7 @@ function toSummary(document: MockDocumentRecord) {
 		documentType: document.documentType,
 		status: document.status,
 		requesterEmail: document.requesterEmail,
+		collaboratorEmails: document.collaboratorEmails,
 		priority: document.priority,
 		currentApproverEmail: document.currentApproverEmail,
 		currentStepStatus: document.currentStepStatus,
@@ -84,6 +111,20 @@ function activeStep(document: MockDocumentRecord) {
 	);
 }
 
+function uniqueEmails(emails: string[]): string[] {
+	const seen = new Set<string>();
+	const result: string[] = [];
+	for (const email of emails) {
+		const key = email.trim().toLowerCase();
+		if (!key || seen.has(key)) {
+			continue;
+		}
+		seen.add(key);
+		result.push(email.trim());
+	}
+	return result;
+}
+
 /**
  * Serves an in-memory Document Routing API so the Code App is runnable offline.
  */
@@ -103,12 +144,18 @@ export function documentRoutingMockPlugin(): Plugin {
 					const url = new URL(req.url, 'http://localhost');
 					const path = url.pathname;
 					const method = req.method ?? 'GET';
+					const actor = requireActor(req, res);
+					if (!actor) {
+						return;
+					}
 
 					if (method === 'GET' && path === '/api/documents') {
 						const status = url.searchParams.get('status');
 						const documentType = url.searchParams.get('documentType');
 						const q = url.searchParams.get('q')?.toLowerCase();
-						let items = [...store.values()].map(toSummary);
+						let items = [...store.values()]
+							.filter((document) => canActorAccessDocument(document, actor))
+							.map(toSummary);
 
 						if (status) {
 							items = items.filter((item) => item.status === status);
@@ -136,20 +183,25 @@ export function documentRoutingMockPlugin(): Plugin {
 							title: string;
 							documentType: string;
 							freeformRequest: string;
-							requesterEmail: string;
 							priority?: 'low' | 'normal' | 'high';
 							requestedPublishSiteUrl?: string;
 							requestedLibraryName?: string;
 						}>(req);
 
+						const type = getDocumentType(body.documentType);
 						const id = randomUUID();
 						const createdAt = stamp();
+						const collaboratorEmails = uniqueEmails([
+							actor,
+							...(type.authorTeamEmails ?? []),
+						]);
 						const document: MockDocumentRecord = {
 							id,
 							title: body.title,
 							documentType: body.documentType,
 							status: 'requested',
-							requesterEmail: body.requesterEmail,
+							requesterEmail: actor,
+							collaboratorEmails,
 							priority: body.priority ?? 'normal',
 							currentApproverEmail: null,
 							currentStepStatus: null,
@@ -173,7 +225,7 @@ export function documentRoutingMockPlugin(): Plugin {
 						};
 						pushHistory(
 							document,
-							body.requesterEmail,
+							actor,
 							'requested',
 							'Freeform request submitted',
 						);
@@ -189,6 +241,13 @@ export function documentRoutingMockPlugin(): Plugin {
 							sendJson(res, 404, { message: 'Document not found', code: 'not_found' });
 							return;
 						}
+						if (!canActorAccessDocument(document, actor)) {
+							sendJson(res, 403, {
+								message: 'Not allowed to view this document',
+								code: 'forbidden',
+							});
+							return;
+						}
 						sendJson(res, 200, document);
 						return;
 					}
@@ -200,10 +259,11 @@ export function documentRoutingMockPlugin(): Plugin {
 							sendJson(res, 404, { message: 'Document not found', code: 'not_found' });
 							return;
 						}
-						if (document.status === 'published' || document.status === 'rejected') {
-							sendJson(res, 409, {
-								message: `Cannot draft a document in status ${document.status}`,
-								code: 'invalid_state',
+						if (!canActorEditDraft(document, actor)) {
+							sendJson(res, 403, {
+								message:
+                  'Only shared authors/requesters can edit drafts in requested/drafting',
+								code: 'forbidden',
 							});
 							return;
 						}
@@ -211,18 +271,17 @@ export function documentRoutingMockPlugin(): Plugin {
 						const body = await readJson<{
 							title: string;
 							bodyMarkdown: string;
-							authorEmail: string;
 							summary?: string;
 						}>(req);
 
 						document.title = body.title;
 						document.draftBodyMarkdown = body.bodyMarkdown;
 						document.draftSummary = body.summary ?? null;
-						document.authorEmail = body.authorEmail;
+						document.authorEmail = document.authorEmail ?? actor;
 						document.status = 'drafting';
 						pushHistory(
 							document,
-							body.authorEmail,
+							actor,
 							'draft_updated',
 							'Draft content saved',
 						);
@@ -272,7 +331,7 @@ export function documentRoutingMockPlugin(): Plugin {
 						syncCurrentApprovalFields(document);
 						pushHistory(
 							document,
-							document.authorEmail ?? document.requesterEmail,
+							actor,
 							'submitted_for_approval',
 							body.comment ?? 'Submitted to approval chain',
 						);
@@ -332,16 +391,16 @@ export function documentRoutingMockPlugin(): Plugin {
 							});
 							return;
 						}
-						const body = await readJson<{ actorEmail: string; comment?: string }>(req);
+						const body = await readJson<{ comment?: string }>(req);
 						try {
-							claimStep(step, body.actorEmail, new Date());
+							claimStep(step, actor, new Date());
 						}
 						catch(error) {
 							const code
 								= error instanceof Error && 'code' in error
 									? String((error as { code: string }).code)
 									: 'invalid_state';
-							sendJson(res, 409, {
+							sendJson(res, code === 'forbidden' ? 403 : 409, {
 								message: error instanceof Error ? error.message : 'Claim failed',
 								code,
 							});
@@ -350,7 +409,7 @@ export function documentRoutingMockPlugin(): Plugin {
 						syncCurrentApprovalFields(document);
 						pushHistory(
 							document,
-							body.actorEmail,
+							actor,
 							'claimed',
 							body.comment ?? `Claimed step ${step.order}`,
 						);
@@ -375,21 +434,25 @@ export function documentRoutingMockPlugin(): Plugin {
 							sendJson(res, 404, { message: 'Approval step not found', code: 'not_found' });
 							return;
 						}
-						const body = await readJson<{ actorEmail: string; comment?: string }>(req);
+						const body = await readJson<{ comment?: string }>(req);
 						try {
-							releaseStep(step, body.actorEmail);
+							releaseStep(step, actor);
 						}
 						catch(error) {
-							sendJson(res, 409, {
+							const code
+								= error instanceof Error && 'code' in error
+									? String((error as { code: string }).code)
+									: 'invalid_state';
+							sendJson(res, code === 'forbidden' ? 403 : 409, {
 								message: error instanceof Error ? error.message : 'Release failed',
-								code: 'invalid_state',
+								code,
 							});
 							return;
 						}
 						syncCurrentApprovalFields(document);
 						pushHistory(
 							document,
-							body.actorEmail,
+							actor,
 							'released',
 							body.comment ?? `Released step ${step.order} back to queue`,
 						);
@@ -437,9 +500,26 @@ export function documentRoutingMockPlugin(): Plugin {
 
 						const body = await readJson<{
 							decision: 'approve' | 'reject';
-							actorEmail: string;
 							comment?: string;
 						}>(req);
+
+						if (body.decision !== 'approve' && body.decision !== 'reject') {
+							sendJson(res, 400, {
+								message: 'decision must be approve or reject',
+								code: 'validation_error',
+							});
+							return;
+						}
+
+						const isAssignee
+							= step.approverEmail?.toLowerCase() === actor.toLowerCase();
+						if (!isAssignee) {
+							sendJson(res, 403, {
+								message: 'Only the assigned/claimed approver can decide this step',
+								code: 'forbidden',
+							});
+							return;
+						}
 
 						step.comment = body.comment ?? null;
 						step.decidedAt = stamp();
@@ -450,7 +530,7 @@ export function documentRoutingMockPlugin(): Plugin {
 							syncCurrentApprovalFields(document);
 							pushHistory(
 								document,
-								body.actorEmail,
+								actor,
 								'rejected',
 								body.comment ?? 'Rejected in approval chain',
 							);
@@ -466,7 +546,7 @@ export function documentRoutingMockPlugin(): Plugin {
 							activateStep(next, new Date());
 							pushHistory(
 								document,
-								body.actorEmail,
+								actor,
 								'step_approved',
 								body.comment ?? `Approved step ${step.order}`,
 							);
@@ -475,7 +555,7 @@ export function documentRoutingMockPlugin(): Plugin {
 							document.status = 'approved';
 							pushHistory(
 								document,
-								body.actorEmail,
+								actor,
 								'fully_approved',
 								body.comment ?? 'All approval steps completed',
 							);
@@ -529,7 +609,7 @@ export function documentRoutingMockPlugin(): Plugin {
 						document.requestedLibraryName = body.libraryName;
 						pushHistory(
 							document,
-							document.authorEmail ?? document.requesterEmail,
+							actor,
 							'published',
 							`Published PDF to ${body.libraryName}`,
 						);

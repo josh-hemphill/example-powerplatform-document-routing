@@ -4,12 +4,33 @@ import { useRoute, useRouter } from 'vue-router';
 import SetupBanner from '@/components/SetupBanner.vue';
 import { usePowerAppsContext } from '@/composables/use-power-apps-context';
 import { appConfig } from '@/config/app.config';
+import {
+	allowsDemoIdentityFallback,
+	LOCAL_DEMO_PERSONAS,
+	useIdentityStore,
+} from '@/stores/identity';
 
 const route = useRoute();
 const router = useRouter();
-const { context } = usePowerAppsContext();
+const { context, isLoading, status, canAct } = usePowerAppsContext();
+const identityStore = useIdentityStore();
 
 const pageTitle = computed(() => String(route.meta.title ?? appConfig.brand.name));
+const showPersonaSwitcher = computed(
+	() => allowsDemoIdentityFallback() && status.value === 'standalone',
+);
+const hostChipLabel = computed(() => {
+	if (status.value === 'hosted') {
+		return 'Power Apps host';
+	}
+	if (status.value === 'standalone') {
+		return 'Local play';
+	}
+	if (status.value === 'failed') {
+		return 'Identity failed';
+	}
+	return 'Loading identity…';
+});
 </script>
 
 <template>
@@ -27,17 +48,39 @@ const pageTitle = computed(() => String(route.meta.title ?? appConfig.brand.name
 			<v-chip
 				class="me-3"
 				size="small"
-				:color="context.isHosted ? 'success' : 'default'"
+				:color="status === 'hosted' ? 'success' : status === 'failed' ? 'error' : 'default'"
 				variant="tonal"
 			>
-				{{ context.isHosted ? 'Power Apps host' : 'Local play' }}
+				{{ hostChipLabel }}
 			</v-chip>
-			<div class="text-body-2 text-medium-emphasis me-4 d-none d-sm-block">
-				{{ context.userName }}
+			<v-select
+				v-if="showPersonaSwitcher"
+				:model-value="context.email"
+				:items="LOCAL_DEMO_PERSONAS"
+				item-title="label"
+				item-value="email"
+				density="compact"
+				hide-details
+				label="Acting as"
+				class="me-3"
+				style="max-width: 220px"
+				@update:model-value="identityStore.switchLocalPersona"
+			/>
+			<div
+				v-else
+				class="text-body-2 text-medium-emphasis me-4 d-none d-sm-block"
+			>
+				<template v-if="isLoading">
+					Resolving user…
+				</template>
+				<template v-else>
+					{{ context.userName }} · {{ context.email }}
+				</template>
 			</div>
 			<v-btn
 				color="primary"
 				prepend-icon="$plus"
+				:disabled="!canAct"
 				@click="router.push({ name: 'new-request' })"
 			>
 				New request
