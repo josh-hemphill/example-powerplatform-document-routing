@@ -46,16 +46,7 @@ watch(
       return
     }
     const lower = email.toLowerCase()
-    if (
-      list.some(
-        (item) =>
-          item.currentStepStatus === 'queued' &&
-          item.currentPoolEmails?.some((member) => member.toLowerCase() === lower),
-      )
-    ) {
-      persona.value = 'available_in_pool'
-      return
-    }
+    // Prefer actionable claimed/named work over claimable pool items.
     if (
       list.some(
         (item) =>
@@ -64,6 +55,16 @@ watch(
       )
     ) {
       persona.value = 'waiting_on_me'
+      return
+    }
+    if (
+      list.some(
+        (item) =>
+          item.currentStepStatus === 'queued' &&
+          item.currentPoolEmails?.some((member) => member.toLowerCase() === lower),
+      )
+    ) {
+      persona.value = 'available_in_pool'
     }
   },
   { immediate: true },

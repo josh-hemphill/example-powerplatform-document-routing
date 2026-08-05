@@ -325,11 +325,21 @@ components:
         comment:
           type: string
     ApprovalStepInput:
+      oneOf:
+        - $ref: '#/components/schemas/NamedApprovalStepInput'
+        - $ref: '#/components/schemas/PoolApprovalStepInput'
+      discriminator:
+        propertyName: assignmentMode
+        mapping:
+          named: '#/components/schemas/NamedApprovalStepInput'
+          pool: '#/components/schemas/PoolApprovalStepInput'
+    NamedApprovalStepInput:
       type: object
-      required: [assignmentMode]
+      required: [assignmentMode, assignee]
       properties:
         assignmentMode:
-          $ref: '#/components/schemas/ApprovalAssignmentMode'
+          type: string
+          enum: [named]
         role:
           type: string
           description: Display role for the step (Legal, Compliance, …)
@@ -339,13 +349,31 @@ components:
           description: Hours until SLA timeout from activation/claim
         assignee:
           $ref: '#/components/schemas/Approver'
-          description: Required when assignmentMode is named
+        elevationPool:
+          type: array
+          items:
+            $ref: '#/components/schemas/Approver'
+          description: Extra members merged into the pool after SLA timeout
+    PoolApprovalStepInput:
+      type: object
+      required: [assignmentMode, pool]
+      properties:
+        assignmentMode:
+          type: string
+          enum: [pool]
+        role:
+          type: string
+          description: Display role for the step (Legal, Compliance, …)
+        slaHours:
+          type: number
+          exclusiveMinimum: 0
+          description: Hours until SLA timeout from queue activation/claim
         pool:
           type: array
           minItems: 1
           items:
             $ref: '#/components/schemas/Approver'
-          description: Eligible claimers when assignmentMode is pool
+          description: Eligible claimers for this pool step
         elevationPool:
           type: array
           items:
