@@ -7,7 +7,6 @@ import { validateConnectionProfile } from './connection-config.ts';
 import { buildControlSeedBundle } from './control-seed.ts';
 import {
 	buildDataverseProvisionPlan,
-
 } from './dataverse-provision-plan.ts';
 import {
 	buildPaConnectCommands,
@@ -39,6 +38,18 @@ const IDEMPOTENT_ERROR_CODES = [
 	'is already present',
 ];
 
+/** Placeholder plan when validation failed — never call builders that parse hosts. */
+export function emptyProvisionPlan(): DataverseProvisionPlan {
+	return {
+		apiRoot: '',
+		prefix: '',
+		schema: { tables: [], environmentVariables: [] },
+		requests: [],
+		environmentVariableDefaults: {},
+		tableLogicalNames: [],
+	};
+}
+
 /**
  * Writes provision plan JSON, env defaults, and pa connect script under deploy/generated.
  * On validation errors, no executable artifacts are written (atomic replace only on success).
@@ -60,7 +71,7 @@ export function writeProvisionArtifacts(
 
 	if (validationErrors.length > 0) {
 		return {
-			plan: buildDataverseProvisionPlan(profile),
+			plan: emptyProvisionPlan(),
 			outputDir,
 			files: [],
 			validationErrors,

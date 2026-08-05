@@ -97,9 +97,10 @@ function attributePayload(
 				...base,
 				'@odata.type': 'Microsoft.Dynamics.CRM.BooleanAttributeMetadata',
 				'OptionSet': {
-					TrueOption: { Value: 1, Label: localizedLabel('Yes') },
-					FalseOption: { Value: 0, Label: localizedLabel('No') },
-					DefaultValue: false,
+					'@odata.type': 'Microsoft.Dynamics.CRM.BooleanOptionSetMetadata',
+					'TrueOption': { Value: 1, Label: localizedLabel('Yes') },
+					'FalseOption': { Value: 0, Label: localizedLabel('No') },
+					'OptionSetType': 'Boolean',
 				},
 				'DefaultValue': false,
 			};

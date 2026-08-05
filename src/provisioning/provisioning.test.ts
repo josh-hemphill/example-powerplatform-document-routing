@@ -275,7 +275,36 @@ describe('writeProvisionArtifacts', () => {
 		const result = writeProvisionArtifacts(profile, dir);
 		expect(result.validationErrors.length).toBeGreaterThan(0);
 		expect(result.files).toHaveLength(0);
+		expect(result.plan.requests).toHaveLength(0);
 		expect(() => readFileSync(join(dir, 'pa-connect.sh'), 'utf8')).toThrow();
+	});
+
+	it('returns validation errors without throwing on an invalid Dataverse URL', () => {
+		const dir = mkdtempSync(join(tmpdir(), 'prov-bad-url-'));
+		tempDirs.push(dir);
+		const profile = sampleProfile();
+		profile.dataverse.environmentUrl = 'not-a-url';
+		expect(() => writeProvisionArtifacts(profile, dir)).not.toThrow();
+		const result = writeProvisionArtifacts(profile, dir);
+		expect(result.validationErrors.some((item) => item.includes('dataverse.environmentUrl'))).toBe(
+			true,
+		);
+		expect(result.files).toHaveLength(0);
+		expect(result.plan.tableLogicalNames).toHaveLength(0);
+	});
+
+	it('emits boolean attributes with top-level DefaultValue only', () => {
+		const plan = buildDataverseProvisionPlan(sampleProfile());
+		const booleanAttribute = plan.requests
+			.filter((request) => request.kind === 'attribute')
+			.map((request) => request.body as Record<string, unknown>)
+			.find((body) => body['@odata.type'] === 'Microsoft.Dynamics.CRM.BooleanAttributeMetadata');
+		expect(booleanAttribute).toBeTruthy();
+		expect(booleanAttribute?.DefaultValue).toBe(false);
+		const optionSet = booleanAttribute?.OptionSet as Record<string, unknown>;
+		expect(optionSet.DefaultValue).toBeUndefined();
+		expect(optionSet.TrueOption).toBeTruthy();
+		expect(optionSet.FalseOption).toBeTruthy();
 	});
 
 	it('writes control seed and plan when valid', () => {
