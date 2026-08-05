@@ -41,16 +41,30 @@ const items = computed(() => {
 
 watch(
   [() => context.value.email, () => data.value?.items],
-  ([email, items]) => {
-    // Demo convenience: jump to "waiting on me" when signed in as an approver.
+  ([email, list]) => {
+    if (!email || !list?.length) {
+      return
+    }
+    const lower = email.toLowerCase()
+    // Prefer actionable claimed/named work over claimable pool items.
     if (
-      email &&
-      (items ?? []).some(
+      list.some(
         (item) =>
-          item.currentApproverEmail?.toLowerCase() === email.toLowerCase(),
+          item.currentStepStatus === 'pending' &&
+          item.currentApproverEmail?.toLowerCase() === lower,
       )
     ) {
       persona.value = 'waiting_on_me'
+      return
+    }
+    if (
+      list.some(
+        (item) =>
+          item.currentStepStatus === 'queued' &&
+          item.currentPoolEmails?.some((member) => member.toLowerCase() === lower),
+      )
+    ) {
+      persona.value = 'available_in_pool'
     }
   },
   { immediate: true },
@@ -139,7 +153,17 @@ watch(
         >
           <td>
             <div class="font-weight-medium">{{ item.title }}</div>
-            <div v-if="item.currentApproverEmail" class="text-caption text-medium-emphasis">
+            <div v-if="item.currentStepStatus === 'queued'" class="text-caption text-medium-emphasis">
+              Pool queue
+              <span v-if="item.currentStepDueAt">
+                · due {{ new Date(item.currentStepDueAt).toLocaleString() }}
+              </span>
+              <span v-if="item.currentStepElevated"> · elevated</span>
+            </div>
+            <div
+              v-else-if="item.currentApproverEmail"
+              class="text-caption text-medium-emphasis"
+            >
               Waiting on {{ item.currentApproverEmail }}
             </div>
           </td>

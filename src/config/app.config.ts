@@ -1,6 +1,7 @@
 /**
  * Adopter-facing app configuration.
  * Change this file (and `document-types.ts`) for most tenant-specific behavior.
+ * Prefer env overrides / deploy/connections.json for hosts so custom domains stay out of source.
  */
 export interface SharePointDefaults {
   siteUrl: string
@@ -22,10 +23,13 @@ export interface LocalDemoUser {
 export interface AppConfig {
   brand: AppBrand
   /**
-   * Replace these with your tenant SharePoint defaults.
+   * Replace these with your tenant SharePoint defaults (any HTTPS host; vanity domains OK).
    * Document types can override folderPath per type.
+   * Override at runtime with VITE_SHAREPOINT_* env vars.
    */
   sharePoint: SharePointDefaults
+  /** Optional Dataverse org URL for docs / future adapters (custom domains OK). */
+  dataverseEnvironmentUrl?: string
   /** Used only when Power Apps host context is unavailable (local Vite). */
   localDemoUser: LocalDemoUser
   features: {
@@ -36,20 +40,45 @@ export interface AppConfig {
   }
 }
 
+type AppEnvKey =
+  | 'VITE_SHAREPOINT_SITE_URL'
+  | 'VITE_SHAREPOINT_LIBRARY_NAME'
+  | 'VITE_SHAREPOINT_FOLDER_PATH'
+  | 'VITE_DATAVERSE_ENVIRONMENT_URL'
+
+const env = (key: AppEnvKey): string | undefined => {
+  try {
+    const meta = import.meta as ImportMeta & {
+      env?: Partial<Record<AppEnvKey, string>>
+    }
+    const value = meta.env?.[key]
+    return typeof value === 'string' && value.trim().length > 0
+      ? value.trim()
+      : undefined
+  } catch {
+    return undefined
+  }
+}
+
 export const appConfig: AppConfig = {
   brand: {
     name: 'Document Routing',
     tagline: 'Freeform request → draft → approvals → SharePoint PDF',
   },
   sharePoint: {
-    // TODO: replace with your SharePoint site URL
-    siteUrl: 'https://contoso.sharepoint.com/sites/Policies',
-    libraryName: 'Published Documents',
-    folderPath: '/Policies',
+    // Sample only — replace via .env (VITE_SHAREPOINT_SITE_URL) or edit here.
+    // Any HTTPS host is valid; do not assume *.sharepoint.com.
+    siteUrl:
+      env('VITE_SHAREPOINT_SITE_URL') ??
+      'https://docs.example.com/sites/Policies',
+    libraryName:
+      env('VITE_SHAREPOINT_LIBRARY_NAME') ?? 'Published Documents',
+    folderPath: env('VITE_SHAREPOINT_FOLDER_PATH') ?? '/Policies',
   },
+  dataverseEnvironmentUrl: env('VITE_DATAVERSE_ENVIRONMENT_URL'),
   localDemoUser: {
     userName: 'Local Developer',
-    email: 'developer@contoso.com',
+    email: 'developer@example.com',
   },
   features: {
     showSetupBanner: true,
@@ -58,13 +87,34 @@ export const appConfig: AppConfig = {
 }
 
 /**
- * True when SharePoint defaults still look like the sample Contoso placeholders.
+ * True when SharePoint / demo identity still look like sample placeholders.
+ * Does not require Microsoft primary domains — only checks for template markers.
  */
 export function hasPlaceholderSharePointConfig(
   config: AppConfig = appConfig,
 ): boolean {
-  return (
-    config.sharePoint.siteUrl.includes('contoso.sharepoint.com') ||
-    config.localDemoUser.email.endsWith('@contoso.com')
-  )
+  const values = [
+    config.sharePoint.siteUrl,
+    config.localDemoUser.email,
+    config.dataverseEnvironmentUrl ?? '',
+  ].map((value) => value.toLowerCase())
+
+  return values.some((value) => {
+    if (!value) {
+      return false
+    }
+    if (
+      value.includes('example.com') ||
+      value.includes('example.org') ||
+      value.includes('replace_me') ||
+      value.includes('replace-me')
+    ) {
+      return true
+    }
+    return (
+      value.includes('@contoso.com') ||
+      value.includes('://contoso.') ||
+      value.includes('.contoso.com')
+    )
+  })
 }

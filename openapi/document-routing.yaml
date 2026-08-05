@@ -137,7 +137,7 @@ paths:
     post:
       operationId: decideApprovalStep
       tags: [Approvals]
-      summary: Approve or reject the current approval step
+      summary: Approve or reject the current claimed/named approval step
       parameters:
         - $ref: '#/components/parameters/DocumentId'
         - name: stepId
@@ -163,6 +163,88 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+  /documents/{documentId}/approvals/{stepId}/claim:
+    post:
+      operationId: claimApprovalStep
+      tags: [Approvals]
+      summary: Self-assign a queued pool approval step
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+        - name: stepId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApprovalActorRequest'
+      responses:
+        '200':
+          description: Step claimed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /documents/{documentId}/approvals/{stepId}/release:
+    post:
+      operationId: releaseApprovalStep
+      tags: [Approvals]
+      summary: Return a claimed pool step to the queue
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+        - name: stepId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApprovalActorRequest'
+      responses:
+        '200':
+          description: Step released back to queue
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /documents/{documentId}/approvals/process-sla:
+    post:
+      operationId: processApprovalSla
+      tags: [Approvals]
+      summary: Process SLA timeouts and elevate overdue steps (scheduler / flow entrypoint)
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProcessSlaRequest'
+      responses:
+        '200':
+          description: Document after SLA processing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /documents/{documentId}/publish:
     post:
       operationId: publishDocumentPdf
@@ -222,10 +304,137 @@ components:
     ApprovalStepStatus:
       type: string
       enum:
+        - waiting
+        - queued
         - pending
         - approved
         - rejected
         - skipped
+    ApprovalAssignmentMode:
+      type: string
+      enum: [named, pool]
+    SubmitForApprovalRequest:
+      type: object
+      required: [steps]
+      properties:
+        steps:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/ApprovalStepInput'
+        comment:
+          type: string
+    ApprovalStepInput:
+      oneOf:
+        - $ref: '#/components/schemas/NamedApprovalStepInput'
+        - $ref: '#/components/schemas/PoolApprovalStepInput'
+      discriminator:
+        propertyName: assignmentMode
+        mapping:
+          named: '#/components/schemas/NamedApprovalStepInput'
+          pool: '#/components/schemas/PoolApprovalStepInput'
+    NamedApprovalStepInput:
+      type: object
+      required: [assignmentMode, assignee]
+      properties:
+        assignmentMode:
+          type: string
+          enum: [named]
+        role:
+          type: string
+          description: Display role for the step (Legal, Compliance, …)
+        slaHours:
+          type: number
+          exclusiveMinimum: 0
+          description: Hours until SLA timeout from activation/claim
+        assignee:
+          $ref: '#/components/schemas/Approver'
+        elevationPool:
+          type: array
+          items:
+            $ref: '#/components/schemas/Approver'
+          description: Extra members merged into the pool after SLA timeout
+    PoolApprovalStepInput:
+      type: object
+      required: [assignmentMode, pool]
+      properties:
+        assignmentMode:
+          type: string
+          enum: [pool]
+        role:
+          type: string
+          description: Display role for the step (Legal, Compliance, …)
+        slaHours:
+          type: number
+          exclusiveMinimum: 0
+          description: Hours until SLA timeout from queue activation/claim
+        pool:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/Approver'
+          description: Eligible claimers for this pool step
+        elevationPool:
+          type: array
+          items:
+            $ref: '#/components/schemas/Approver'
+          description: Extra members merged into the pool after SLA timeout
+    Approver:
+      type: object
+      required: [email, displayName]
+      properties:
+        email:
+          type: string
+          format: email
+        displayName:
+          type: string
+        role:
+          type: string
+          description: e.g. Legal, Compliance, Department Head
+    ApprovalActorRequest:
+      type: object
+      required: [actorEmail]
+      properties:
+        actorEmail:
+          type: string
+          format: email
+        comment:
+          type: string
+    ApprovalDecisionRequest:
+      type: object
+      required: [decision, actorEmail]
+      properties:
+        decision:
+          type: string
+          enum: [approve, reject]
+        actorEmail:
+          type: string
+          format: email
+        comment:
+          type: string
+    ProcessSlaRequest:
+      type: object
+      properties:
+        now:
+          type: string
+          format: date-time
+          description: Override clock for tests/local demos; production schedulers omit this
+    PublishRequest:
+      type: object
+      required: [sharePointSiteUrl, libraryName]
+      properties:
+        sharePointSiteUrl:
+          type: string
+          format: uri
+        libraryName:
+          type: string
+        folderPath:
+          type: string
+          description: Optional folder under the library
+          default: /
+        fileName:
+          type: string
+          description: Overrides the default PDF file name
     CreateDocumentRequest:
       type: object
       required: [title, freeformRequest, requesterEmail, documentType]
@@ -271,57 +480,6 @@ components:
           format: email
         summary:
           type: string
-    SubmitForApprovalRequest:
-      type: object
-      required: [approvers]
-      properties:
-        approvers:
-          type: array
-          minItems: 1
-          items:
-            $ref: '#/components/schemas/Approver'
-        comment:
-          type: string
-    Approver:
-      type: object
-      required: [email, displayName]
-      properties:
-        email:
-          type: string
-          format: email
-        displayName:
-          type: string
-        role:
-          type: string
-          description: e.g. Legal, Compliance, Department Head
-    ApprovalDecisionRequest:
-      type: object
-      required: [decision, actorEmail]
-      properties:
-        decision:
-          type: string
-          enum: [approve, reject]
-        actorEmail:
-          type: string
-          format: email
-        comment:
-          type: string
-    PublishRequest:
-      type: object
-      required: [sharePointSiteUrl, libraryName]
-      properties:
-        sharePointSiteUrl:
-          type: string
-          format: uri
-        libraryName:
-          type: string
-        folderPath:
-          type: string
-          description: Optional folder under the library
-          default: /
-        fileName:
-          type: string
-          description: Overrides the default PDF file name
     DocumentSummary:
       type: object
       required:
@@ -352,6 +510,23 @@ components:
           type: string
           format: email
           nullable: true
+        currentStepStatus:
+          allOf:
+            - $ref: '#/components/schemas/ApprovalStepStatus'
+          nullable: true
+        currentStepDueAt:
+          type: string
+          format: date-time
+          nullable: true
+        currentStepElevated:
+          type: boolean
+          nullable: true
+        currentPoolEmails:
+          type: array
+          items:
+            type: string
+            format: email
+          description: Eligible claimers when the active step is a pool queue
         createdAt:
           type: string
           format: date-time
@@ -360,7 +535,13 @@ components:
           format: date-time
     ApprovalStep:
       type: object
-      required: [id, order, approverEmail, approverDisplayName, status]
+      required:
+        - id
+        - order
+        - assignmentMode
+        - status
+        - pool
+        - elevated
       properties:
         id:
           type: string
@@ -368,16 +549,45 @@ components:
         order:
           type: integer
           minimum: 1
+        assignmentMode:
+          $ref: '#/components/schemas/ApprovalAssignmentMode'
         approverEmail:
           type: string
           format: email
+          nullable: true
         approverDisplayName:
           type: string
+          nullable: true
         role:
           type: string
           nullable: true
         status:
           $ref: '#/components/schemas/ApprovalStepStatus'
+        pool:
+          type: array
+          items:
+            $ref: '#/components/schemas/Approver'
+        elevationPool:
+          type: array
+          items:
+            $ref: '#/components/schemas/Approver'
+        slaHours:
+          type: number
+          nullable: true
+        dueAt:
+          type: string
+          format: date-time
+          nullable: true
+        claimedAt:
+          type: string
+          format: date-time
+          nullable: true
+        elevated:
+          type: boolean
+        elevatedAt:
+          type: string
+          format: date-time
+          nullable: true
         comment:
           type: string
           nullable: true

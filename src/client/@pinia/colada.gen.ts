@@ -4,8 +4,8 @@ import { type _JSONValue, defineQueryOptions, type UseMutationOptions } from '@p
 
 import { serializeQueryKeyValue } from '../client';
 import { client } from '../client.gen';
-import { createDocumentRequest, decideApprovalStep, getDocument, listDocuments, type Options, publishDocumentPdf, submitForApproval, updateDocumentDraft } from '../sdk.gen';
-import type { CreateDocumentRequestData, CreateDocumentRequestResponse, DecideApprovalStepData, DecideApprovalStepError, DecideApprovalStepResponse, GetDocumentData, GetDocumentError, GetDocumentResponse, ListDocumentsData, ListDocumentsResponse, PublishDocumentPdfData, PublishDocumentPdfError, PublishDocumentPdfResponse, SubmitForApprovalData, SubmitForApprovalError, SubmitForApprovalResponse, UpdateDocumentDraftData, UpdateDocumentDraftError, UpdateDocumentDraftResponse } from '../types.gen';
+import { claimApprovalStep, createDocumentRequest, decideApprovalStep, getDocument, listDocuments, type Options, processApprovalSla, publishDocumentPdf, releaseApprovalStep, submitForApproval, updateDocumentDraft } from '../sdk.gen';
+import type { ClaimApprovalStepData, ClaimApprovalStepError, ClaimApprovalStepResponse, CreateDocumentRequestData, CreateDocumentRequestResponse, DecideApprovalStepData, DecideApprovalStepError, DecideApprovalStepResponse, GetDocumentData, GetDocumentError, GetDocumentResponse, ListDocumentsData, ListDocumentsResponse, ProcessApprovalSlaData, ProcessApprovalSlaError, ProcessApprovalSlaResponse, PublishDocumentPdfData, PublishDocumentPdfError, PublishDocumentPdfResponse, ReleaseApprovalStepData, ReleaseApprovalStepError, ReleaseApprovalStepResponse, SubmitForApprovalData, SubmitForApprovalError, SubmitForApprovalResponse, UpdateDocumentDraftData, UpdateDocumentDraftError, UpdateDocumentDraftResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'path'> & {
@@ -119,11 +119,53 @@ export const submitForApprovalMutation = (options?: Partial<Options<SubmitForApp
 });
 
 /**
- * Approve or reject the current approval step
+ * Approve or reject the current claimed/named approval step
  */
 export const decideApprovalStepMutation = (options?: Partial<Options<DecideApprovalStepData>>): UseMutationOptions<DecideApprovalStepResponse, Options<DecideApprovalStepData>, DecideApprovalStepError> => ({
     mutation: async (vars) => {
         const { data } = await decideApprovalStep({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+/**
+ * Self-assign a queued pool approval step
+ */
+export const claimApprovalStepMutation = (options?: Partial<Options<ClaimApprovalStepData>>): UseMutationOptions<ClaimApprovalStepResponse, Options<ClaimApprovalStepData>, ClaimApprovalStepError> => ({
+    mutation: async (vars) => {
+        const { data } = await claimApprovalStep({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+/**
+ * Return a claimed pool step to the queue
+ */
+export const releaseApprovalStepMutation = (options?: Partial<Options<ReleaseApprovalStepData>>): UseMutationOptions<ReleaseApprovalStepResponse, Options<ReleaseApprovalStepData>, ReleaseApprovalStepError> => ({
+    mutation: async (vars) => {
+        const { data } = await releaseApprovalStep({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+/**
+ * Process SLA timeouts and elevate overdue steps (scheduler / flow entrypoint)
+ */
+export const processApprovalSlaMutation = (options?: Partial<Options<ProcessApprovalSlaData>>): UseMutationOptions<ProcessApprovalSlaResponse, Options<ProcessApprovalSlaData>, ProcessApprovalSlaError> => ({
+    mutation: async (vars) => {
+        const { data } = await processApprovalSla({
             ...options,
             ...vars,
             throwOnError: true

@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import { appConfig } from '../config/app.config.ts'
-import { getDocumentType } from '../config/document-types.ts'
+import {
+  addHoursIso,
+  type ApproverPerson,
+} from '../domain/approval-queue.ts'
+import { syncCurrentApprovalFields } from './approval-engine.ts'
 
 export type MockDocumentStatus =
   | 'requested'
@@ -10,6 +14,25 @@ export type MockDocumentStatus =
   | 'rejected'
   | 'published'
 
+export interface MockApprovalStep {
+  id: string
+  order: number
+  assignmentMode: 'named' | 'pool'
+  approverEmail: string | null
+  approverDisplayName: string | null
+  role: string | null
+  status: 'waiting' | 'queued' | 'pending' | 'approved' | 'rejected' | 'skipped'
+  pool: ApproverPerson[]
+  elevationPool: ApproverPerson[]
+  slaHours: number | null
+  dueAt: string | null
+  claimedAt: string | null
+  elevated: boolean
+  elevatedAt: string | null
+  comment: string | null
+  decidedAt: string | null
+}
+
 export interface MockDocumentRecord {
   id: string
   title: string
@@ -18,22 +41,17 @@ export interface MockDocumentRecord {
   requesterEmail: string
   priority: 'low' | 'normal' | 'high'
   currentApproverEmail: string | null
+  currentStepStatus: MockApprovalStep['status'] | null
+  currentStepDueAt: string | null
+  currentStepElevated: boolean | null
+  currentPoolEmails: string[]
   createdAt: string
   updatedAt: string
   freeformRequest: string
   draftBodyMarkdown: string | null
   draftSummary: string | null
   authorEmail: string | null
-  approvalSteps: Array<{
-    id: string
-    order: number
-    approverEmail: string
-    approverDisplayName: string
-    role: string | null
-    status: 'pending' | 'approved' | 'rejected' | 'skipped'
-    comment: string | null
-    decidedAt: string | null
-  }>
+  approvalSteps: MockApprovalStep[]
   history: Array<{
     id: string
     at: string
@@ -47,64 +65,67 @@ export interface MockDocumentRecord {
   requestedLibraryName: string | null
 }
 
-const now = (): string => new Date().toISOString()
+const stamp = (): string => new Date().toISOString()
 
 /**
- * Seeds demo documents across types and workflow stages for local play.
+ * Seeds demo documents across types, including an open pool queue past SLA.
  */
 export function createSeedDocuments(): MockDocumentRecord[] {
-  const createdAt = now()
-  const policy = getDocumentType('policy')
-  const sop = getDocumentType('sop')
+  const createdAt = stamp()
+  const overdueDueAt = addHoursIso(-1)
 
-  const requestedId = randomUUID()
-  const draftingId = randomUUID()
-  const inReviewId = randomUUID()
+  const requested: MockDocumentRecord = {
+    id: randomUUID(),
+    title: 'Q3 Travel Policy Update',
+    documentType: 'policy',
+    status: 'requested',
+    requesterEmail: 'alex.requester@contoso.com',
+    priority: 'high',
+    currentApproverEmail: null,
+    currentStepStatus: null,
+    currentStepDueAt: null,
+    currentStepElevated: null,
+    currentPoolEmails: [],
+    createdAt,
+    updatedAt: createdAt,
+    freeformRequest:
+      'Please draft an updated travel policy covering economy class defaults, manager pre-approval above $1,500, and green travel options for trips under 4 hours.',
+    draftBodyMarkdown: null,
+    draftSummary: null,
+    authorEmail: null,
+    approvalSteps: [],
+    history: [
+      {
+        id: randomUUID(),
+        at: createdAt,
+        actorEmail: 'alex.requester@contoso.com',
+        action: 'requested',
+        message: 'Freeform request submitted',
+      },
+    ],
+    publishedPdfUrl: null,
+    sharePointItemId: null,
+    requestedPublishSiteUrl: appConfig.sharePoint.siteUrl,
+    requestedLibraryName: appConfig.sharePoint.libraryName,
+  }
 
-  return [
-    {
-      id: requestedId,
-      title: 'Q3 Travel Policy Update',
-      documentType: policy.id,
-      status: 'requested',
-      requesterEmail: 'alex.requester@contoso.com',
-      priority: 'high',
-      currentApproverEmail: null,
-      createdAt,
-      updatedAt: createdAt,
-      freeformRequest:
-        'Please draft an updated travel policy covering economy class defaults, manager pre-approval above $1,500, and green travel options for trips under 4 hours.',
-      draftBodyMarkdown: null,
-      draftSummary: null,
-      authorEmail: null,
-      approvalSteps: [],
-      history: [
-        {
-          id: randomUUID(),
-          at: createdAt,
-          actorEmail: 'alex.requester@contoso.com',
-          action: 'requested',
-          message: 'Freeform request submitted',
-        },
-      ],
-      publishedPdfUrl: null,
-      sharePointItemId: null,
-      requestedPublishSiteUrl: appConfig.sharePoint.siteUrl,
-      requestedLibraryName: appConfig.sharePoint.libraryName,
-    },
-    {
-      id: draftingId,
-      title: 'Laptop Refresh SOP',
-      documentType: sop.id,
-      status: 'drafting',
-      requesterEmail: 'pat.manager@contoso.com',
-      priority: 'normal',
-      currentApproverEmail: null,
-      createdAt,
-      updatedAt: createdAt,
-      freeformRequest:
-        'Document the 36-month laptop refresh process for corporate devices, including inventory checks and return shipping.',
-      draftBodyMarkdown: `# Laptop Refresh SOP
+  const drafting: MockDocumentRecord = {
+    id: randomUUID(),
+    title: 'Laptop Refresh SOP',
+    documentType: 'sop',
+    status: 'drafting',
+    requesterEmail: 'pat.manager@contoso.com',
+    priority: 'normal',
+    currentApproverEmail: null,
+    currentStepStatus: null,
+    currentStepDueAt: null,
+    currentStepElevated: null,
+    currentPoolEmails: [],
+    createdAt,
+    updatedAt: createdAt,
+    freeformRequest:
+      'Document the 36-month laptop refresh process for corporate devices, including inventory checks and return shipping.',
+    draftBodyMarkdown: `# Laptop Refresh SOP
 
 ## Overview
 Document the 36-month laptop refresh process for corporate devices.
@@ -114,73 +135,134 @@ Document the 36-month laptop refresh process for corporate devices.
 2. Order replacement
 3. Image and ship
 `,
-      draftSummary: 'Corporate laptop refresh procedure',
-      authorEmail: appConfig.localDemoUser.email,
-      approvalSteps: [],
-      history: [
-        {
-          id: randomUUID(),
-          at: createdAt,
-          actorEmail: 'pat.manager@contoso.com',
-          action: 'requested',
-          message: 'Freeform request submitted',
-        },
-        {
-          id: randomUUID(),
-          at: createdAt,
-          actorEmail: appConfig.localDemoUser.email,
-          action: 'draft_updated',
-          message: 'Draft content saved',
-        },
-      ],
-      publishedPdfUrl: null,
-      sharePointItemId: null,
-      requestedPublishSiteUrl: appConfig.sharePoint.siteUrl,
-      requestedLibraryName: appConfig.sharePoint.libraryName,
-    },
-    {
-      id: inReviewId,
-      title: 'Remote Work Announcement',
-      documentType: 'announcement',
-      status: 'in_review',
-      requesterEmail: 'alex.requester@contoso.com',
-      priority: 'normal',
-      currentApproverEmail: 'morgan.comms@contoso.com',
-      createdAt,
-      updatedAt: createdAt,
-      freeformRequest:
-        'Announce hybrid work Fridays for HQ staff starting next month.',
-      draftBodyMarkdown: `# Remote Work Announcement
+    draftSummary: 'Corporate laptop refresh procedure',
+    authorEmail: appConfig.localDemoUser.email,
+    approvalSteps: [],
+    history: [
+      {
+        id: randomUUID(),
+        at: createdAt,
+        actorEmail: 'pat.manager@contoso.com',
+        action: 'requested',
+        message: 'Freeform request submitted',
+      },
+      {
+        id: randomUUID(),
+        at: createdAt,
+        actorEmail: appConfig.localDemoUser.email,
+        action: 'draft_updated',
+        message: 'Draft content saved',
+      },
+    ],
+    publishedPdfUrl: null,
+    sharePointItemId: null,
+    requestedPublishSiteUrl: appConfig.sharePoint.siteUrl,
+    requestedLibraryName: appConfig.sharePoint.libraryName,
+  }
 
-Hybrid work Fridays begin next month for HQ staff.
+  const queuedPool: MockDocumentRecord = {
+    id: randomUUID(),
+    title: 'Expense Policy Clarification',
+    documentType: 'policy',
+    status: 'in_review',
+    requesterEmail: 'alex.requester@contoso.com',
+    priority: 'high',
+    currentApproverEmail: null,
+    currentStepStatus: 'queued',
+    currentStepDueAt: overdueDueAt,
+    currentStepElevated: false,
+    currentPoolEmails: [
+      'jordan.legal@contoso.com',
+      'avery.counsel@contoso.com',
+    ],
+    createdAt,
+    updatedAt: createdAt,
+    freeformRequest: 'Clarify meal caps for customer visits.',
+    draftBodyMarkdown: `# Expense Policy Clarification
+
+Meal caps for customer visits are $75 / person.
 `,
-      draftSummary: 'Hybrid Fridays announcement',
-      authorEmail: appConfig.localDemoUser.email,
-      approvalSteps: [
-        {
-          id: randomUUID(),
-          order: 1,
-          approverEmail: 'morgan.comms@contoso.com',
-          approverDisplayName: 'Morgan Communications',
-          role: 'Communications',
-          status: 'pending',
-          comment: null,
-          decidedAt: null,
-        },
-      ],
-      history: [
-        {
-          id: randomUUID(),
-          at: createdAt,
-          actorEmail: appConfig.localDemoUser.email,
-          action: 'submitted_for_approval',
-          message: 'Submitted to approval chain',
-        },
-      ],
-      publishedPdfUrl: null,
-      sharePointItemId: null,
-      requestedPublishSiteUrl: appConfig.sharePoint.siteUrl,
-      requestedLibraryName: appConfig.sharePoint.libraryName,
-    },
-  ]
+    draftSummary: 'Meal cap clarification',
+    authorEmail: appConfig.localDemoUser.email,
+    approvalSteps: [
+      {
+        id: randomUUID(),
+        order: 1,
+        assignmentMode: 'pool',
+        approverEmail: null,
+        approverDisplayName: null,
+        role: 'Legal Reviewers',
+        status: 'queued',
+        pool: [
+          {
+            displayName: 'Jordan Legal',
+            email: 'jordan.legal@contoso.com',
+          },
+          {
+            displayName: 'Avery Counsel',
+            email: 'avery.counsel@contoso.com',
+          },
+        ],
+        elevationPool: [
+          {
+            displayName: 'Pat Chief Counsel',
+            email: 'pat.counsel@contoso.com',
+            role: 'Elevated Legal',
+          },
+        ],
+        slaHours: 8,
+        dueAt: overdueDueAt,
+        claimedAt: null,
+        elevated: false,
+        elevatedAt: null,
+        comment: null,
+        decidedAt: null,
+      },
+      {
+        id: randomUUID(),
+        order: 2,
+        assignmentMode: 'named',
+        approverEmail: 'sam.compliance@contoso.com',
+        approverDisplayName: 'Sam Compliance',
+        role: 'Compliance',
+        status: 'waiting',
+        pool: [
+          {
+            displayName: 'Sam Compliance',
+            email: 'sam.compliance@contoso.com',
+          },
+        ],
+        elevationPool: [
+          {
+            displayName: 'Chris Compliance Lead',
+            email: 'chris.compliance@contoso.com',
+            role: 'Elevated Compliance',
+          },
+        ],
+        slaHours: 24,
+        dueAt: null,
+        claimedAt: null,
+        elevated: false,
+        elevatedAt: null,
+        comment: null,
+        decidedAt: null,
+      },
+    ],
+    history: [
+      {
+        id: randomUUID(),
+        at: createdAt,
+        actorEmail: appConfig.localDemoUser.email,
+        action: 'submitted_for_approval',
+        message: 'Submitted to approval chain (Legal pool is open; SLA already due for demo)',
+      },
+    ],
+    publishedPdfUrl: null,
+    sharePointItemId: null,
+    requestedPublishSiteUrl: appConfig.sharePoint.siteUrl,
+    requestedLibraryName: appConfig.sharePoint.libraryName,
+  }
+
+  syncCurrentApprovalFields(queuedPool)
+  return [requested, drafting, queuedPool]
 }

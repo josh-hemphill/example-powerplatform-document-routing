@@ -3,11 +3,14 @@ import { computed, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useMutation, useQuery, useQueryCache } from '@pinia/colada'
 import {
+  claimApprovalStepMutation,
   decideApprovalStepMutation,
   getDocumentQuery,
   getDocumentQueryKey,
   listDocumentsQueryKey,
+  processApprovalSlaMutation,
   publishDocumentPdfMutation,
+  releaseApprovalStepMutation,
   submitForApprovalMutation,
   updateDocumentDraftMutation,
 } from '@/client/@pinia/colada.gen'
@@ -18,9 +21,10 @@ import { appConfig } from '@/config/app.config'
 import {
   buildDraftFromTemplate,
   getDocumentType,
-  type ApproverTemplate,
+  toApprovalStepInputs,
 } from '@/config/document-types'
 import { usePowerAppsContext } from '@/composables/use-power-apps-context'
+import { isEmailInPool } from '@/domain/approval-queue'
 import { resolvePublishTargets } from '@/publishing/html-pdf-template'
 import { publishApprovedDocument } from '@/publishing/publish-document'
 
@@ -49,7 +53,6 @@ const draftForm = reactive({
 
 const approvalForm = reactive({
   comment: '',
-  approvers: [] as ApproverTemplate[],
 })
 
 const decisionForm = reactive({
@@ -64,6 +67,13 @@ const publishForm = reactive({
   fileName: '',
 })
 
+const activeStep = computed(
+  () =>
+    document.value?.approvalSteps.find(
+      (step) => step.status === 'queued' || step.status === 'pending',
+    ) ?? null,
+)
+
 watch(
   document,
   (value) => {
@@ -77,14 +87,20 @@ watch(
       buildDraftFromTemplate(type, value.title, value.freeformRequest)
     draftForm.summary = value.draftSummary ?? ''
     draftForm.authorEmail = value.authorEmail ?? context.value.email ?? ''
-    approvalForm.approvers = type.approvalChain.map((step) => ({ ...step }))
     const targets = resolvePublishTargets(value)
     publishForm.sharePointSiteUrl = targets.siteUrl
     publishForm.libraryName = targets.libraryName
     publishForm.folderPath = targets.folderPath
     publishForm.fileName = targets.fileName
+
+    const step = value.approvalSteps.find(
+      (item) => item.status === 'queued' || item.status === 'pending',
+    )
     decisionForm.actorEmail =
-      value.currentApproverEmail ?? context.value.email ?? ''
+      step?.approverEmail ||
+      step?.pool?.[0]?.email ||
+      context.value.email ||
+      ''
   },
   { immediate: true },
 )
@@ -98,57 +114,55 @@ async function invalidateDocumentQueries(): Promise<void> {
   ])
 }
 
-const {
-  mutateAsync: saveDraftAsync,
-  isLoading: isSavingDraft,
-} = useMutation({
+const { mutateAsync: saveDraftAsync, isLoading: isSavingDraft } = useMutation({
   ...updateDocumentDraftMutation(),
   async onSettled() {
     await invalidateDocumentQueries()
   },
 })
 
-const {
-  mutateAsync: submitApprovalAsync,
-  isLoading: isSubmittingApproval,
-} = useMutation({
-  ...submitForApprovalMutation(),
-  async onSettled() {
-    await invalidateDocumentQueries()
-  },
-})
+const { mutateAsync: submitApprovalAsync, isLoading: isSubmittingApproval } =
+  useMutation({
+    ...submitForApprovalMutation(),
+    async onSettled() {
+      await invalidateDocumentQueries()
+    },
+  })
 
-const {
-  mutateAsync: decideStepAsync,
-  isLoading: isDecidingStep,
-} = useMutation({
+const { mutateAsync: decideStepAsync, isLoading: isDecidingStep } = useMutation({
   ...decideApprovalStepMutation(),
   async onSettled() {
     await invalidateDocumentQueries()
   },
 })
 
-const {
-  mutateAsync: publishPdfAsync,
-  isLoading: isPublishingPdf,
-} = useMutation({
-  ...publishDocumentPdfMutation(),
+const { mutateAsync: claimStepAsync, isLoading: isClaiming } = useMutation({
+  ...claimApprovalStepMutation(),
   async onSettled() {
     await invalidateDocumentQueries()
   },
 })
 
-function addApprover(): void {
-  approvalForm.approvers.push({
-    displayName: '',
-    email: '',
-    role: 'Approver',
-  })
-}
+const { mutateAsync: releaseStepAsync, isLoading: isReleasing } = useMutation({
+  ...releaseApprovalStepMutation(),
+  async onSettled() {
+    await invalidateDocumentQueries()
+  },
+})
 
-function removeApprover(index: number): void {
-  approvalForm.approvers.splice(index, 1)
-}
+const { mutateAsync: processSlaAsync, isLoading: isProcessingSla } = useMutation({
+  ...processApprovalSlaMutation(),
+  async onSettled() {
+    await invalidateDocumentQueries()
+  },
+})
+
+const { mutateAsync: publishPdfAsync, isLoading: isPublishingPdf } = useMutation({
+  ...publishDocumentPdfMutation(),
+  async onSettled() {
+    await invalidateDocumentQueries()
+  },
+})
 
 async function onSaveDraft(): Promise<void> {
   actionError.value = null
@@ -176,18 +190,11 @@ async function onSubmitForApproval(): Promise<void> {
   actionError.value = null
   actionSuccess.value = null
   try {
-    if (approvalForm.approvers.length === 0) {
-      throw new Error('Add at least one approver (edit document-types.ts defaults).')
-    }
-    for (const approver of approvalForm.approvers) {
-      if (!approver.displayName.trim() || !approver.email.trim()) {
-        throw new Error('Each approver needs a name and email.')
-      }
-    }
+    const steps = toApprovalStepInputs(documentType.value.approvalChain)
     await submitApprovalAsync({
       path: { documentId: documentId.value },
       body: {
-        approvers: approvalForm.approvers,
+        steps,
         comment: approvalForm.comment || undefined,
       },
     })
@@ -198,12 +205,71 @@ async function onSubmitForApproval(): Promise<void> {
   }
 }
 
+async function onClaim(): Promise<void> {
+  actionError.value = null
+  actionSuccess.value = null
+  const step = activeStep.value
+  if (!step || step.status !== 'queued') {
+    actionError.value = 'No queued pool step to claim.'
+    return
+  }
+  try {
+    await claimStepAsync({
+      path: { documentId: documentId.value, stepId: step.id },
+      body: {
+        actorEmail: decisionForm.actorEmail || context.value.email || '',
+      },
+    })
+    actionSuccess.value = 'Step claimed. You can approve or reject.'
+  } catch (claimError) {
+    actionError.value =
+      claimError instanceof Error ? claimError.message : 'Failed to claim step'
+  }
+}
+
+async function onRelease(): Promise<void> {
+  actionError.value = null
+  actionSuccess.value = null
+  const step = activeStep.value
+  if (!step || step.status !== 'pending' || step.assignmentMode !== 'pool') {
+    actionError.value = 'No claimed pool step to release.'
+    return
+  }
+  try {
+    await releaseStepAsync({
+      path: { documentId: documentId.value, stepId: step.id },
+      body: {
+        actorEmail: decisionForm.actorEmail || step.approverEmail || '',
+      },
+    })
+    actionSuccess.value = 'Returned to the pool queue.'
+  } catch (releaseError) {
+    actionError.value =
+      releaseError instanceof Error ? releaseError.message : 'Failed to release step'
+  }
+}
+
+async function onProcessSla(): Promise<void> {
+  actionError.value = null
+  actionSuccess.value = null
+  try {
+    await processSlaAsync({
+      path: { documentId: documentId.value },
+      body: {},
+    })
+    actionSuccess.value = 'SLA processor ran (elevates overdue steps when due).'
+  } catch (slaError) {
+    actionError.value =
+      slaError instanceof Error ? slaError.message : 'Failed to process SLA'
+  }
+}
+
 async function onDecision(decision: 'approve' | 'reject'): Promise<void> {
   actionError.value = null
   actionSuccess.value = null
-  const step = document.value?.approvalSteps.find((item) => item.status === 'pending')
-  if (!step) {
-    actionError.value = 'No pending approval step.'
+  const step = activeStep.value
+  if (!step || step.status !== 'pending') {
+    actionError.value = 'No pending approval step. Claim a pool step first if needed.'
     return
   }
 
@@ -215,7 +281,7 @@ async function onDecision(decision: 'approve' | 'reject'): Promise<void> {
       },
       body: {
         decision,
-        actorEmail: decisionForm.actorEmail || step.approverEmail,
+        actorEmail: decisionForm.actorEmail || step.approverEmail || '',
         comment: decisionForm.comment || undefined,
       },
     })
@@ -258,10 +324,6 @@ async function onPublish(): Promise<void> {
   }
 }
 
-const pendingStep = computed(
-  () => document.value?.approvalSteps.find((step) => step.status === 'pending') ?? null,
-)
-
 const canDraft = computed(
   () =>
     document.value &&
@@ -269,8 +331,27 @@ const canDraft = computed(
 )
 
 const canSubmitApproval = computed(() => document.value?.status === 'drafting')
-const canDecide = computed(() => document.value?.status === 'in_review' && pendingStep.value)
+const canClaim = computed(() => {
+  const step = activeStep.value
+  const actor = decisionForm.actorEmail || context.value.email
+  return Boolean(
+    step?.status === 'queued' &&
+      actor &&
+      isEmailInPool(step.pool ?? [], actor),
+  )
+})
+const canRelease = computed(() => {
+  const step = activeStep.value
+  const actor = (decisionForm.actorEmail || context.value.email || '').toLowerCase()
+  return Boolean(
+    step?.status === 'pending' &&
+      step.assignmentMode === 'pool' &&
+      step.approverEmail?.toLowerCase() === actor,
+  )
+})
+const canDecide = computed(() => activeStep.value?.status === 'pending')
 const canPublish = computed(() => document.value?.status === 'approved')
+const canProcessSla = computed(() => document.value?.status === 'in_review')
 </script>
 
 <template>
@@ -336,52 +417,23 @@ const canPublish = computed(() => document.value?.status === 'approved')
             <div class="text-subtitle-1 font-weight-bold mb-3">3. Approval chain</div>
             <template v-if="document.approvalSteps.length === 0">
               <p class="text-body-2 text-medium-emphasis mb-3">
-                Defaults come from the <strong>{{ documentType.label }}</strong> type in
-                <code>document-types.ts</code>.
-                <span v-if="appConfig.features.allowApproverOverride">
-                  You can adjust them before submitting.
-                </span>
+                Chain comes from <code>document-types.ts</code> for
+                <strong>{{ documentType.label }}</strong> (named and/or pool + SLA).
               </p>
-              <div
-                v-for="(approver, index) in approvalForm.approvers"
-                :key="index"
-                class="d-flex flex-wrap ga-2 mb-2"
-              >
-                <v-text-field
-                  v-model="approver.displayName"
-                  label="Name"
-                  :disabled="!appConfig.features.allowApproverOverride"
-                  hide-details
-                  class="flex-grow-1"
-                  style="min-width: 140px"
-                />
-                <v-text-field
-                  v-model="approver.email"
-                  label="Email"
-                  :disabled="!appConfig.features.allowApproverOverride"
-                  hide-details
-                  class="flex-grow-1"
-                  style="min-width: 180px"
-                />
-                <v-text-field
-                  v-model="approver.role"
-                  label="Role"
-                  :disabled="!appConfig.features.allowApproverOverride"
-                  hide-details
-                  style="min-width: 120px; max-width: 160px"
-                />
-                <v-btn
-                  v-if="appConfig.features.allowApproverOverride"
-                  icon="mdi-delete-outline"
-                  variant="text"
-                  @click="removeApprover(index)"
-                />
-              </div>
-              <div v-if="appConfig.features.allowApproverOverride" class="mb-3">
-                <v-btn size="small" variant="tonal" prepend-icon="mdi-plus" @click="addApprover">
-                  Add approver
-                </v-btn>
-              </div>
+              <v-list density="compact" class="mb-3 bg-transparent">
+                <v-list-item
+                  v-for="(step, index) in documentType.approvalChain"
+                  :key="index"
+                >
+                  <v-list-item-title>
+                    Step {{ index + 1 }} ·
+                    {{ step.mode === 'pool' ? step.poolRole : `${step.displayName} (${step.role})` }}
+                  </v-list-item-title>
+                  <v-list-item-subtitle>
+                    {{ step.mode === 'pool' ? `Pool · SLA ${step.slaHours}h` : `Named · SLA ${step.slaHours ?? '—'}h` }}
+                  </v-list-item-subtitle>
+                </v-list-item>
+              </v-list>
               <v-text-field v-model="approvalForm.comment" label="Submission comment" class="mb-3" />
               <v-btn
                 color="warning"
@@ -394,16 +446,35 @@ const canPublish = computed(() => document.value?.status === 'approved')
             </template>
             <template v-else>
               <ApprovalStepper :steps="document.approvalSteps" />
-              <div v-if="canDecide" class="mt-4">
+              <div class="mt-4">
                 <v-text-field
                   v-model="decisionForm.actorEmail"
-                  label="Acting as"
+                  label="Acting as (email)"
                   class="mb-2"
+                  hint="Use a pool member email to claim, e.g. jordan.legal@contoso.com"
+                  persistent-hint
                 />
-                <v-text-field v-model="decisionForm.comment" label="Decision comment" class="mb-3" />
-                <div class="d-flex ga-2">
+                <v-text-field v-model="decisionForm.comment" label="Comment" class="mb-3" />
+                <div class="d-flex flex-wrap ga-2">
+                  <v-btn
+                    color="info"
+                    :disabled="!canClaim"
+                    :loading="isClaiming"
+                    @click="onClaim"
+                  >
+                    Claim from pool
+                  </v-btn>
+                  <v-btn
+                    variant="tonal"
+                    :disabled="!canRelease"
+                    :loading="isReleasing"
+                    @click="onRelease"
+                  >
+                    Release to queue
+                  </v-btn>
                   <v-btn
                     color="success"
+                    :disabled="!canDecide"
                     :loading="isDecidingStep"
                     @click="onDecision('approve')"
                   >
@@ -412,10 +483,19 @@ const canPublish = computed(() => document.value?.status === 'approved')
                   <v-btn
                     color="error"
                     variant="tonal"
+                    :disabled="!canDecide"
                     :loading="isDecidingStep"
                     @click="onDecision('reject')"
                   >
                     Reject
+                  </v-btn>
+                  <v-btn
+                    variant="outlined"
+                    :disabled="!canProcessSla"
+                    :loading="isProcessingSla"
+                    @click="onProcessSla"
+                  >
+                    Process SLA
                   </v-btn>
                 </div>
               </div>

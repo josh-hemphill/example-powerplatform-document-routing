@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CreateDocumentRequestData, CreateDocumentRequestResponses, DecideApprovalStepData, DecideApprovalStepErrors, DecideApprovalStepResponses, GetDocumentData, GetDocumentErrors, GetDocumentResponses, ListDocumentsData, ListDocumentsResponses, PublishDocumentPdfData, PublishDocumentPdfErrors, PublishDocumentPdfResponses, SubmitForApprovalData, SubmitForApprovalErrors, SubmitForApprovalResponses, UpdateDocumentDraftData, UpdateDocumentDraftErrors, UpdateDocumentDraftResponses } from './types.gen';
+import type { ClaimApprovalStepData, ClaimApprovalStepErrors, ClaimApprovalStepResponses, CreateDocumentRequestData, CreateDocumentRequestResponses, DecideApprovalStepData, DecideApprovalStepErrors, DecideApprovalStepResponses, GetDocumentData, GetDocumentErrors, GetDocumentResponses, ListDocumentsData, ListDocumentsResponses, ProcessApprovalSlaData, ProcessApprovalSlaErrors, ProcessApprovalSlaResponses, PublishDocumentPdfData, PublishDocumentPdfErrors, PublishDocumentPdfResponses, ReleaseApprovalStepData, ReleaseApprovalStepErrors, ReleaseApprovalStepResponses, SubmitForApprovalData, SubmitForApprovalErrors, SubmitForApprovalResponses, UpdateDocumentDraftData, UpdateDocumentDraftErrors, UpdateDocumentDraftResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -65,10 +65,46 @@ export const submitForApproval = <ThrowOnError extends boolean = false>(options:
 });
 
 /**
- * Approve or reject the current approval step
+ * Approve or reject the current claimed/named approval step
  */
 export const decideApprovalStep = <ThrowOnError extends boolean = false>(options: Options<DecideApprovalStepData, ThrowOnError>): RequestResult<DecideApprovalStepResponses, DecideApprovalStepErrors, ThrowOnError> => (options.client ?? client).post<DecideApprovalStepResponses, DecideApprovalStepErrors, ThrowOnError>({
     url: '/documents/{documentId}/approvals/{stepId}/decision',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Self-assign a queued pool approval step
+ */
+export const claimApprovalStep = <ThrowOnError extends boolean = false>(options: Options<ClaimApprovalStepData, ThrowOnError>): RequestResult<ClaimApprovalStepResponses, ClaimApprovalStepErrors, ThrowOnError> => (options.client ?? client).post<ClaimApprovalStepResponses, ClaimApprovalStepErrors, ThrowOnError>({
+    url: '/documents/{documentId}/approvals/{stepId}/claim',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Return a claimed pool step to the queue
+ */
+export const releaseApprovalStep = <ThrowOnError extends boolean = false>(options: Options<ReleaseApprovalStepData, ThrowOnError>): RequestResult<ReleaseApprovalStepResponses, ReleaseApprovalStepErrors, ThrowOnError> => (options.client ?? client).post<ReleaseApprovalStepResponses, ReleaseApprovalStepErrors, ThrowOnError>({
+    url: '/documents/{documentId}/approvals/{stepId}/release',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Process SLA timeouts and elevate overdue steps (scheduler / flow entrypoint)
+ */
+export const processApprovalSla = <ThrowOnError extends boolean = false>(options: Options<ProcessApprovalSlaData, ThrowOnError>): RequestResult<ProcessApprovalSlaResponses, ProcessApprovalSlaErrors, ThrowOnError> => (options.client ?? client).post<ProcessApprovalSlaResponses, ProcessApprovalSlaErrors, ThrowOnError>({
+    url: '/documents/{documentId}/approvals/process-sla',
     ...options,
     headers: {
         'Content-Type': 'application/json',

@@ -1,8 +1,10 @@
 import type { DocumentStatus } from '../domain/document-status'
+import type { ApprovalStepStatus } from '../domain/approval-queue'
 
 export type InboxPersona =
   | 'all'
   | 'waiting_on_me'
+  | 'available_in_pool'
   | 'my_requests'
   | 'needs_draft'
   | 'ready_to_publish'
@@ -22,7 +24,12 @@ export const INBOX_PERSONAS: PersonaFilterItem[] = [
   {
     title: 'Waiting on me',
     value: 'waiting_on_me',
-    description: 'Approval steps assigned to the signed-in user',
+    description: 'Named or claimed steps assigned to me',
+  },
+  {
+    title: 'Available in my pool',
+    value: 'available_in_pool',
+    description: 'Queued pool steps I can claim',
   },
   {
     title: 'My requests',
@@ -45,6 +52,8 @@ export interface PersonaFilterableDocument {
   status: DocumentStatus
   requesterEmail: string
   currentApproverEmail?: string | null
+  currentStepStatus?: ApprovalStepStatus | null
+  currentPoolEmails?: string[] | null
   authorEmail?: string | null
 }
 
@@ -63,7 +72,19 @@ export function matchesInboxPersona(
       return true
     case 'waiting_on_me':
       return Boolean(
-        email && document.currentApproverEmail?.toLowerCase() === email,
+        email &&
+          document.currentApproverEmail?.toLowerCase() === email &&
+          // Treat missing status as pending for older/partial payloads; never match queued.
+          (document.currentStepStatus == null ||
+            document.currentStepStatus === 'pending'),
+      )
+    case 'available_in_pool':
+      return Boolean(
+        email &&
+          document.currentStepStatus === 'queued' &&
+          document.currentPoolEmails?.some(
+            (member) => member.toLowerCase() === email,
+          ),
       )
     case 'my_requests':
       return Boolean(email && document.requesterEmail.toLowerCase() === email)

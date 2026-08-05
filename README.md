@@ -2,7 +2,7 @@
 
 Example Power Platform **Code App** that routes freeform document requests through authoring, a chain of approvals, and PDF publish to SharePoint.
 
-**Adopting for your org?** Start with [`SETUP.md`](./SETUP.md) — most changes are limited to `src/config/app.config.ts` and `src/config/document-types.ts`.
+**Adopting for your org?** Start with [`SETUP.md`](./SETUP.md) — config in `src/config/*`, deploy scaffolding in [`deploy/`](./deploy/README.md).
 
 Stack:
 
@@ -11,6 +11,7 @@ Stack:
 - **Pinia Colada** for async server-state (queries/mutations)
 - **HeyAPI (`@hey-api/openapi-ts`)** to generate a typed SDK + Pinia Colada helpers from OpenAPI
 - **Power Apps CLI** via `@microsoft/power-apps-cli` (`pa …` commands; not the older `pac code` group)
+- **Deploy scaffolding** for Dataverse tables + SharePoint site wiring (custom domains supported)
 
 ## Workflow
 
@@ -23,7 +24,9 @@ Freeform request → Author draft → Approval chain → Approved → Publish PD
 3. **Approvals** — default chain from the document type (optionally editable)  
 4. **Publish** — HTML template hook + SharePoint stub / OpenAPI publish API  
 
-Inbox personas: All · Waiting on me · My requests · Needs draft · Ready to publish.
+Inbox personas: All · Waiting on me · Available in my pool · My requests · Needs draft · Ready to publish.
+
+Approvals support **named** steps and **pool** queues with claim/release, SLA timers, and elevation pools (`document-types.ts`).
 
 ## Quick start (local)
 
@@ -55,8 +58,10 @@ Use **hash routing** (`createWebHashHistory`) so deep links work when embedded. 
 ## Connecting data
 
 - Regenerate SDKs after OpenAPI edits: `pnpm generate:api`
-- Point at a real API with `VITE_DOCUMENT_API_BASE_URL`
-- Add SharePoint with `pa app add data-source` and replace `SharePointPublishService`
+- Scaffold Dataverse + SharePoint wiring: `cp deploy/connections.example.json deploy/connections.json` → edit hosts → `pnpm provision` (see [`deploy/README.md`](./deploy/README.md))
+- Point at a real API with `VITE_DOCUMENT_API_BASE_URL` (any HTTPS host)
+- SharePoint / Dataverse URLs accept **custom / vanity domains** — nothing assumes `*.sharepoint.com` or `*.dynamics.com`
+- Add data sources with generated `deploy/generated/pa-connect.sh` or `pa app add data-source`
 - Optional approvals notifications via `pa app add flow`
 
 ## PDF generation
@@ -67,12 +72,15 @@ Customize `src/publishing/html-pdf-template.ts`. Run HTML→PDF (or Typst) **ser
 
 ```text
 SETUP.md                          Adopter checklist (start here)
-src/config/app.config.ts          Brand + SharePoint defaults
+deploy/                           Dataverse + SharePoint provision scaffolding
+src/config/app.config.ts          Brand + SharePoint defaults (env-overridable)
 src/config/document-types.ts      Types, draft scaffolds, approval chains
 src/config/inbox-personas.ts      Inbox persona filters
+src/provisioning/                 Connection validation + Dataverse plan generator
 src/publishing/                   HTML PDF template + publish orchestrator
 openapi/document-routing.yaml     OpenAPI contract
 src/client/                       Generated SDK (do not hand-edit)
 src/mock/                         Local Vite mock + seed data
 src/views/                        Inbox, new request, document workspace
+scripts/provision.ts              pnpm provision / provision:apply CLI
 ```

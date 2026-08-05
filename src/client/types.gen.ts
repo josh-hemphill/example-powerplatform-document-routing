@@ -6,7 +6,97 @@ export type ClientOptions = {
 
 export type DocumentStatus = 'requested' | 'drafting' | 'in_review' | 'approved' | 'rejected' | 'published';
 
-export type ApprovalStepStatus = 'pending' | 'approved' | 'rejected' | 'skipped';
+export type ApprovalStepStatus = 'waiting' | 'queued' | 'pending' | 'approved' | 'rejected' | 'skipped';
+
+export type ApprovalAssignmentMode = 'named' | 'pool';
+
+export type SubmitForApprovalRequest = {
+    steps: Array<ApprovalStepInput>;
+    comment?: string;
+};
+
+export type ApprovalStepInput = ({
+    assignmentMode: 'named';
+} & NamedApprovalStepInput) | ({
+    assignmentMode: 'pool';
+} & PoolApprovalStepInput);
+
+export type NamedApprovalStepInput = {
+    assignmentMode: 'named';
+    /**
+     * Display role for the step (Legal, Compliance, …)
+     */
+    role?: string;
+    /**
+     * Hours until SLA timeout from activation/claim
+     */
+    slaHours?: number;
+    assignee: Approver;
+    /**
+     * Extra members merged into the pool after SLA timeout
+     */
+    elevationPool?: Array<Approver>;
+};
+
+export type PoolApprovalStepInput = {
+    assignmentMode: 'pool';
+    /**
+     * Display role for the step (Legal, Compliance, …)
+     */
+    role?: string;
+    /**
+     * Hours until SLA timeout from queue activation/claim
+     */
+    slaHours?: number;
+    /**
+     * Eligible claimers for this pool step
+     */
+    pool: Array<Approver>;
+    /**
+     * Extra members merged into the pool after SLA timeout
+     */
+    elevationPool?: Array<Approver>;
+};
+
+export type Approver = {
+    email: string;
+    displayName: string;
+    /**
+     * e.g. Legal, Compliance, Department Head
+     */
+    role?: string;
+};
+
+export type ApprovalActorRequest = {
+    actorEmail: string;
+    comment?: string;
+};
+
+export type ApprovalDecisionRequest = {
+    decision: 'approve' | 'reject';
+    actorEmail: string;
+    comment?: string;
+};
+
+export type ProcessSlaRequest = {
+    /**
+     * Override clock for tests/local demos; production schedulers omit this
+     */
+    now?: string;
+};
+
+export type PublishRequest = {
+    sharePointSiteUrl: string;
+    libraryName: string;
+    /**
+     * Optional folder under the library
+     */
+    folderPath?: string;
+    /**
+     * Overrides the default PDF file name
+     */
+    fileName?: string;
+};
 
 export type CreateDocumentRequest = {
     title: string;
@@ -37,39 +127,6 @@ export type UpdateDraftRequest = {
     summary?: string;
 };
 
-export type SubmitForApprovalRequest = {
-    approvers: Array<Approver>;
-    comment?: string;
-};
-
-export type Approver = {
-    email: string;
-    displayName: string;
-    /**
-     * e.g. Legal, Compliance, Department Head
-     */
-    role?: string;
-};
-
-export type ApprovalDecisionRequest = {
-    decision: 'approve' | 'reject';
-    actorEmail: string;
-    comment?: string;
-};
-
-export type PublishRequest = {
-    sharePointSiteUrl: string;
-    libraryName: string;
-    /**
-     * Optional folder under the library
-     */
-    folderPath?: string;
-    /**
-     * Overrides the default PDF file name
-     */
-    fileName?: string;
-};
-
 export type DocumentSummary = {
     id: string;
     title: string;
@@ -78,6 +135,13 @@ export type DocumentSummary = {
     requesterEmail: string;
     priority?: 'low' | 'normal' | 'high';
     currentApproverEmail?: string;
+    currentStepStatus?: ApprovalStepStatus;
+    currentStepDueAt?: string;
+    currentStepElevated?: boolean;
+    /**
+     * Eligible claimers when the active step is a pool queue
+     */
+    currentPoolEmails?: Array<string>;
     createdAt: string;
     updatedAt: string;
 };
@@ -85,10 +149,18 @@ export type DocumentSummary = {
 export type ApprovalStep = {
     id: string;
     order: number;
-    approverEmail: string;
-    approverDisplayName: string;
+    assignmentMode: ApprovalAssignmentMode;
+    approverEmail?: string;
+    approverDisplayName?: string;
     role?: string;
     status: ApprovalStepStatus;
+    pool: Array<Approver>;
+    elevationPool?: Array<Approver>;
+    slaHours?: number;
+    dueAt?: string;
+    claimedAt?: string;
+    elevated: boolean;
+    elevatedAt?: string;
     comment?: string;
     decidedAt?: string;
 };
@@ -293,6 +365,97 @@ export type DecideApprovalStepResponses = {
 };
 
 export type DecideApprovalStepResponse = DecideApprovalStepResponses[keyof DecideApprovalStepResponses];
+
+export type ClaimApprovalStepData = {
+    body: ApprovalActorRequest;
+    path: {
+        documentId: string;
+        stepId: string;
+    };
+    query?: never;
+    url: '/documents/{documentId}/approvals/{stepId}/claim';
+};
+
+export type ClaimApprovalStepErrors = {
+    /**
+     * Resource not found
+     */
+    404: Error;
+    /**
+     * Invalid state transition
+     */
+    409: Error;
+};
+
+export type ClaimApprovalStepError = ClaimApprovalStepErrors[keyof ClaimApprovalStepErrors];
+
+export type ClaimApprovalStepResponses = {
+    /**
+     * Step claimed
+     */
+    200: Document;
+};
+
+export type ClaimApprovalStepResponse = ClaimApprovalStepResponses[keyof ClaimApprovalStepResponses];
+
+export type ReleaseApprovalStepData = {
+    body: ApprovalActorRequest;
+    path: {
+        documentId: string;
+        stepId: string;
+    };
+    query?: never;
+    url: '/documents/{documentId}/approvals/{stepId}/release';
+};
+
+export type ReleaseApprovalStepErrors = {
+    /**
+     * Resource not found
+     */
+    404: Error;
+    /**
+     * Invalid state transition
+     */
+    409: Error;
+};
+
+export type ReleaseApprovalStepError = ReleaseApprovalStepErrors[keyof ReleaseApprovalStepErrors];
+
+export type ReleaseApprovalStepResponses = {
+    /**
+     * Step released back to queue
+     */
+    200: Document;
+};
+
+export type ReleaseApprovalStepResponse = ReleaseApprovalStepResponses[keyof ReleaseApprovalStepResponses];
+
+export type ProcessApprovalSlaData = {
+    body?: ProcessSlaRequest;
+    path: {
+        documentId: string;
+    };
+    query?: never;
+    url: '/documents/{documentId}/approvals/process-sla';
+};
+
+export type ProcessApprovalSlaErrors = {
+    /**
+     * Resource not found
+     */
+    404: Error;
+};
+
+export type ProcessApprovalSlaError = ProcessApprovalSlaErrors[keyof ProcessApprovalSlaErrors];
+
+export type ProcessApprovalSlaResponses = {
+    /**
+     * Document after SLA processing
+     */
+    200: Document;
+};
+
+export type ProcessApprovalSlaResponse = ProcessApprovalSlaResponses[keyof ProcessApprovalSlaResponses];
 
 export type PublishDocumentPdfData = {
     body: PublishRequest;
