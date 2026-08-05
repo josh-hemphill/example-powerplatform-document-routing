@@ -6,7 +6,8 @@ import { appConfig } from '../config/app.config.ts';
 import { getDocumentType } from '../config/document-types.ts';
 import {
 	canActorAccessDocument,
-	canActorEditDraft,
+	canActorMutateDraft,
+	isDraftEditableStatus,
 } from '../domain/document-access.ts';
 import { buildSharePointDocumentUrl } from '../publishing/sharepoint-paths.ts';
 import {
@@ -259,7 +260,14 @@ export function documentRoutingMockPlugin(): Plugin {
 							sendJson(res, 404, { message: 'Document not found', code: 'not_found' });
 							return;
 						}
-						if (!canActorEditDraft(document, actor)) {
+						if (!isDraftEditableStatus(document.status)) {
+							sendJson(res, 409, {
+								message: 'Draft can only be edited while requested or drafting',
+								code: 'invalid_state',
+							});
+							return;
+						}
+						if (!canActorMutateDraft(document, actor)) {
 							sendJson(res, 403, {
 								message:
                   'Only shared authors/requesters can edit drafts in requested/drafting',

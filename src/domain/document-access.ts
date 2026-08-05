@@ -17,6 +17,8 @@ export interface AccessibleDocument {
 	}>;
 }
 
+const DRAFT_EDITABLE_STATUSES = new Set(['requested', 'drafting']);
+
 /**
  * True when the actor may list/open the document (owner, collaborator, author, or active approver/pool).
  */
@@ -54,6 +56,30 @@ export function canActorAccessDocument(
 	});
 }
 
+/** Draft body may only change while the case is requested or drafting. */
+export function isDraftEditableStatus(status: string): boolean {
+	return DRAFT_EDITABLE_STATUSES.has(status);
+}
+
+/**
+ * True when the actor is in the draft collaboration set (requester, author, or collaborator).
+ * Callers must check `isDraftEditableStatus` separately when status codes matter.
+ */
+export function canActorMutateDraft(
+	document: Pick<AccessibleDocument, 'requesterEmail' | 'authorEmail' | 'collaboratorEmails'>,
+	actorEmail: string,
+): boolean {
+	const email = actorEmail.trim().toLowerCase();
+	if (!email) {
+		return false;
+	}
+	return (
+		document.requesterEmail.toLowerCase() === email
+		|| document.authorEmail?.toLowerCase() === email
+		|| document.collaboratorEmails.some((item) => item.toLowerCase() === email)
+	);
+}
+
 /**
  * True when the actor may edit draft content (requested/drafting only).
  */
@@ -61,13 +87,5 @@ export function canActorEditDraft(
 	document: AccessibleDocument,
 	actorEmail: string,
 ): boolean {
-	if (document.status !== 'requested' && document.status !== 'drafting') {
-		return false;
-	}
-	const email = actorEmail.trim().toLowerCase();
-	return (
-		document.requesterEmail.toLowerCase() === email
-		|| document.authorEmail?.toLowerCase() === email
-		|| document.collaboratorEmails.some((item) => item.toLowerCase() === email)
-	);
+	return isDraftEditableStatus(document.status) && canActorMutateDraft(document, actorEmail);
 }
