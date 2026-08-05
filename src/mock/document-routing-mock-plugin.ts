@@ -4,19 +4,21 @@ import type { Plugin } from 'vite'
 import { appConfig } from '../config/app.config.ts'
 import { buildSharePointDocumentUrl } from '../publishing/sharepoint-paths.ts'
 import {
+  activateStep,
+  claimStep,
+  createStepFromInput,
+  processStepSla,
+  releaseStep,
+  syncCurrentApprovalFields,
+} from './approval-engine.ts'
+import {
   createSeedDocuments,
   type MockDocumentRecord,
 } from './seed-documents.ts'
 
-interface ApproverInput {
-  email: string
-  displayName: string
-  role?: string
-}
-
 const store = new Map<string, MockDocumentRecord>()
 
-const now = (): string => new Date().toISOString()
+const stamp = (): string => new Date().toISOString()
 
 const seed = (): void => {
   if (store.size > 0) {
@@ -54,6 +56,10 @@ const toSummary = (document: MockDocumentRecord) => ({
   requesterEmail: document.requesterEmail,
   priority: document.priority,
   currentApproverEmail: document.currentApproverEmail,
+  currentStepStatus: document.currentStepStatus,
+  currentStepDueAt: document.currentStepDueAt,
+  currentStepElevated: document.currentStepElevated,
+  currentPoolEmails: document.currentPoolEmails,
   createdAt: document.createdAt,
   updatedAt: document.updatedAt,
 })
@@ -66,18 +72,23 @@ const pushHistory = (
 ): void => {
   document.history.unshift({
     id: randomUUID(),
-    at: now(),
+    at: stamp(),
     actorEmail,
     action,
     message,
   })
-  document.updatedAt = now()
+  document.updatedAt = stamp()
 }
 
 const matchRoute = (
   url: string,
   pattern: RegExp,
 ): RegExpMatchArray | null => url.match(pattern)
+
+const activeStep = (document: MockDocumentRecord) =>
+  document.approvalSteps.find(
+    (step) => step.status === 'queued' || step.status === 'pending',
+  )
 
 /**
  * Serves an in-memory Document Routing API so the Code App is runnable offline.
@@ -138,7 +149,7 @@ export function documentRoutingMockPlugin(): Plugin {
             }>(req)
 
             const id = randomUUID()
-            const createdAt = now()
+            const createdAt = stamp()
             const document: MockDocumentRecord = {
               id,
               title: body.title,
@@ -147,6 +158,10 @@ export function documentRoutingMockPlugin(): Plugin {
               requesterEmail: body.requesterEmail,
               priority: body.priority ?? 'normal',
               currentApproverEmail: null,
+              currentStepStatus: null,
+              currentStepDueAt: null,
+              currentStepElevated: null,
+              currentPoolEmails: [],
               createdAt,
               updatedAt: createdAt,
               freeformRequest: body.freeformRequest,
@@ -240,28 +255,147 @@ export function documentRoutingMockPlugin(): Plugin {
             }
 
             const body = await readJson<{
-              approvers: ApproverInput[]
+              steps: Array<{
+                assignmentMode: 'named' | 'pool'
+                role?: string
+                slaHours?: number
+                assignee?: { email: string; displayName: string; role?: string }
+                pool?: Array<{ email: string; displayName: string; role?: string }>
+                elevationPool?: Array<{
+                  email: string
+                  displayName: string
+                  role?: string
+                }>
+              }>
               comment?: string
             }>(req)
 
-            document.approvalSteps = body.approvers.map((approver, index) => ({
-              id: randomUUID(),
-              order: index + 1,
-              approverEmail: approver.email,
-              approverDisplayName: approver.displayName,
-              role: approver.role ?? null,
-              status: 'pending',
-              comment: null,
-              decidedAt: null,
-            }))
+            const clock = new Date()
+            document.approvalSteps = body.steps.map((step, index) =>
+              createStepFromInput(step, index + 1, clock, index === 0),
+            )
             document.status = 'in_review'
-            document.currentApproverEmail =
-              document.approvalSteps[0]?.approverEmail ?? null
+            syncCurrentApprovalFields(document)
             pushHistory(
               document,
               document.authorEmail ?? document.requesterEmail,
               'submitted_for_approval',
               body.comment ?? 'Submitted to approval chain',
+            )
+            sendJson(res, 200, document)
+            return
+          }
+
+          const slaMatch = matchRoute(
+            path,
+            /^\/api\/documents\/([^/]+)\/approvals\/process-sla$/,
+          )
+          if (method === 'POST' && slaMatch) {
+            const document = store.get(slaMatch[1]!)
+            if (!document) {
+              sendJson(res, 404, { message: 'Document not found', code: 'not_found' })
+              return
+            }
+            const body = await readJson<{ now?: string }>(req)
+            const clock = body.now ? new Date(body.now) : new Date()
+            const step = activeStep(document)
+            if (step) {
+              const result = processStepSla(step, clock)
+              if (result.changed && result.message) {
+                pushHistory(
+                  document,
+                  'system@sla-processor',
+                  'sla_elevated',
+                  result.message,
+                )
+              }
+            }
+            syncCurrentApprovalFields(document)
+            sendJson(res, 200, document)
+            return
+          }
+
+          const claimMatch = matchRoute(
+            path,
+            /^\/api\/documents\/([^/]+)\/approvals\/([^/]+)\/claim$/,
+          )
+          if (method === 'POST' && claimMatch) {
+            const document = store.get(claimMatch[1]!)
+            if (!document) {
+              sendJson(res, 404, { message: 'Document not found', code: 'not_found' })
+              return
+            }
+            const step = document.approvalSteps.find((item) => item.id === claimMatch[2])
+            if (!step) {
+              sendJson(res, 404, { message: 'Approval step not found', code: 'not_found' })
+              return
+            }
+            const active = activeStep(document)
+            if (!active || active.id !== step.id) {
+              sendJson(res, 409, {
+                message: 'Only the current active step can be claimed',
+                code: 'invalid_state',
+              })
+              return
+            }
+            const body = await readJson<{ actorEmail: string; comment?: string }>(req)
+            try {
+              claimStep(step, body.actorEmail, new Date())
+            } catch (error) {
+              const code =
+                error instanceof Error && 'code' in error
+                  ? String((error as { code: string }).code)
+                  : 'invalid_state'
+              sendJson(res, 409, {
+                message: error instanceof Error ? error.message : 'Claim failed',
+                code,
+              })
+              return
+            }
+            syncCurrentApprovalFields(document)
+            pushHistory(
+              document,
+              body.actorEmail,
+              'claimed',
+              body.comment ?? `Claimed step ${step.order}`,
+            )
+            sendJson(res, 200, document)
+            return
+          }
+
+          const releaseMatch = matchRoute(
+            path,
+            /^\/api\/documents\/([^/]+)\/approvals\/([^/]+)\/release$/,
+          )
+          if (method === 'POST' && releaseMatch) {
+            const document = store.get(releaseMatch[1]!)
+            if (!document) {
+              sendJson(res, 404, { message: 'Document not found', code: 'not_found' })
+              return
+            }
+            const step = document.approvalSteps.find(
+              (item) => item.id === releaseMatch[2],
+            )
+            if (!step) {
+              sendJson(res, 404, { message: 'Approval step not found', code: 'not_found' })
+              return
+            }
+            const body = await readJson<{ actorEmail: string; comment?: string }>(req)
+            try {
+              releaseStep(step, body.actorEmail)
+            } catch (error) {
+              sendJson(res, 409, {
+                message: error instanceof Error ? error.message : 'Release failed',
+                code: 'invalid_state',
+              })
+              return
+            }
+            syncCurrentApprovalFields(document)
+            pushHistory(
+              document,
+              body.actorEmail,
+              'released',
+              body.comment ?? `Released step ${step.order} back to queue`,
             )
             sendJson(res, 200, document)
             return
@@ -296,12 +430,10 @@ export function documentRoutingMockPlugin(): Plugin {
               return
             }
 
-            const active = document.approvalSteps.find(
-              (item) => item.status === 'pending',
-            )
-            if (!active || active.id !== step.id) {
+            const active = activeStep(document)
+            if (!active || active.id !== step.id || step.status !== 'pending') {
               sendJson(res, 409, {
-                message: 'Only the current pending step can be decided',
+                message: 'Only a claimed/named pending step can be decided',
                 code: 'invalid_state',
               })
               return
@@ -314,12 +446,12 @@ export function documentRoutingMockPlugin(): Plugin {
             }>(req)
 
             step.comment = body.comment ?? null
-            step.decidedAt = now()
+            step.decidedAt = stamp()
 
             if (body.decision === 'reject') {
               step.status = 'rejected'
               document.status = 'rejected'
-              document.currentApproverEmail = null
+              syncCurrentApprovalFields(document)
               pushHistory(
                 document,
                 body.actorEmail,
@@ -335,7 +467,7 @@ export function documentRoutingMockPlugin(): Plugin {
               (item) => item.order === step.order + 1,
             )
             if (next) {
-              document.currentApproverEmail = next.approverEmail
+              activateStep(next, new Date())
               pushHistory(
                 document,
                 body.actorEmail,
@@ -344,7 +476,6 @@ export function documentRoutingMockPlugin(): Plugin {
               )
             } else {
               document.status = 'approved'
-              document.currentApproverEmail = null
               pushHistory(
                 document,
                 body.actorEmail,
@@ -353,6 +484,7 @@ export function documentRoutingMockPlugin(): Plugin {
               )
             }
 
+            syncCurrentApprovalFields(document)
             sendJson(res, 200, document)
             return
           }
@@ -410,7 +542,7 @@ export function documentRoutingMockPlugin(): Plugin {
               pdfFileName,
               sharePointUrl,
               sharePointItemId,
-              publishedAt: now(),
+              publishedAt: stamp(),
             })
             return
           }

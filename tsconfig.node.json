@@ -19,6 +19,7 @@
     "vite.config.ts",
     "openapi-ts.config.ts",
     "src/mock/**/*.ts",
-    "src/publishing/sharepoint-paths.ts"
+    "src/publishing/sharepoint-paths.ts",
+    "src/domain/approval-queue.ts"
   ]
 }

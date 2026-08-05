@@ -23,7 +23,9 @@ Freeform request → Author draft → Approval chain → Approved → Publish PD
 3. **Approvals** — default chain from the document type (optionally editable)  
 4. **Publish** — HTML template hook + SharePoint stub / OpenAPI publish API  
 
-Inbox personas: All · Waiting on me · My requests · Needs draft · Ready to publish.
+Inbox personas: All · Waiting on me · Available in my pool · My requests · Needs draft · Ready to publish.
+
+Approvals support **named** steps and **pool** queues with claim/release, SLA timers, and elevation pools (`document-types.ts`).
 
 ## Quick start (local)
 

@@ -3,15 +3,21 @@ defineProps<{
   steps: Array<{
     id: string
     order: number
-    approverDisplayName: string
-    approverEmail: string
+    assignmentMode: 'named' | 'pool'
+    approverDisplayName?: string | null
+    approverEmail?: string | null
     role?: string | null
-    status: 'pending' | 'approved' | 'rejected' | 'skipped'
+    status: 'waiting' | 'queued' | 'pending' | 'approved' | 'rejected' | 'skipped'
+    dueAt?: string | null
+    elevated?: boolean
+    pool?: Array<{ displayName: string; email: string }>
     comment?: string | null
   }>
 }>()
 
 const statusIcon: Record<string, string> = {
+  waiting: 'mdi-timer-sand',
+  queued: 'mdi-account-multiple-outline',
   pending: 'mdi-clock-outline',
   approved: 'mdi-check-circle',
   rejected: 'mdi-close-circle',
@@ -19,15 +25,26 @@ const statusIcon: Record<string, string> = {
 }
 
 const statusColor: Record<string, string> = {
+  waiting: 'default',
+  queued: 'info',
   pending: 'warning',
   approved: 'success',
   rejected: 'error',
   skipped: 'default',
 }
+
+function formatDue(dueAt: string | null | undefined): string {
+  if (!dueAt) {
+    return ''
+  }
+  const due = new Date(dueAt)
+  const overdue = due.getTime() < Date.now()
+  return `${overdue ? 'Overdue' : 'Due'} ${due.toLocaleString()}`
+}
 </script>
 
 <template>
-  <v-list lines="two" class="bg-transparent pa-0">
+  <v-list lines="three" class="bg-transparent pa-0">
     <v-list-item
       v-for="step in steps"
       :key="step.id"
@@ -39,10 +56,32 @@ const statusColor: Record<string, string> = {
         </v-avatar>
       </template>
       <v-list-item-title>
-        Step {{ step.order }} · {{ step.approverDisplayName }}
+        Step {{ step.order }} ·
+        {{
+          step.assignmentMode === 'pool' && step.status === 'queued'
+            ? (step.role || 'Pool')
+            : (step.approverDisplayName || step.role || 'Approver')
+        }}
+        <v-chip
+          v-if="step.elevated"
+          size="x-small"
+          color="error"
+          variant="tonal"
+          class="ms-2"
+        >
+          Elevated
+        </v-chip>
       </v-list-item-title>
       <v-list-item-subtitle>
-        {{ step.role || 'Approver' }} · {{ step.approverEmail }}
+        {{ step.assignmentMode === 'pool' ? 'Pool' : 'Named' }}
+        · {{ step.status }}
+        <span v-if="step.approverEmail"> · {{ step.approverEmail }}</span>
+        <span v-if="step.status === 'queued' && step.pool?.length">
+          · {{ step.pool.length }} eligible
+        </span>
+      </v-list-item-subtitle>
+      <v-list-item-subtitle v-if="step.dueAt || step.comment">
+        <span v-if="step.dueAt">{{ formatDue(step.dueAt) }}</span>
         <span v-if="step.comment"> · “{{ step.comment }}”</span>
       </v-list-item-subtitle>
     </v-list-item>

@@ -1,8 +1,39 @@
 /**
  * Document types and default approval chains.
- * Add or edit entries here for each routing use case in your org.
+ * Supports named assignees and pool/self-assign steps with SLA elevation.
  */
-export interface ApproverTemplate {
+export interface ApproverPerson {
+  displayName: string
+  email: string
+  role?: string
+}
+
+export interface NamedApprovalStepTemplate {
+  mode: 'named'
+  displayName: string
+  email: string
+  role: string
+  /** Optional SLA; when set, overdue named steps can elevate into elevationPool. */
+  slaHours?: number
+  elevationPool?: ApproverPerson[]
+}
+
+export interface PoolApprovalStepTemplate {
+  mode: 'pool'
+  poolRole: string
+  pool: ApproverPerson[]
+  /** Hours until timeout from queue activation (and again after elevation). */
+  slaHours: number
+  /** Merged into the pool when SLA expires without a claim/decision. */
+  elevationPool?: ApproverPerson[]
+}
+
+export type ApprovalStepTemplate =
+  | NamedApprovalStepTemplate
+  | PoolApprovalStepTemplate
+
+/** @deprecated Prefer ApprovalStepTemplate; kept for simple named-only edits. */
+export type ApproverTemplate = {
   displayName: string
   email: string
   role: string
@@ -12,17 +43,10 @@ export interface DocumentTypeDefinition {
   id: string
   label: string
   description: string
-  /** Prefills the freeform request field on "New request". */
   requestHint: string
-  /**
-   * Markdown scaffold inserted when an author opens a new draft.
-   * Use {{title}} and {{request}} placeholders.
-   */
   draftTemplate: string
-  /** Override app-level SharePoint folder for this type. */
   folderPath?: string
-  /** Ordered approval chain applied when submitting for approval. */
-  approvalChain: ApproverTemplate[]
+  approvalChain: ApprovalStepTemplate[]
 }
 
 export const documentTypes: DocumentTypeDefinition[] = [
@@ -49,14 +73,40 @@ Who and what this policy covers.
     folderPath: '/Policies',
     approvalChain: [
       {
-        displayName: 'Jordan Legal',
-        email: 'jordan.legal@contoso.com',
-        role: 'Legal',
+        mode: 'pool',
+        poolRole: 'Legal Reviewers',
+        slaHours: 8,
+        pool: [
+          {
+            displayName: 'Jordan Legal',
+            email: 'jordan.legal@contoso.com',
+          },
+          {
+            displayName: 'Avery Counsel',
+            email: 'avery.counsel@contoso.com',
+          },
+        ],
+        elevationPool: [
+          {
+            displayName: 'Pat Chief Counsel',
+            email: 'pat.counsel@contoso.com',
+            role: 'Elevated Legal',
+          },
+        ],
       },
       {
+        mode: 'named',
         displayName: 'Sam Compliance',
         email: 'sam.compliance@contoso.com',
         role: 'Compliance',
+        slaHours: 24,
+        elevationPool: [
+          {
+            displayName: 'Chris Compliance Lead',
+            email: 'chris.compliance@contoso.com',
+            role: 'Elevated Compliance',
+          },
+        ],
       },
     ],
   },
@@ -83,14 +133,32 @@ Who and what this policy covers.
     folderPath: '/SOPs',
     approvalChain: [
       {
-        displayName: 'Casey Operations',
-        email: 'casey.ops@contoso.com',
-        role: 'Process Owner',
+        mode: 'pool',
+        poolRole: 'Operations Reviewers',
+        slaHours: 4,
+        pool: [
+          {
+            displayName: 'Casey Operations',
+            email: 'casey.ops@contoso.com',
+          },
+          {
+            displayName: 'Taylor Ops',
+            email: 'taylor.ops@contoso.com',
+          },
+        ],
+        elevationPool: [
+          {
+            displayName: 'Jamie Ops Lead',
+            email: 'jamie.ops@contoso.com',
+          },
+        ],
       },
       {
+        mode: 'named',
         displayName: 'Riley QA',
         email: 'riley.qa@contoso.com',
         role: 'Quality',
+        slaHours: 8,
       },
     ],
   },
@@ -110,9 +178,11 @@ Who and what this policy covers.
     folderPath: '/Announcements',
     approvalChain: [
       {
+        mode: 'named',
         displayName: 'Morgan Communications',
         email: 'morgan.comms@contoso.com',
         role: 'Communications',
+        slaHours: 12,
       },
     ],
   },
@@ -140,6 +210,35 @@ export function buildDraftFromTemplate(
   return type.draftTemplate
     .replaceAll('{{title}}', title)
     .replaceAll('{{request}}', request)
+}
+
+/**
+ * Maps config approval templates into OpenAPI submit step payloads.
+ */
+export function toApprovalStepInputs(chain: ApprovalStepTemplate[]) {
+  return chain.map((step) => {
+    if (step.mode === 'named') {
+      return {
+        assignmentMode: 'named' as const,
+        role: step.role,
+        slaHours: step.slaHours,
+        assignee: {
+          displayName: step.displayName,
+          email: step.email,
+          role: step.role,
+        },
+        elevationPool: step.elevationPool,
+      }
+    }
+
+    return {
+      assignmentMode: 'pool' as const,
+      role: step.poolRole,
+      slaHours: step.slaHours,
+      pool: step.pool,
+      elevationPool: step.elevationPool,
+    }
+  })
 }
 
 /**
