@@ -1,17 +1,18 @@
 <script setup lang="ts">
+import type { DocumentStatus } from '@/domain/document-status';
 import {
-  DOCUMENT_STATUS_COLORS,
-  DOCUMENT_STATUS_LABELS,
-  type DocumentStatus,
-} from '@/domain/document-status'
+	DOCUMENT_STATUS_COLORS,
+	DOCUMENT_STATUS_LABELS,
+
+} from '@/domain/document-status';
 
 defineProps<{
-  status: DocumentStatus
-}>()
+	status: DocumentStatus;
+}>();
 </script>
 
 <template>
-  <v-chip size="small" variant="tonal" :color="DOCUMENT_STATUS_COLORS[status]">
-    {{ DOCUMENT_STATUS_LABELS[status] }}
-  </v-chip>
+	<v-chip size="small" variant="tonal" :color="DOCUMENT_STATUS_COLORS[status]">
+		{{ DOCUMENT_STATUS_LABELS[status] }}
+	</v-chip>
 </template>

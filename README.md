@@ -21,10 +21,10 @@ Stack:
 Freeform request → Author draft → Approval chain → Approved → Publish PDF → SharePoint
 ```
 
-1. **Request** — pick a document type, capture unstructured text + SharePoint target  
-2. **Draft** — type-specific Markdown scaffold; author fleshes it out  
-3. **Approvals** — default chain from the document type (optionally editable)  
-4. **Publish** — HTML template hook + SharePoint stub / OpenAPI publish API  
+1. **Request** — pick a document type, capture unstructured text + SharePoint target
+2. **Draft** — type-specific Markdown scaffold; author fleshes it out
+3. **Approvals** — default chain from the document type (optionally editable)
+4. **Publish** — HTML template hook + SharePoint stub / OpenAPI publish API
 
 Inbox personas: All · Waiting on me · Available in my pool · My requests · Needs draft · Ready to publish.
 
@@ -74,9 +74,11 @@ Customize `src/publishing/html-pdf-template.ts`. Run HTML→PDF (or Typst) **ser
 
 ```text
 SETUP.md                          Adopter checklist (start here)
+docs/remediation-roadmap.md       Phased hardening plan (Dataverse-first)
 deploy/                           Dataverse + SharePoint provision scaffolding
+deploy/SCHEMA.md                  Control + case table model (collaboration / SLA)
 src/config/app.config.ts          Brand + SharePoint defaults (env-overridable)
-src/config/document-types.ts      Types, draft scaffolds, approval chains
+src/config/document-types.ts      Local/mock type seed (Dataverse is source of truth hosted)
 src/config/inbox-personas.ts      Inbox persona filters
 src/provisioning/                 Connection validation + Dataverse plan generator
 src/publishing/                   HTML PDF template + publish orchestrator
@@ -85,4 +87,5 @@ src/client/                       Generated SDK (do not hand-edit)
 src/mock/                         Local Vite mock + seed data
 src/views/                        Inbox, new request, document workspace
 scripts/provision.ts              pnpm provision / provision:apply CLI
+eslint.config.js                  @antfu/eslint-config (org Vue style)
 ```
