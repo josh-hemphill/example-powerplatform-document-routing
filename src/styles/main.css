@@ -1,0 +1,27 @@
+:root {
+  color: #102a43;
+  font-family: 'Segoe UI', 'Helvetica Neue', sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(11, 92, 171, 0.12), transparent 40%),
+    radial-gradient(circle at top right, rgba(15, 118, 110, 0.1), transparent 35%),
+    #f3f6f8;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+}
+
+.markdown-preview {
+  white-space: pre-wrap;
+  line-height: 1.55;
+}
