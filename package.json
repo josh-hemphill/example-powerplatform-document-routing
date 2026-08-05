@@ -14,7 +14,10 @@
     "typecheck": "vue-tsc -b --pretty false",
     "power:init": "pa app init --display-name \"Document Routing\"",
     "power:run": "pa app run",
-    "power:push": "pnpm build && pa app push"
+    "power:push": "pnpm build && pa app push",
+    "provision": "node --experimental-strip-types scripts/provision.ts",
+    "provision:example": "node --experimental-strip-types scripts/provision.ts --example",
+    "provision:apply": "node --experimental-strip-types scripts/provision.ts --apply"
   },
   "dependencies": {
     "@mdi/font": "^7.4.47",

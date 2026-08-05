@@ -14,6 +14,8 @@ dist-ssr
 .env
 .env.*.local
 power.config.json
+deploy/connections.json
+deploy/generated/
 
 # Editor directories and files
 .vscode/*

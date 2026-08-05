@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/document-routing/connections.schema.json",
+  "title": "Document Routing connection profile",
+  "type": "object",
+  "required": ["publisher", "solution", "powerPlatform", "dataverse", "sharePoint", "api"],
+  "additionalProperties": true,
+  "properties": {
+    "publisher": {
+      "type": "object",
+      "required": ["uniqueName", "friendlyName", "prefix"],
+      "properties": {
+        "uniqueName": { "type": "string", "minLength": 1 },
+        "friendlyName": { "type": "string", "minLength": 1 },
+        "prefix": {
+          "type": "string",
+          "pattern": "^[a-z]{2,8}$",
+          "description": "Dataverse publisher prefix for custom tables/columns"
+        },
+        "optionValuePrefix": { "type": "integer", "minimum": 10000 }
+      }
+    },
+    "solution": {
+      "type": "object",
+      "required": ["uniqueName", "friendlyName", "version"],
+      "properties": {
+        "uniqueName": { "type": "string" },
+        "friendlyName": { "type": "string" },
+        "version": { "type": "string" }
+      }
+    },
+    "powerPlatform": {
+      "type": "object",
+      "required": ["environmentId"],
+      "properties": {
+        "environmentId": { "type": "string" },
+        "cloud": {
+          "type": "string",
+          "enum": ["public", "usgov", "usgovhigh", "usgovdod", "china"]
+        }
+      }
+    },
+    "dataverse": {
+      "type": "object",
+      "required": ["environmentUrl"],
+      "properties": {
+        "environmentUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "Any HTTPS org URL (custom/vanity Dataverse domains allowed)"
+        },
+        "apiVersion": { "type": "string", "default": "v9.2" }
+      }
+    },
+    "sharePoint": {
+      "type": "object",
+      "required": ["siteUrl", "libraryName"],
+      "properties": {
+        "siteUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "Any HTTPS site URL (vanity SharePoint / custom domains allowed)"
+        },
+        "libraryName": { "type": "string", "minLength": 1 },
+        "folderPath": { "type": "string" },
+        "connectorId": { "type": "string", "default": "shared_sharepointonline" }
+      }
+    },
+    "api": {
+      "type": "object",
+      "required": ["baseUrl"],
+      "properties": {
+        "baseUrl": {
+          "type": "string",
+          "description": "Document Routing OpenAPI host (Custom Connector / Function). Absolute HTTPS or /api for local mock."
+        }
+      }
+    }
+  }
+}
