@@ -69,6 +69,7 @@ export default antfu(
 			'deploy/generated/**',
 			'dist/**',
 			'power.config.json',
+			'.cursor/**',
 		],
 	},
 	{
