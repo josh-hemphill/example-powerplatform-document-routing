@@ -1,0 +1,7 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/PowerAppsCodeApps/main/templates/vite/power.config.schema.json",
+  "appId": "00000000-0000-0000-0000-000000000000",
+  "environmentId": "REPLACE_WITH_ENVIRONMENT_ID",
+  "displayName": "Document Routing",
+  "description": "Route freeform document requests through drafting, approvals, and SharePoint PDF publish."
+}

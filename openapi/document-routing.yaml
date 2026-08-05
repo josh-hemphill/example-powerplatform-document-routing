@@ -1,0 +1,464 @@
+openapi: 3.1.0
+info:
+  title: Document Routing API
+  version: 1.0.0
+  description: |
+    Routes freeform document requests through drafting and a chain of approvals,
+    then publishes an approved PDF to SharePoint. In Power Platform, this API is
+    typically exposed as a Custom Connector or wrapped by a Power Automate flow.
+servers:
+  - url: /api
+    description: Local Vite mock (development)
+  - url: https://{environment}.crm.dynamics.com/api/document-routing
+    description: Power Platform hosted API
+    variables:
+      environment:
+        default: contoso
+tags:
+  - name: Documents
+  - name: Approvals
+  - name: Publishing
+paths:
+  /documents:
+    get:
+      operationId: listDocuments
+      tags: [Documents]
+      summary: List document routing cases
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/DocumentStatus'
+        - name: q
+          in: query
+          description: Free-text search across title and request body
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Document list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DocumentSummary'
+    post:
+      operationId: createDocumentRequest
+      tags: [Documents]
+      summary: Submit a freeform document request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDocumentRequest'
+      responses:
+        '201':
+          description: Created request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+  /documents/{documentId}:
+    get:
+      operationId: getDocument
+      tags: [Documents]
+      summary: Get a document routing case
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      responses:
+        '200':
+          description: Document detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /documents/{documentId}/draft:
+    put:
+      operationId: updateDocumentDraft
+      tags: [Documents]
+      summary: Author or update the draft content
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDraftRequest'
+      responses:
+        '200':
+          description: Updated draft
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /documents/{documentId}/submit-for-approval:
+    post:
+      operationId: submitForApproval
+      tags: [Approvals]
+      summary: Move a draft into the approval chain
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitForApprovalRequest'
+      responses:
+        '200':
+          description: Submitted for approval
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /documents/{documentId}/approvals/{stepId}/decision:
+    post:
+      operationId: decideApprovalStep
+      tags: [Approvals]
+      summary: Approve or reject the current approval step
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+        - name: stepId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApprovalDecisionRequest'
+      responses:
+        '200':
+          description: Updated document after decision
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /documents/{documentId}/publish:
+    post:
+      operationId: publishDocumentPdf
+      tags: [Publishing]
+      summary: Render the approved document as PDF and publish to SharePoint
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublishRequest'
+      responses:
+        '200':
+          description: Published document
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublishResult'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+components:
+  parameters:
+    DocumentId:
+      name: documentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: Invalid state transition
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    DocumentStatus:
+      type: string
+      enum:
+        - requested
+        - drafting
+        - in_review
+        - approved
+        - rejected
+        - published
+    ApprovalStepStatus:
+      type: string
+      enum:
+        - pending
+        - approved
+        - rejected
+        - skipped
+    CreateDocumentRequest:
+      type: object
+      required: [title, freeformRequest, requesterEmail]
+      properties:
+        title:
+          type: string
+          minLength: 3
+          maxLength: 200
+        freeformRequest:
+          type: string
+          minLength: 10
+          description: Unstructured request text that authors turn into a draft
+        requesterEmail:
+          type: string
+          format: email
+        priority:
+          type: string
+          enum: [low, normal, high]
+          default: normal
+        requestedPublishSiteUrl:
+          type: string
+          format: uri
+          description: Target SharePoint site for the final PDF
+        requestedLibraryName:
+          type: string
+          description: SharePoint document library display name
+          default: Published Documents
+    UpdateDraftRequest:
+      type: object
+      required: [title, bodyMarkdown, authorEmail]
+      properties:
+        title:
+          type: string
+          minLength: 3
+        bodyMarkdown:
+          type: string
+          minLength: 1
+        authorEmail:
+          type: string
+          format: email
+        summary:
+          type: string
+    SubmitForApprovalRequest:
+      type: object
+      required: [approvers]
+      properties:
+        approvers:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/Approver'
+        comment:
+          type: string
+    Approver:
+      type: object
+      required: [email, displayName]
+      properties:
+        email:
+          type: string
+          format: email
+        displayName:
+          type: string
+        role:
+          type: string
+          description: e.g. Legal, Compliance, Department Head
+    ApprovalDecisionRequest:
+      type: object
+      required: [decision, actorEmail]
+      properties:
+        decision:
+          type: string
+          enum: [approve, reject]
+        actorEmail:
+          type: string
+          format: email
+        comment:
+          type: string
+    PublishRequest:
+      type: object
+      required: [sharePointSiteUrl, libraryName]
+      properties:
+        sharePointSiteUrl:
+          type: string
+          format: uri
+        libraryName:
+          type: string
+        folderPath:
+          type: string
+          description: Optional folder under the library
+          default: /
+        fileName:
+          type: string
+          description: Overrides the default PDF file name
+    DocumentSummary:
+      type: object
+      required:
+        - id
+        - title
+        - status
+        - requesterEmail
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        status:
+          $ref: '#/components/schemas/DocumentStatus'
+        requesterEmail:
+          type: string
+          format: email
+        priority:
+          type: string
+          enum: [low, normal, high]
+        currentApproverEmail:
+          type: string
+          format: email
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ApprovalStep:
+      type: object
+      required: [id, order, approverEmail, approverDisplayName, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        order:
+          type: integer
+          minimum: 1
+        approverEmail:
+          type: string
+          format: email
+        approverDisplayName:
+          type: string
+        role:
+          type: string
+          nullable: true
+        status:
+          $ref: '#/components/schemas/ApprovalStepStatus'
+        comment:
+          type: string
+          nullable: true
+        decidedAt:
+          type: string
+          format: date-time
+          nullable: true
+    Document:
+      allOf:
+        - $ref: '#/components/schemas/DocumentSummary'
+        - type: object
+          required:
+            - freeformRequest
+            - approvalSteps
+            - history
+          properties:
+            freeformRequest:
+              type: string
+            draftBodyMarkdown:
+              type: string
+              nullable: true
+            draftSummary:
+              type: string
+              nullable: true
+            authorEmail:
+              type: string
+              format: email
+              nullable: true
+            approvalSteps:
+              type: array
+              items:
+                $ref: '#/components/schemas/ApprovalStep'
+            history:
+              type: array
+              items:
+                $ref: '#/components/schemas/HistoryEvent'
+            publishedPdfUrl:
+              type: string
+              format: uri
+              nullable: true
+            sharePointItemId:
+              type: string
+              nullable: true
+            requestedPublishSiteUrl:
+              type: string
+              format: uri
+              nullable: true
+            requestedLibraryName:
+              type: string
+              nullable: true
+    HistoryEvent:
+      type: object
+      required: [id, at, actorEmail, action, message]
+      properties:
+        id:
+          type: string
+          format: uuid
+        at:
+          type: string
+          format: date-time
+        actorEmail:
+          type: string
+          format: email
+        action:
+          type: string
+        message:
+          type: string
+    PublishResult:
+      type: object
+      required:
+        - document
+        - pdfFileName
+        - sharePointUrl
+        - publishedAt
+      properties:
+        document:
+          $ref: '#/components/schemas/Document'
+        pdfFileName:
+          type: string
+        sharePointUrl:
+          type: string
+          format: uri
+        sharePointItemId:
+          type: string
+        publishedAt:
+          type: string
+          format: date-time
+    Error:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+        code:
+          type: string
