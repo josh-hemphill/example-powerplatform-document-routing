@@ -1,6 +1,6 @@
 /**
  * Example of the typed SharePoint service shape produced by:
- * `pa app add-data-source` / `pac code add-data-source -a shared_sharepointonline ...`
+ * `pnpm exec pa app add data-source --connector shared_sharepointonline ...`
  *
  * Replace this stub with the generated service under `src/generated/services`
  * once a real SharePoint connection is added to the Code App.

@@ -27,6 +27,7 @@
   },
   "devDependencies": {
     "@hey-api/openapi-ts": "^0.99.0",
+    "@microsoft/power-apps-cli": "^0.15.2",
     "@microsoft/power-apps-vite": "^1.0.2",
     "@types/node": "^24.13.3",
     "@vitejs/plugin-vue": "^6.0.8",
