@@ -1,27 +1,29 @@
 {
-  "compilerOptions": {
-    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
-    "target": "es2023",
-    "lib": ["ES2023"],
-    "types": ["node"],
-    "skipLibCheck": true,
-    "module": "nodenext",
-    "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true,
-    "moduleDetection": "force",
-    "noEmit": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "erasableSyntaxOnly": true,
-    "noFallthroughCasesInSwitch": true
-  },
-  "include": [
-    "vite.config.ts",
-    "openapi-ts.config.ts",
-    "scripts/**/*.ts",
-    "src/mock/**/*.ts",
-    "src/provisioning/**/*.ts",
-    "src/publishing/sharepoint-paths.ts",
-    "src/domain/approval-queue.ts"
-  ]
+	"compilerOptions": {
+		"tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
+		"target": "es2023",
+		"lib": ["ES2023"],
+		"moduleDetection": "force",
+		"module": "nodenext",
+		"types": ["node"],
+		"allowImportingTsExtensions": true,
+		"noFallthroughCasesInSwitch": true,
+		"noUnusedLocals": true,
+		"noUnusedParameters": true,
+		"noEmit": true,
+		"verbatimModuleSyntax": true,
+		"erasableSyntaxOnly": true,
+		"skipLibCheck": true
+	},
+	"include": [
+		"vite.config.ts",
+		"openapi-ts.config.ts",
+		"scripts/**/*.ts",
+		"src/mock/**/*.ts",
+		"src/provisioning/**/*.ts",
+		"src/config/document-types.ts",
+		"src/config/sample-identities.ts",
+		"src/publishing/sharepoint-paths.ts",
+		"src/domain/approval-queue.ts"
+	]
 }

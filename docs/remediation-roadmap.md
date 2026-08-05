@@ -8,17 +8,17 @@ This is intentional scaffolding evolution for an example Code App — not a rewr
 
 ## Guiding decisions
 
-| Decision | Choice |
-| --- | --- |
-| Source of truth | Dataverse tables (case + control/config). Frontend and local mock **mirror** that model; they do not own policy. |
-| Identity | Always from Power Apps host / Dataverse caller principal. **Never** accept `actorEmail` / spoofable identity on commands. |
-| Collaborative drafts | `requested` / `drafting` records are **readable (and co-editable by authors)** across collaborators before submit. Content freezes (or versions) on submit-for-approval. |
-| Routing & assignment | Resolved from Dataverse control tables at submit time. Requester cannot invent chains. Optional admin-gated overrides only. |
-| Enforcement | Prefer Dataverse security roles, column security, business rules, and sharing. Use **Power Automate** for SLA sweeps, elevation under service identity, notifications, and HTML→PDF→SharePoint publish. |
-| Admin surface | In-app **Admin** route (security-role gated) to edit document types, pools, chains, destinations, and feature flags — not hardcoded `document-types.ts` for production. |
-| Local play | Keep Vite mock, but align semantics with Dataverse rules so demo behavior matches hosted behavior. |
-| Icons | Switch to **`@mdi/js` + Vuetify `mdi-svg`** (tree-shakable). Drop `@mdi/font`. |
-| Lint | Reuse `@antfu/eslint-config` shape from public repos (`redirect-newtab-ext` Vue config; `monup` lib config). |
+| Decision             | Choice                                                                                                                                                                                                  |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Source of truth      | Dataverse tables (case + control/config). Frontend and local mock **mirror** that model; they do not own policy.                                                                                        |
+| Identity             | Always from Power Apps host / Dataverse caller principal. **Never** accept `actorEmail` / spoofable identity on commands.                                                                               |
+| Collaborative drafts | `requested` / `drafting` records are **readable (and co-editable by authors)** across collaborators before submit. Content freezes (or versions) on submit-for-approval.                                |
+| Routing & assignment | Resolved from Dataverse control tables at submit time. Requester cannot invent chains. Optional admin-gated overrides only.                                                                             |
+| Enforcement          | Prefer Dataverse security roles, column security, business rules, and sharing. Use **Power Automate** for SLA sweeps, elevation under service identity, notifications, and HTML→PDF→SharePoint publish. |
+| Admin surface        | In-app **Admin** route (security-role gated) to edit document types, pools, chains, destinations, and feature flags — not hardcoded `document-types.ts` for production.                                 |
+| Local play           | Keep Vite mock, but align semantics with Dataverse rules so demo behavior matches hosted behavior.                                                                                                      |
+| Icons                | Switch to **`@mdi/js` + Vuetify `mdi-svg`** (tree-shakable). Drop `@mdi/font`.                                                                                                                          |
+| Lint                 | Reuse `@antfu/eslint-config` shape from public repos (`redirect-newtab-ext` Vue config; `monup` lib config).                                                                                            |
 
 ### What stays in the Code App
 
@@ -36,37 +36,39 @@ This is intentional scaffolding evolution for an example Code App — not a rewr
 
 ## Finding → phase map
 
-| Finding (summary) | Phase |
-| --- | --- |
-| Client-spoofable identity / editable “Acting as” | 2, 3 |
-| Browser-supplied approval policy | 1, 2, 4 |
-| Draft edits during review / approved without invalidate | 1, 3 |
-| Invalid decision → approve | 3, 6 |
-| Named SLA elevation no-op | 1, 3 |
-| Claim/release resets SLA indefinitely | 1, 3 |
-| Production publish stub throws / HTML-as-PDF | 5 |
-| User-controlled SharePoint destinations | 1, 4, 5 |
-| Provisioning shell injection / weak idempotency / bad lookups | 1 |
-| Empty approval chains accepted | 1, 3 |
-| Power Apps context duplication / demo fallback | 2 |
-| `VITE_*` build-time vs provisioned env vars | 2, 6 |
-| OpenAPI 3.1 nullability / weak validation | 6 |
-| Client-controlled SLA `now` | 3 |
-| Invalid timestamps fail open | 3 |
-| Contoso approvers survive setup banner | 1, 4 |
-| Unknown doc type → `policy` fallback | 1, 3 |
-| Filename collisions | 5 |
-| `allowApproverOverride` docs drift | 4, 6 |
-| Query refetch clobbers edits / no concurrency | 6 |
-| Typed API errors discarded | 6 |
-| Weak form validation / a11y / no CI/lint | 0, 6, 7 |
-| Full MDI webfont | 0 |
-| Oversized workspace view / duplicated types | 6 |
-| Concurrent TOCTOU / no CAS | 3, 7 |
+| Finding (summary)                                             | Phase   |
+| ------------------------------------------------------------- | ------- |
+| Client-spoofable identity / editable “Acting as”              | 2, 3    |
+| Browser-supplied approval policy                              | 1, 2, 4 |
+| Draft edits during review / approved without invalidate       | 1, 3    |
+| Invalid decision → approve                                    | 3, 6    |
+| Named SLA elevation no-op                                     | 1, 3    |
+| Claim/release resets SLA indefinitely                         | 1, 3    |
+| Production publish stub throws / HTML-as-PDF                  | 5       |
+| User-controlled SharePoint destinations                       | 1, 4, 5 |
+| Provisioning shell injection / weak idempotency / bad lookups | 1       |
+| Empty approval chains accepted                                | 1, 3    |
+| Power Apps context duplication / demo fallback                | 2       |
+| `VITE_*` build-time vs provisioned env vars                   | 2, 6    |
+| OpenAPI 3.1 nullability / weak validation                     | 6       |
+| Client-controlled SLA `now`                                   | 3       |
+| Invalid timestamps fail open                                  | 3       |
+| Contoso approvers survive setup banner                        | 1, 4    |
+| Unknown doc type → `policy` fallback                          | 1, 3    |
+| Filename collisions                                           | 5       |
+| `allowApproverOverride` docs drift                            | 4, 6    |
+| Query refetch clobbers edits / no concurrency                 | 6       |
+| Typed API errors discarded                                    | 6       |
+| Weak form validation / a11y / no CI/lint                      | 0, 6, 7 |
+| Full MDI webfont                                              | 0       |
+| Oversized workspace view / duplicated types                   | 6       |
+| Concurrent TOCTOU / no CAS                                    | 3, 7    |
 
 ---
 
 ## Phase 0 — Tooling baseline
+
+**Status:** Implemented (see PR for phase 0+1).
 
 **Goal:** Fast, low-risk foundation so later phases land cleanly.
 
@@ -97,20 +99,22 @@ This is intentional scaffolding evolution for an example Code App — not a rewr
 
 ## Phase 1 — Dataverse control model & schema
 
+**Status:** Implemented (schema, seed, provisioning hardening). Runtime engine / Admin UI remain later phases.
+
 **Goal:** Routing, pools, destinations, and document-type policy live in Dataverse — not in bundled TS config.
 
 ### New / extended tables (publisher prefix `dr_` default)
 
 Keep existing `document`, `approvalstep`, `historyevent`. Add control tables:
 
-| Table | Purpose |
-| --- | --- |
-| `documenttype` | Label, description, request hint, draft scaffold, default folder, active flag, policy version |
-| `approvalchainstep` | Ordered template steps per document type (named vs pool, SLA hours, role) |
-| `approverpool` | Named pool definition (Legal Reviewers, etc.) |
-| `approverpoolmember` | Pool membership (lookup to Entra/Dataverse user or email+UPN) |
-| `publishdestination` | Allowed site / library / folder roots (HTTPS hosts, vanity OK) |
-| `appsetting` | Feature flags (e.g. allow limited chain override, collaboration mode) |
+| Table                | Purpose                                                                                       |
+| -------------------- | --------------------------------------------------------------------------------------------- |
+| `documenttype`       | Label, description, request hint, draft scaffold, default folder, active flag, policy version |
+| `approvalchainstep`  | Ordered template steps per document type (named vs pool, SLA hours, role)                     |
+| `approverpool`       | Named pool definition (Legal Reviewers, etc.)                                                 |
+| `approverpoolmember` | Pool membership (lookup to Entra/Dataverse user or email+UPN)                                 |
+| `publishdestination` | Allowed site / library / folder roots (HTTPS hosts, vanity OK)                                |
+| `appsetting`         | Feature flags (e.g. allow limited chain override, collaboration mode)                         |
 
 ### Document / step field changes
 
@@ -118,7 +122,7 @@ Keep existing `document`, `approvalstep`, `historyevent`. Add control tables:
 - **Immutable SLA anchor:** `activatedueat` (or `slaDeadlineAt`) set when the step activates; claim/release **must not** move it. Optional separate `decisionDueAt` if product needs a claim window.
 - **Elevation:** explicit semantics column/behavior — for named overdue steps: either convert to `pool` using `elevationPool`, or reassign to elevation queue. No silent merge into an unused `pool` field.
 - **Revision:** `contentRevision` (integer) incremented on draft save; approval steps store `approvedRevision`. Submit snapshots revision; post-submit draft edits require **withdraw/revise** (invalidates steps).
-- **Publish:** drop free-form site URL as the trusted path; store `publishdestination` lookup (+ optional relative folder override within allowed root). Keep requested-* columns only as soft preferences if needed, validated against allowlist.
+- **Publish:** drop free-form site URL as the trusted path; store `publishdestination` lookup (+ optional relative folder override within allowed root). Keep requested-\* columns only as soft preferences if needed, validated against allowlist.
 - Align OpenAPI/Dataverse title lengths and nullable fields to one canonical schema.
 
 ### Provisioning fixes (same phase)
@@ -198,12 +202,12 @@ Rules:
 
 ### Power Automate flows (minimum set)
 
-| Flow | Trigger | Responsibility |
-| --- | --- | --- |
-| SLA sweeper | Recurrence | Find overdue active steps; elevate / requeue; write history |
-| Notify | Step queued / elevated / decided | Email/Teams to pool or assignee |
-| Publish | When status → `approved` **or** explicit publish command by Publisher role | HTML→PDF→SharePoint using allowlisted destination; write back URL/item id; idempotent on revision |
-| Optional: on submit | Status → `in_review` | Double-check chain materialization if not done in plugin |
+| Flow                | Trigger                                                                    | Responsibility                                                                                    |
+| ------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| SLA sweeper         | Recurrence                                                                 | Find overdue active steps; elevate / requeue; write history                                       |
+| Notify              | Step queued / elevated / decided                                           | Email/Teams to pool or assignee                                                                   |
+| Publish             | When status → `approved` **or** explicit publish command by Publisher role | HTML→PDF→SharePoint using allowlisted destination; write back URL/item id; idempotent on revision |
+| Optional: on submit | Status → `in_review`                                                       | Double-check chain materialization if not done in plugin                                          |
 
 Prefer Dataverse **business rules / column constraints** for simple field locks; use Flow when timers, SharePoint, or service identity are required.
 
@@ -231,7 +235,7 @@ Prefer Dataverse **business rules / column constraints** for simple field locks;
   2. **Approval chains** — ordered steps, named vs pool, SLA, elevation pool.
   3. **Pools & members** — maintain membership (search users where connector allows).
   4. **Publish destinations** — allowlisted HTTPS sites/libraries/folders.
-  5. **Settings** — feature flags (`allowApproverOverride` meaning: *admin-authorized* limited override at submit, default off); collaboration group binding.
+  5. **Settings** — feature flags (`allowApproverOverride` meaning: _admin-authorized_ limited override at submit, default off); collaboration group binding.
   6. **Flow health** (read-only) — last SLA run / publish failures if stored on `appsetting` or a small `flowrun` log table (optional stretch).
 
 ### Permissions
@@ -341,18 +345,18 @@ Phases 0 and 1 can proceed in parallel after the schema sketch is agreed. Phase 
 
 Ship as stacked PRs (one phase per PR unless a phase is tiny):
 
-| PR | Title focus |
-| --- | --- |
-| 0 | ESLint (antfu), MDI SVG icons, `pnpm check`, CI |
-| 1a | Dataverse control schema + SLA/revision fields |
-| 1b | Provisioning validation, quoting, lookup/idempotency |
-| 2 | Identity store, strip actor spoofing, draft sharing rules |
-| 3a | Approval engine + mock tests (SLA/elevation/decisions) |
-| 3b | Flow stubs + deploy docs |
-| 4 | Admin page + SETUP rewrite |
-| 5 | Publish orchestration via Flow |
-| 6 | Workspace split, OpenAPI 3.1, a11y/errors |
-| 7 | Coverage thresholds + concurrency notes |
+| PR  | Title focus                                               |
+| --- | --------------------------------------------------------- |
+| 0   | ESLint (antfu), MDI SVG icons, `pnpm check`, CI           |
+| 1a  | Dataverse control schema + SLA/revision fields            |
+| 1b  | Provisioning validation, quoting, lookup/idempotency      |
+| 2   | Identity store, strip actor spoofing, draft sharing rules |
+| 3a  | Approval engine + mock tests (SLA/elevation/decisions)    |
+| 3b  | Flow stubs + deploy docs                                  |
+| 4   | Admin page + SETUP rewrite                                |
+| 5   | Publish orchestration via Flow                            |
+| 6   | Workspace split, OpenAPI 3.1, a11y/errors                 |
+| 7   | Coverage thresholds + concurrency notes                   |
 
 ---
 

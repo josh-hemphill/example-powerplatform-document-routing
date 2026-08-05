@@ -1,36 +1,36 @@
 {
-  "$schema": "./connections.schema.json",
-  "publisher": {
-    "uniqueName": "docrouting",
-    "friendlyName": "Document Routing",
-    "prefix": "dr",
-    "optionValuePrefix": 72700
-  },
-  "solution": {
-    "uniqueName": "DocumentRouting",
-    "friendlyName": "Document Routing",
-    "version": "1.0.0.0"
-  },
-  "powerPlatform": {
-    "environmentId": "REPLACE_ME_ENVIRONMENT_ID",
-    "cloud": "public"
-  },
-  "dataverse": {
-    "environmentUrl": "https://REPLACE_ME.dataverse.example.com",
-    "apiVersion": "v9.2"
-  },
-  "sharePoint": {
-    "siteUrl": "https://docs.example.com/sites/Policies",
-    "libraryName": "Published Documents",
-    "folderPath": "/Policies",
-    "connectorId": "shared_sharepointonline"
-  },
-  "api": {
-    "baseUrl": "https://api.example.com/document-routing"
-  },
-  "notes": [
-    "Copy this file to deploy/connections.json and replace REPLACE_ME / example hosts.",
-    "All URLs are free-form HTTPS endpoints — vanity SharePoint hosts, custom Dataverse domains, and private API hosts are supported.",
-    "Do not assume *.sharepoint.com or *.dynamics.com; use the hostnames your tenant actually serves."
-  ]
+	"$schema": "./connections.schema.json",
+	"publisher": {
+		"uniqueName": "docrouting",
+		"friendlyName": "Document Routing",
+		"prefix": "dr",
+		"optionValuePrefix": 72700
+	},
+	"solution": {
+		"uniqueName": "DocumentRouting",
+		"friendlyName": "Document Routing",
+		"version": "1.0.0.0"
+	},
+	"powerPlatform": {
+		"environmentId": "REPLACE_ME_ENVIRONMENT_ID",
+		"cloud": "public"
+	},
+	"dataverse": {
+		"environmentUrl": "https://REPLACE_ME.dataverse.example.com",
+		"apiVersion": "v9.2"
+	},
+	"sharePoint": {
+		"siteUrl": "https://docs.example.com/sites/Policies",
+		"libraryName": "Published Documents",
+		"folderPath": "/Policies",
+		"connectorId": "shared_sharepointonline"
+	},
+	"api": {
+		"baseUrl": "https://api.example.com/document-routing"
+	},
+	"notes": [
+		"Copy this file to deploy/connections.json and replace REPLACE_ME / example hosts.",
+		"All URLs are free-form HTTPS endpoints — vanity SharePoint hosts, custom Dataverse domains, and private API hosts are supported.",
+		"Do not assume *.sharepoint.com or *.dynamics.com; use the hostnames your tenant actually serves."
+	]
 }

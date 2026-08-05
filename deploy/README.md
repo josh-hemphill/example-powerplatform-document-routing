@@ -15,32 +15,43 @@ bash deploy/generated/pa-connect.sh   # after replacing CONNECTION_ID
 
 ## Files
 
-| Path | Purpose |
-| --- | --- |
+| Path                       | Purpose                                         |
+| -------------------------- | ----------------------------------------------- |
 | `connections.example.json` | Template connection profile (placeholder hosts) |
-| `connections.json` | Your real profile (**gitignored**) |
-| `connections.schema.json` | JSON Schema for the profile |
-| `generated/` | Output of `pnpm provision` (gitignored) |
+| `connections.json`         | Your real profile (**gitignored**)              |
+| `connections.schema.json`  | JSON Schema for the profile                     |
+| `generated/`               | Output of `pnpm provision` (gitignored)         |
 
 ## Domain rules
 
 - **Any HTTPS host** is valid for SharePoint site URL, Dataverse org URL, and API base URL.
 - Vanity SharePoint (`https://docs.contoso-corp.net/...`) and custom Dataverse domains are first-class.
-- Provisioning refuses to *apply* while hosts still look like `example.com` / `REPLACE_ME` / sample `contoso` placeholders.
+- Provisioning refuses to _apply_ while hosts still look like `example.com` / `REPLACE_ME` / sample `contoso` placeholders.
 - Microsoft primary domains are **allowed** when that is what your tenant uses — they are simply **not assumed**.
 
 ## What gets created
 
-Dataverse tables (publisher prefix default `dr`):
+Dataverse tables (publisher prefix default `dr`) — see [`SCHEMA.md`](./SCHEMA.md):
 
-- `dr_document` — case + draft + denormalized inbox/SLA fields
-- `dr_approvalstep` — named/pool steps, claim/SLA/elevation JSON pools
+**Control (org-owned)**
+
+- `dr_publishdestination` — allowlisted SharePoint publish roots
+- `dr_approverpool` / `dr_approverpoolmember` — pools + members
+- `dr_documenttype` / `dr_approvalchainstep` — types, scaffolds, policy version, chain templates
+- `dr_appsetting` — feature flags
+
+**Case**
+
+- `dr_document` — case + collaborative draft + revision + publish destination lookup
+- `dr_approvalstep` — runtime steps with immutable `activatedueat` SLA
 - `dr_historyevent` — audit trail
 
 Environment variables (seeded from your connection profile):
 
 - `dr_SharePointSiteUrl`, `dr_SharePointLibraryName`, `dr_SharePointFolderPath`
 - `dr_DocumentApiBaseUrl`, `dr_DataverseEnvironmentUrl`
+
+`pnpm provision` also writes `control-seed.json` (demo types/pools from `src/config/document-types.ts`) and a shell-quoted `pa-connect.sh`. **Validation errors prevent writing executable artifacts.**
 
 SharePoint remains the **PDF binary** target. Lists are not used as the workflow store.
 

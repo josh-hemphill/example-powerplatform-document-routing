@@ -1,185 +1,363 @@
-import { describe, expect, it } from 'vitest'
+import type { ConnectionProfile } from './connection-config.ts';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
-  assertDeployableEndpoint,
-  dataverseWebApiRoot,
-  isPlaceholderHost,
-  looksLikePlaceholder,
-  parseEndpointUrl,
-} from './connection-urls.ts'
-import { validateConnectionProfile, type ConnectionProfile } from './connection-config.ts'
-import { buildDataverseProvisionPlan } from './dataverse-provision-plan.ts'
-import { buildPaConnectCommands } from './pa-connect-commands.ts'
-import { buildDataverseSchema, prefixedLogicalName } from './dataverse-schema.ts'
-import { applyDataversePlan } from './write-artifacts.ts'
 
-const sampleProfile = (): ConnectionProfile => ({
-  publisher: {
-    uniqueName: 'docrouting',
-    friendlyName: 'Document Routing',
-    prefix: 'dr',
-    optionValuePrefix: 72700,
-  },
-  solution: {
-    uniqueName: 'DocumentRouting',
-    friendlyName: 'Document Routing',
-    version: '1.0.0.0',
-  },
-  powerPlatform: {
-    environmentId: '11111111-2222-3333-4444-555555555555',
-    cloud: 'public',
-  },
-  dataverse: {
-    environmentUrl: 'https://data.fabrikam.internal',
-    apiVersion: 'v9.2',
-  },
-  sharePoint: {
-    siteUrl: 'https://docs.fabrikam.internal/sites/Policies',
-    libraryName: 'Published Documents',
-    folderPath: '/Policies',
-    connectorId: 'shared_sharepointonline',
-  },
-  api: {
-    baseUrl: 'https://api.fabrikam.internal/document-routing',
-  },
-})
+	loadConnectionProfile,
+	validateAgainstJsonSchema,
+	validateConnectionProfile,
+} from './connection-config.ts';
+import {
+	assertDeployableEndpoint,
+	dataverseWebApiRoot,
+	isPlaceholderHost,
+	looksLikePlaceholder,
+	parseEndpointUrl,
+} from './connection-urls.ts';
+import {
+	buildControlSeedBundle,
+	controlSeedHasSampleIdentities,
+} from './control-seed.ts';
+import {
+	buildDataverseProvisionPlan,
+	relationshipDefinitionPayload,
+} from './dataverse-provision-plan.ts';
+import {
+	buildDataverseSchema,
+	DOCUMENT_TITLE_MAX_LENGTH,
+} from './dataverse-schema.ts';
+import { buildPaConnectCommands } from './pa-connect-commands.ts';
+import { assertSafeCliToken, shellQuote } from './shell-quote.ts';
+import {
+	applyDataversePlan,
+	isDocumentedDuplicate,
+	writeProvisionArtifacts,
+} from './write-artifacts.ts';
+
+function sampleProfile(): ConnectionProfile {
+	return {
+		publisher: {
+			uniqueName: 'docrouting',
+			friendlyName: 'Document Routing',
+			prefix: 'dr',
+			optionValuePrefix: 72700,
+		},
+		solution: {
+			uniqueName: 'DocumentRouting',
+			friendlyName: 'Document Routing',
+			version: '1.0.0.0',
+		},
+		powerPlatform: {
+			environmentId: '11111111-2222-3333-4444-555555555555',
+			cloud: 'public',
+		},
+		dataverse: {
+			environmentUrl: 'https://data.fabrikam.internal',
+			apiVersion: 'v9.2',
+		},
+		sharePoint: {
+			siteUrl: 'https://docs.fabrikam.internal/sites/Policies',
+			libraryName: 'Published Documents',
+			folderPath: '/Policies',
+			connectorId: 'shared_sharepointonline',
+		},
+		api: {
+			baseUrl: 'https://api.fabrikam.internal/document-routing',
+		},
+	};
+}
+
+const tempDirs: string[] = [];
+
+afterEach(() => {
+	while (tempDirs.length) {
+		const dir = tempDirs.pop();
+		if (dir) {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	}
+});
 
 describe('connection URLs', () => {
-  it('accepts custom / vanity hosts (not only Microsoft primary domains)', () => {
-    expect(parseEndpointUrl('https://docs.fabrikam.internal/sites/X', 'site').host).toBe(
-      'docs.fabrikam.internal',
-    )
-    expect(
-      parseEndpointUrl('https://dataverse.contoso-corp.net', 'org').host,
-    ).toBe('dataverse.contoso-corp.net')
-    expect(dataverseWebApiRoot('https://org.crm.dynamics.com/')).toBe(
-      'https://org.crm.dynamics.com/api/data/v9.2',
-    )
-    expect(dataverseWebApiRoot('https://data.fabrikam.internal')).toBe(
-      'https://data.fabrikam.internal/api/data/v9.2',
-    )
-  })
+	it('accepts custom / vanity hosts (not only Microsoft primary domains)', () => {
+		expect(parseEndpointUrl('https://docs.fabrikam.internal/sites/X', 'site').host).toBe(
+			'docs.fabrikam.internal',
+		);
+		expect(
+			parseEndpointUrl('https://dataverse.contoso-corp.net', 'org').host,
+		).toBe('dataverse.contoso-corp.net');
+		expect(dataverseWebApiRoot('https://org.crm.dynamics.com/')).toBe(
+			'https://org.crm.dynamics.com/api/data/v9.2',
+		);
+		expect(dataverseWebApiRoot('https://data.fabrikam.internal')).toBe(
+			'https://data.fabrikam.internal/api/data/v9.2',
+		);
+	});
 
-  it('builds Web API root from origin and rejects org URLs with a path', () => {
-    expect(() =>
-      dataverseWebApiRoot('https://data.fabrikam.internal/foo'),
-    ).toThrow(/without a path/)
-  })
+	it('builds Web API root from origin and rejects org URLs with a path', () => {
+		expect(() =>
+			dataverseWebApiRoot('https://data.fabrikam.internal/foo'),
+		).toThrow(/without a path/);
+	});
 
-  it('requires https for deployable endpoints', () => {
-    expect(() =>
-      assertDeployableEndpoint('http://docs.fabrikam.internal/sites/X', 'sharePoint.siteUrl'),
-    ).toThrow(/must use https/)
-  })
+	it('requires https for deployable endpoints', () => {
+		expect(() =>
+			assertDeployableEndpoint('http://docs.fabrikam.internal/sites/X', 'sharePoint.siteUrl'),
+		).toThrow(/must use https/);
+	});
 
-  it('flags documentation placeholders without requiring *.sharepoint.com', () => {
-    expect(isPlaceholderHost('docs.example.com')).toBe(true)
-    expect(isPlaceholderHost('docs.fabrikam.internal')).toBe(false)
-    expect(looksLikePlaceholder('https://REPLACE_ME.dataverse.example.com')).toBe(
-      true,
-    )
-    expect(() =>
-      assertDeployableEndpoint(
-        'https://docs.example.com/sites/Policies',
-        'sharePoint.siteUrl',
-      ),
-    ).toThrow(/placeholder host/)
-  })
-})
+	it('flags documentation placeholders without requiring *.sharepoint.com', () => {
+		expect(isPlaceholderHost('docs.example.com')).toBe(true);
+		expect(isPlaceholderHost('docs.fabrikam.internal')).toBe(false);
+		expect(looksLikePlaceholder('https://REPLACE_ME.dataverse.example.com')).toBe(
+			true,
+		);
+		expect(() =>
+			assertDeployableEndpoint(
+				'https://docs.example.com/sites/Policies',
+				'sharePoint.siteUrl',
+			),
+		).toThrow(/placeholder host/);
+	});
+});
 
 describe('connection profile validation', () => {
-  it('allows custom domains when strict', () => {
-    const issues = validateConnectionProfile(sampleProfile(), {
-      requireDeployableHosts: true,
-    })
-    expect(issues.filter((issue) => issue.severity === 'error')).toHaveLength(0)
-  })
+	it('allows custom domains when strict', () => {
+		const issues = validateConnectionProfile(sampleProfile(), {
+			requireDeployableHosts: true,
+		});
+		expect(issues.filter((issue) => issue.severity === 'error')).toHaveLength(0);
+	});
 
-  it('errors on example placeholder hosts when strict', () => {
-    const profile = sampleProfile()
-    profile.sharePoint.siteUrl = 'https://docs.example.com/sites/Policies'
-    const issues = validateConnectionProfile(profile, {
-      requireDeployableHosts: true,
-    })
-    expect(issues.some((issue) => issue.field === 'sharePoint.siteUrl')).toBe(true)
-  })
-})
+	it('errors on example placeholder hosts when strict', () => {
+		const profile = sampleProfile();
+		profile.sharePoint.siteUrl = 'https://docs.example.com/sites/Policies';
+		const issues = validateConnectionProfile(profile, {
+			requireDeployableHosts: true,
+		});
+		expect(issues.some((issue) => issue.field === 'sharePoint.siteUrl')).toBe(true);
+	});
+
+	it('rejects unknown properties via JSON Schema', () => {
+		const issues = validateAgainstJsonSchema({
+			...sampleProfile(),
+			extraEvil: true,
+		});
+		expect(issues.some((issue) => issue.message.includes('must NOT have additional properties'))).toBe(
+			true,
+		);
+	});
+
+	it('loadConnectionProfile throws on schema-invalid JSON', () => {
+		const dir = mkdtempSync(join(tmpdir(), 'conn-'));
+		tempDirs.push(dir);
+		const path = join(dir, 'bad.json');
+		writeFileSync(path, JSON.stringify({ publisher: { prefix: 'dr' } }));
+		expect(() => loadConnectionProfile(path)).toThrow(/Invalid connection profile/);
+	});
+});
+
+describe('shell quoting', () => {
+	it('pOSIX-quotes values with spaces and embedded quotes', () => {
+		expect(shellQuote(`Policies "Q1"`)).toBe(`'Policies "Q1"'`);
+		expect(shellQuote(`it's`)).toBe(`'it'\\''s'`);
+	});
+
+	it('rejects unsafe connector tokens', () => {
+		expect(() => assertSafeCliToken('shared;rm -rf', 'connector')).toThrow(/must match/);
+	});
+});
 
 describe('dataverse schema + provision plan', () => {
-  it('prefixes tables and includes queue/SLA fields', () => {
-    const schema = buildDataverseSchema('dr')
-    expect(prefixedLogicalName('dr', 'document')).toBe('dr_document')
-    expect(schema.tables.map((table) => table.schemaName)).toEqual([
-      'document',
-      'approvalstep',
-      'historyevent',
-    ])
-    const document = schema.tables[0]!
-    expect(document.columns.some((column) => column.schemaName === 'currentpoolemails')).toBe(
-      true,
-    )
-    const step = schema.tables[1]!
-    expect(step.columns.some((column) => column.schemaName === 'elevationpooljson')).toBe(
-      true,
-    )
-  })
+	it('includes control tables and SLA/revision fields', () => {
+		const schema = buildDataverseSchema('dr');
+		expect(schema.tables.map((table) => table.schemaName)).toEqual([
+			'publishdestination',
+			'approverpool',
+			'approverpoolmember',
+			'documenttype',
+			'approvalchainstep',
+			'appsetting',
+			'document',
+			'approvalstep',
+			'historyevent',
+		]);
+		const document = schema.tables.find((table) => table.schemaName === 'document')!;
+		expect(document.columns.some((column) => column.schemaName === 'contentrevision')).toBe(
+			true,
+		);
+		expect(document.columns.some((column) => column.schemaName === 'publishdestination')).toBe(
+			true,
+		);
+		expect(
+			document.columns.find((column) => column.schemaName === 'title')?.maxLength,
+		).toBe(DOCUMENT_TITLE_MAX_LENGTH);
 
-  it('uses publisher optionValuePrefix for choice option values', () => {
-    const schema = buildDataverseSchema('dr', 81_200)
-    const status = schema.tables[0]!.columns.find((column) => column.schemaName === 'status')
-    expect(status?.options?.[0]).toEqual({ value: 812_000_000, label: 'requested' })
-    expect(status?.options?.[2]).toEqual({ value: 812_000_002, label: 'in_review' })
-  })
+		const step = schema.tables.find((table) => table.schemaName === 'approvalstep')!;
+		expect(step.columns.some((column) => column.schemaName === 'activatedueat')).toBe(true);
+		expect(step.columns.some((column) => column.schemaName === 'elevationsemantics')).toBe(
+			true,
+		);
+	});
 
-  it('builds web api plan and pa commands using profile hosts', () => {
-    const profile = sampleProfile()
-    const plan = buildDataverseProvisionPlan(profile)
-    expect(plan.apiRoot).toBe('https://data.fabrikam.internal/api/data/v9.2')
-    expect(plan.tableLogicalNames).toContain('dr_document')
-    expect(plan.requests.some((request) => request.path === '/EntityDefinitions')).toBe(
-      true,
-    )
-    expect(plan.environmentVariableDefaults.dr_SharePointSiteUrl).toBe(
-      profile.sharePoint.siteUrl,
-    )
+	it('uses publisher optionValuePrefix for choice option values', () => {
+		const schema = buildDataverseSchema('dr', 81_200);
+		const document = schema.tables.find((table) => table.schemaName === 'document')!;
+		const status = document.columns.find((column) => column.schemaName === 'status');
+		expect(status?.options?.[0]).toEqual({ value: 812_000_000, label: 'requested' });
+		expect(status?.options?.[2]).toEqual({ value: 812_000_002, label: 'in_review' });
+	});
 
-    const commands = buildPaConnectCommands(profile, plan)
-    const sharePoint = commands.find((item) =>
-      item.command.includes('--dataset '),
-    )
-    expect(sharePoint?.command).toContain(
-      '--dataset "https://docs.fabrikam.internal/sites/Policies"',
-    )
-    expect(sharePoint?.command).not.toContain('sharepoint.com')
+	it('builds lookup relationships via RelationshipDefinitions', () => {
+		const profile = sampleProfile();
+		const plan = buildDataverseProvisionPlan(profile);
+		const relationship = plan.requests.find(
+			(request) =>
+				request.kind === 'relationship'
+				&& request.path === '/RelationshipDefinitions'
+				&& String((request.body as { SchemaName?: string }).SchemaName).includes(
+					'document_publishdestination',
+				),
+		);
+		expect(relationship).toBeTruthy();
+		expect(relationship?.body).toMatchObject({
+			'@odata.type': 'Microsoft.Dynamics.CRM.OneToManyRelationshipMetadata',
+			'Lookup': {
+				'@odata.type': 'Microsoft.Dynamics.CRM.LookupAttributeMetadata',
+			},
+		});
 
-    const dataverse = commands.find((item) => item.command.includes('--table dr_document'))
-    expect(dataverse?.command).toContain(
-      '--org-url "https://data.fabrikam.internal"',
-    )
-  })
-})
+		const schema = buildDataverseSchema('dr');
+		const document = schema.tables.find((table) => table.schemaName === 'document')!;
+		const column = document.columns.find((item) => item.schemaName === 'publishdestination')!;
+		const payload = relationshipDefinitionPayload('dr', document, column);
+		expect(payload.ReferencingEntity).toBe('dr_document');
+		expect(payload.ReferencedEntity).toBe('dr_publishdestination');
+	});
+
+	it('builds web api plan and shell-quoted pa commands using profile hosts', () => {
+		const profile = sampleProfile();
+		const plan = buildDataverseProvisionPlan(profile);
+		expect(plan.apiRoot).toBe('https://data.fabrikam.internal/api/data/v9.2');
+		expect(plan.tableLogicalNames).toContain('dr_document');
+		expect(plan.tableLogicalNames).toContain('dr_documenttype');
+		expect(plan.requests.some((request) => request.path === '/EntityDefinitions')).toBe(
+			true,
+		);
+		expect(plan.environmentVariableDefaults.dr_SharePointSiteUrl).toBe(
+			profile.sharePoint.siteUrl,
+		);
+
+		const commands = buildPaConnectCommands(profile, plan);
+		const sharePoint = commands.find((item) =>
+			item.command.includes('--dataset '),
+		);
+		expect(sharePoint?.command).toContain(
+			`--dataset ${shellQuote('https://docs.fabrikam.internal/sites/Policies')}`,
+		);
+		expect(sharePoint?.command).not.toContain('sharepoint.com');
+
+		const dataverse = commands.find((item) => item.command.includes('--table dr_document'));
+		expect(dataverse?.command).toContain(
+			`--org-url ${shellQuote('https://data.fabrikam.internal')}`,
+		);
+	});
+});
+
+describe('writeProvisionArtifacts', () => {
+	it('does not write executable artifacts when validation fails', () => {
+		const dir = mkdtempSync(join(tmpdir(), 'prov-'));
+		tempDirs.push(dir);
+		const profile = sampleProfile();
+		profile.sharePoint.connectorId = 'bad;token';
+		const result = writeProvisionArtifacts(profile, dir);
+		expect(result.validationErrors.length).toBeGreaterThan(0);
+		expect(result.files).toHaveLength(0);
+		expect(result.plan.requests).toHaveLength(0);
+		expect(() => readFileSync(join(dir, 'pa-connect.sh'), 'utf8')).toThrow();
+	});
+
+	it('returns validation errors without throwing on an invalid Dataverse URL', () => {
+		const dir = mkdtempSync(join(tmpdir(), 'prov-bad-url-'));
+		tempDirs.push(dir);
+		const profile = sampleProfile();
+		profile.dataverse.environmentUrl = 'not-a-url';
+		expect(() => writeProvisionArtifacts(profile, dir)).not.toThrow();
+		const result = writeProvisionArtifacts(profile, dir);
+		expect(result.validationErrors.some((item) => item.includes('dataverse.environmentUrl'))).toBe(
+			true,
+		);
+		expect(result.files).toHaveLength(0);
+		expect(result.plan.tableLogicalNames).toHaveLength(0);
+	});
+
+	it('emits boolean attributes with top-level DefaultValue only', () => {
+		const plan = buildDataverseProvisionPlan(sampleProfile());
+		const booleanAttribute = plan.requests
+			.filter((request) => request.kind === 'attribute')
+			.map((request) => request.body as Record<string, unknown>)
+			.find((body) => body['@odata.type'] === 'Microsoft.Dynamics.CRM.BooleanAttributeMetadata');
+		expect(booleanAttribute).toBeTruthy();
+		expect(booleanAttribute?.DefaultValue).toBe(false);
+		const optionSet = booleanAttribute?.OptionSet as Record<string, unknown>;
+		expect(optionSet.DefaultValue).toBeUndefined();
+		expect(optionSet.TrueOption).toBeTruthy();
+		expect(optionSet.FalseOption).toBeTruthy();
+	});
+
+	it('writes control seed and plan when valid', () => {
+		const dir = mkdtempSync(join(tmpdir(), 'prov-ok-'));
+		tempDirs.push(dir);
+		const result = writeProvisionArtifacts(sampleProfile(), dir);
+		expect(result.validationErrors).toHaveLength(0);
+		expect(result.files.some((file) => file.endsWith('control-seed.json'))).toBe(true);
+		const seed = JSON.parse(readFileSync(join(dir, 'control-seed.json'), 'utf8'));
+		expect(seed.documentTypes.length).toBeGreaterThan(0);
+		expect(seed.sampleIdentityEmails.length).toBeGreaterThan(0);
+	});
+});
+
+describe('control seed', () => {
+	it('flags Contoso sample identities', () => {
+		const seed = buildControlSeedBundle('dr');
+		expect(controlSeedHasSampleIdentities(seed)).toBe(true);
+		expect(seed.appSettings.some((item) => item.key === 'allowApproverOverride')).toBe(
+			true,
+		);
+	});
+});
 
 describe('applyDataversePlan', () => {
-  it('does not treat HTTP 404 as skipped when creating entities', async () => {
-    const profile = sampleProfile()
-    const plan = buildDataverseProvisionPlan(profile)
-    const createOnly = {
-      ...plan,
-      requests: plan.requests.filter((request) => request.path === '/EntityDefinitions').slice(0, 1),
-    }
+	it('does not treat HTTP 404 as skipped when creating entities', async() => {
+		const profile = sampleProfile();
+		const plan = buildDataverseProvisionPlan(profile);
+		const createOnly = {
+			...plan,
+			requests: plan.requests.filter((request) => request.kind === 'entity').slice(0, 1),
+		};
 
-    const result = await applyDataversePlan(
-      createOnly,
-      'token',
-      async () =>
-        new Response('{"error":{"message":"Not Found"}}', {
-          status: 404,
-          headers: { 'Content-Type': 'application/json' },
-        }),
-    )
+		const result = await applyDataversePlan(
+			createOnly,
+			'token',
+			async() =>
+				new Response('{"error":{"message":"Not Found"}}', {
+					status: 404,
+					headers: { 'Content-Type': 'application/json' },
+				}),
+		);
 
-    expect(result.applied).toBe(0)
-    expect(result.skipped).toBe(0)
-    expect(result.failed).toHaveLength(1)
-    expect(result.failed[0]?.error).toMatch(/HTTP 404/)
-  })
-})
+		expect(result.applied).toBe(0);
+		expect(result.skipped).toBe(0);
+		expect(result.failed).toHaveLength(1);
+		expect(result.failed[0]?.error).toMatch(/HTTP 404/);
+	});
+
+	it('recognizes documented duplicate conditions only', () => {
+		expect(isDocumentedDuplicate(409, 'conflict')).toBe(true);
+		expect(isDocumentedDuplicate(400, '0x80044328 Attribute')).toBe(true);
+		expect(isDocumentedDuplicate(400, 'something went wrong')).toBe(false);
+		expect(isDocumentedDuplicate(404, 'Not Found')).toBe(false);
+	});
+});

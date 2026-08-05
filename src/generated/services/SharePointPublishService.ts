@@ -1,4 +1,4 @@
-import { buildSharePointDocumentUrl } from '@/publishing/sharepoint-paths'
+import { buildSharePointDocumentUrl } from '@/publishing/sharepoint-paths';
 
 /**
  * Example of the typed SharePoint service shape produced by:
@@ -8,41 +8,41 @@ import { buildSharePointDocumentUrl } from '@/publishing/sharepoint-paths'
  * once a real SharePoint connection is added to the Code App.
  */
 export interface SharePointFileCreateRequest {
-  siteUrl: string
-  libraryName: string
-  folderPath: string
-  fileName: string
-  contentBase64: string
-  contentType?: string
+	siteUrl: string;
+	libraryName: string;
+	folderPath: string;
+	fileName: string;
+	contentBase64: string;
+	contentType?: string;
 }
 
 export interface SharePointFileCreateResult {
-  itemId: string
-  webUrl: string
+	itemId: string;
+	webUrl: string;
 }
 
 export const SharePointPublishService = {
-  /**
-   * Uploads a rendered PDF into a SharePoint document library.
-   * In production this calls the generated SharePoint connector or a flow.
-   */
-  async createFile(
-    request: SharePointFileCreateRequest,
-  ): Promise<SharePointFileCreateResult> {
-    if (import.meta.env.DEV) {
-      return {
-        itemId: crypto.randomUUID(),
-        webUrl: buildSharePointDocumentUrl({
-          siteUrl: request.siteUrl,
-          libraryName: request.libraryName,
-          folderPath: request.folderPath,
-          fileName: request.fileName,
-        }),
-      }
-    }
+	/**
+	 * Uploads a rendered PDF into a SharePoint document library.
+	 * In production this calls the generated SharePoint connector or a flow.
+	 */
+	async createFile(
+		request: SharePointFileCreateRequest,
+	): Promise<SharePointFileCreateResult> {
+		if (import.meta.env.DEV) {
+			return {
+				itemId: crypto.randomUUID(),
+				webUrl: buildSharePointDocumentUrl({
+					siteUrl: request.siteUrl,
+					libraryName: request.libraryName,
+					folderPath: request.folderPath,
+					fileName: request.fileName,
+				}),
+			};
+		}
 
-    throw new Error(
-      'SharePointPublishService stub is not connected. Add the SharePoint data source with the Power Apps CLI and regenerate services.',
-    )
-  },
-}
+		throw new Error(
+			'SharePointPublishService stub is not connected. Add the SharePoint data source with the Power Apps CLI and regenerate services.',
+		);
+	},
+};
