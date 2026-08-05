@@ -1,4 +1,5 @@
 import { ref, onMounted } from 'vue'
+import { appConfig } from '@/config/app.config'
 
 export interface PowerAppsUserContext {
   userId?: string
@@ -36,8 +37,8 @@ export function usePowerAppsContext() {
       if (!hostContext) {
         context.value = {
           isHosted: false,
-          userName: 'Local Developer',
-          email: 'developer@contoso.com',
+          userName: appConfig.localDemoUser.userName,
+          email: appConfig.localDemoUser.email,
         }
         return
       }
@@ -54,8 +55,8 @@ export function usePowerAppsContext() {
         loadError instanceof Error ? loadError.message : 'Failed to load Power Apps context'
       context.value = {
         isHosted: false,
-        userName: 'Local Developer',
-        email: 'developer@contoso.com',
+        userName: appConfig.localDemoUser.userName,
+        email: appConfig.localDemoUser.email,
       }
     } finally {
       isLoading.value = false

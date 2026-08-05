@@ -14,8 +14,15 @@ import {
 import ApprovalStepper from '@/components/ApprovalStepper.vue'
 import DocumentStatusChip from '@/components/DocumentStatusChip.vue'
 import WorkflowTimeline from '@/components/WorkflowTimeline.vue'
+import { appConfig } from '@/config/app.config'
+import {
+  buildDraftFromTemplate,
+  getDocumentType,
+  type ApproverTemplate,
+} from '@/config/document-types'
 import { usePowerAppsContext } from '@/composables/use-power-apps-context'
-import { SharePointPublishService } from '@/generated/services/SharePointPublishService'
+import { resolvePublishTargets } from '@/publishing/html-pdf-template'
+import { publishApprovedDocument } from '@/publishing/publish-document'
 
 const route = useRoute()
 const queryCache = useQueryCache()
@@ -31,6 +38,8 @@ const { data: document, isPending, error, refetch } = useQuery(() =>
   }),
 )
 
+const documentType = computed(() => getDocumentType(document.value?.documentType))
+
 const draftForm = reactive({
   title: '',
   bodyMarkdown: '',
@@ -40,8 +49,7 @@ const draftForm = reactive({
 
 const approvalForm = reactive({
   comment: '',
-  approversText:
-    'Jordan Legal <jordan.legal@contoso.com> | Legal\nSam Compliance <sam.compliance@contoso.com> | Compliance',
+  approvers: [] as ApproverTemplate[],
 })
 
 const decisionForm = reactive({
@@ -51,8 +59,8 @@ const decisionForm = reactive({
 
 const publishForm = reactive({
   sharePointSiteUrl: '',
-  libraryName: 'Published Documents',
-  folderPath: '/Policies',
+  libraryName: '',
+  folderPath: '',
   fileName: '',
 })
 
@@ -62,15 +70,19 @@ watch(
     if (!value) {
       return
     }
+    const type = getDocumentType(value.documentType)
     draftForm.title = value.title
     draftForm.bodyMarkdown =
       value.draftBodyMarkdown ??
-      `# ${value.title}\n\n## Request\n${value.freeformRequest}\n\n## Draft\n`
+      buildDraftFromTemplate(type, value.title, value.freeformRequest)
     draftForm.summary = value.draftSummary ?? ''
     draftForm.authorEmail = value.authorEmail ?? context.value.email ?? ''
-    publishForm.sharePointSiteUrl =
-      value.requestedPublishSiteUrl ?? 'https://contoso.sharepoint.com/sites/Policies'
-    publishForm.libraryName = value.requestedLibraryName ?? 'Published Documents'
+    approvalForm.approvers = type.approvalChain.map((step) => ({ ...step }))
+    const targets = resolvePublishTargets(value)
+    publishForm.sharePointSiteUrl = targets.siteUrl
+    publishForm.libraryName = targets.libraryName
+    publishForm.folderPath = targets.folderPath
+    publishForm.fileName = targets.fileName
     decisionForm.actorEmail =
       value.currentApproverEmail ?? context.value.email ?? ''
   },
@@ -79,7 +91,9 @@ watch(
 
 async function invalidateDocumentQueries(): Promise<void> {
   await Promise.all([
-    queryCache.invalidateQueries({ key: getDocumentQueryKey({ path: { documentId: documentId.value } }) }),
+    queryCache.invalidateQueries({
+      key: getDocumentQueryKey({ path: { documentId: documentId.value } }),
+    }),
     queryCache.invalidateQueries({ key: listDocumentsQueryKey() }),
   ])
 }
@@ -124,24 +138,16 @@ const {
   },
 })
 
-function parseApprovers(text: string) {
-  return text
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const match = line.match(/^(.+?)\s*<([^>]+)>(?:\s*\|\s*(.+))?$/)
-      if (!match) {
-        throw new Error(
-          `Approver line must look like: Name <email@contoso.com> | Role\nGot: ${line}`,
-        )
-      }
-      return {
-        displayName: match[1]!.trim(),
-        email: match[2]!.trim(),
-        role: match[3]?.trim(),
-      }
-    })
+function addApprover(): void {
+  approvalForm.approvers.push({
+    displayName: '',
+    email: '',
+    role: 'Approver',
+  })
+}
+
+function removeApprover(index: number): void {
+  approvalForm.approvers.splice(index, 1)
 }
 
 async function onSaveDraft(): Promise<void> {
@@ -153,7 +159,10 @@ async function onSaveDraft(): Promise<void> {
       body: {
         title: draftForm.title,
         bodyMarkdown: draftForm.bodyMarkdown,
-        authorEmail: draftForm.authorEmail || context.value.email || 'author@contoso.com',
+        authorEmail:
+          draftForm.authorEmail ||
+          context.value.email ||
+          appConfig.localDemoUser.email,
         summary: draftForm.summary || undefined,
       },
     })
@@ -167,11 +176,18 @@ async function onSubmitForApproval(): Promise<void> {
   actionError.value = null
   actionSuccess.value = null
   try {
-    const approvers = parseApprovers(approvalForm.approversText)
+    if (approvalForm.approvers.length === 0) {
+      throw new Error('Add at least one approver (edit document-types.ts defaults).')
+    }
+    for (const approver of approvalForm.approvers) {
+      if (!approver.displayName.trim() || !approver.email.trim()) {
+        throw new Error('Each approver needs a name and email.')
+      }
+    }
     await submitApprovalAsync({
       path: { documentId: documentId.value },
       body: {
-        approvers,
+        approvers: approvalForm.approvers,
         comment: approvalForm.comment || undefined,
       },
     })
@@ -214,37 +230,36 @@ async function onDecision(decision: 'approve' | 'reject'): Promise<void> {
 async function onPublish(): Promise<void> {
   actionError.value = null
   actionSuccess.value = null
-  try {
-    // Demonstrates the SharePoint connector stub used alongside the OpenAPI publish API.
-    // In Power Platform, replace the stub with the generated SharePoint service or a flow.
-    const previewUpload = await SharePointPublishService.createFile({
-      siteUrl: publishForm.sharePointSiteUrl,
-      libraryName: publishForm.libraryName,
-      folderPath: publishForm.folderPath,
-      fileName: publishForm.fileName || `${draftForm.title || 'document'}.pdf`,
-      contentBase64: btoa(unescape(encodeURIComponent(draftForm.bodyMarkdown || document.value?.freeformRequest || ''))),
-      contentType: 'application/pdf',
-    })
+  if (!document.value) {
+    return
+  }
 
-    const result = await publishPdfAsync({
-      path: { documentId: documentId.value },
-      body: {
-        sharePointSiteUrl: publishForm.sharePointSiteUrl,
-        libraryName: publishForm.libraryName,
-        folderPath: publishForm.folderPath,
-        fileName: publishForm.fileName || undefined,
+  try {
+    const result = await publishApprovedDocument({
+      document: document.value,
+      targets: { ...publishForm },
+      publishApi: async (body) => {
+        const published = await publishPdfAsync({
+          path: { documentId: documentId.value },
+          body,
+        })
+        return {
+          sharePointUrl: published.sharePointUrl,
+          pdfFileName: published.pdfFileName,
+          sharePointItemId: published.sharePointItemId,
+        }
       },
     })
 
-    actionSuccess.value = `Published to SharePoint: ${result.sharePointUrl} (connector preview item ${previewUpload.itemId})`
+    actionSuccess.value = `Published to SharePoint: ${result.sharePointUrl}`
   } catch (publishError) {
     actionError.value =
       publishError instanceof Error ? publishError.message : 'Failed to publish PDF'
   }
 }
 
-const pendingStep = computed(() =>
-  document.value?.approvalSteps.find((step) => step.status === 'pending') ?? null,
+const pendingStep = computed(
+  () => document.value?.approvalSteps.find((step) => step.status === 'pending') ?? null,
 )
 
 const canDraft = computed(
@@ -278,7 +293,7 @@ const canPublish = computed(() => document.value?.status === 'approved')
           <div>
             <div class="text-h6 font-weight-bold">{{ document.title }}</div>
             <div class="text-body-2 text-medium-emphasis">
-              Requested by {{ document.requesterEmail }}
+              {{ documentType.label }} · Requested by {{ document.requesterEmail }}
             </div>
           </div>
           <div class="d-flex align-center ga-2">
@@ -320,14 +335,53 @@ const canPublish = computed(() => document.value?.status === 'approved')
           <v-card class="pa-4 mb-4">
             <div class="text-subtitle-1 font-weight-bold mb-3">3. Approval chain</div>
             <template v-if="document.approvalSteps.length === 0">
-              <v-textarea
-                v-model="approvalForm.approversText"
-                label="Approvers (one per line)"
-                rows="4"
-                hint="Format: Name <email@contoso.com> | Role"
-                persistent-hint
-                class="mb-2"
-              />
+              <p class="text-body-2 text-medium-emphasis mb-3">
+                Defaults come from the <strong>{{ documentType.label }}</strong> type in
+                <code>document-types.ts</code>.
+                <span v-if="appConfig.features.allowApproverOverride">
+                  You can adjust them before submitting.
+                </span>
+              </p>
+              <div
+                v-for="(approver, index) in approvalForm.approvers"
+                :key="index"
+                class="d-flex flex-wrap ga-2 mb-2"
+              >
+                <v-text-field
+                  v-model="approver.displayName"
+                  label="Name"
+                  :disabled="!appConfig.features.allowApproverOverride"
+                  hide-details
+                  class="flex-grow-1"
+                  style="min-width: 140px"
+                />
+                <v-text-field
+                  v-model="approver.email"
+                  label="Email"
+                  :disabled="!appConfig.features.allowApproverOverride"
+                  hide-details
+                  class="flex-grow-1"
+                  style="min-width: 180px"
+                />
+                <v-text-field
+                  v-model="approver.role"
+                  label="Role"
+                  :disabled="!appConfig.features.allowApproverOverride"
+                  hide-details
+                  style="min-width: 120px; max-width: 160px"
+                />
+                <v-btn
+                  v-if="appConfig.features.allowApproverOverride"
+                  icon="mdi-delete-outline"
+                  variant="text"
+                  @click="removeApprover(index)"
+                />
+              </div>
+              <div v-if="appConfig.features.allowApproverOverride" class="mb-3">
+                <v-btn size="small" variant="tonal" prepend-icon="mdi-plus" @click="addApprover">
+                  Add approver
+                </v-btn>
+              </div>
               <v-text-field v-model="approvalForm.comment" label="Submission comment" class="mb-3" />
               <v-btn
                 color="warning"
@@ -379,7 +433,7 @@ const canPublish = computed(() => document.value?.status === 'approved')
             <v-text-field v-model="publishForm.folderPath" label="Folder path" class="mb-2" />
             <v-text-field
               v-model="publishForm.fileName"
-              label="PDF file name (optional)"
+              label="PDF file name"
               class="mb-3"
             />
             <v-btn

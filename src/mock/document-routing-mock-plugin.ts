@@ -1,6 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Plugin } from 'vite'
+import { appConfig } from '../config/app.config.ts'
+import { buildSharePointDocumentUrl } from '../publishing/sharepoint-paths.ts'
+import {
+  createSeedDocuments,
+  type MockDocumentRecord,
+} from './seed-documents.ts'
 
 interface ApproverInput {
   email: string
@@ -8,43 +14,7 @@ interface ApproverInput {
   role?: string
 }
 
-interface DocumentRecord {
-  id: string
-  title: string
-  status: 'requested' | 'drafting' | 'in_review' | 'approved' | 'rejected' | 'published'
-  requesterEmail: string
-  priority: 'low' | 'normal' | 'high'
-  currentApproverEmail: string | null
-  createdAt: string
-  updatedAt: string
-  freeformRequest: string
-  draftBodyMarkdown: string | null
-  draftSummary: string | null
-  authorEmail: string | null
-  approvalSteps: Array<{
-    id: string
-    order: number
-    approverEmail: string
-    approverDisplayName: string
-    role: string | null
-    status: 'pending' | 'approved' | 'rejected' | 'skipped'
-    comment: string | null
-    decidedAt: string | null
-  }>
-  history: Array<{
-    id: string
-    at: string
-    actorEmail: string
-    action: string
-    message: string
-  }>
-  publishedPdfUrl: string | null
-  sharePointItemId: string | null
-  requestedPublishSiteUrl: string | null
-  requestedLibraryName: string | null
-}
-
-const store = new Map<string, DocumentRecord>()
+const store = new Map<string, MockDocumentRecord>()
 
 const now = (): string => new Date().toISOString()
 
@@ -52,38 +22,9 @@ const seed = (): void => {
   if (store.size > 0) {
     return
   }
-
-  const id = randomUUID()
-  const createdAt = now()
-  store.set(id, {
-    id,
-    title: 'Q3 Travel Policy Update',
-    status: 'requested',
-    requesterEmail: 'alex.requester@contoso.com',
-    priority: 'high',
-    currentApproverEmail: null,
-    createdAt,
-    updatedAt: createdAt,
-    freeformRequest:
-      'Please draft an updated travel policy covering economy class defaults, manager pre-approval above $1,500, and green travel options for trips under 4 hours.',
-    draftBodyMarkdown: null,
-    draftSummary: null,
-    authorEmail: null,
-    approvalSteps: [],
-    history: [
-      {
-        id: randomUUID(),
-        at: createdAt,
-        actorEmail: 'alex.requester@contoso.com',
-        action: 'requested',
-        message: 'Freeform request submitted',
-      },
-    ],
-    publishedPdfUrl: null,
-    sharePointItemId: null,
-    requestedPublishSiteUrl: 'https://contoso.sharepoint.com/sites/Policies',
-    requestedLibraryName: 'Published Documents',
-  })
+  for (const document of createSeedDocuments()) {
+    store.set(document.id, document)
+  }
 }
 
 const readJson = async <T>(req: IncomingMessage): Promise<T> => {
@@ -105,9 +46,10 @@ const sendJson = (
   res.end(JSON.stringify(body))
 }
 
-const toSummary = (document: DocumentRecord) => ({
+const toSummary = (document: MockDocumentRecord) => ({
   id: document.id,
   title: document.title,
+  documentType: document.documentType,
   status: document.status,
   requesterEmail: document.requesterEmail,
   priority: document.priority,
@@ -117,7 +59,7 @@ const toSummary = (document: DocumentRecord) => ({
 })
 
 const pushHistory = (
-  document: DocumentRecord,
+  document: MockDocumentRecord,
   actorEmail: string,
   action: string,
   message: string,
@@ -159,11 +101,15 @@ export function documentRoutingMockPlugin(): Plugin {
 
           if (method === 'GET' && path === '/api/documents') {
             const status = url.searchParams.get('status')
+            const documentType = url.searchParams.get('documentType')
             const q = url.searchParams.get('q')?.toLowerCase()
             let items = [...store.values()].map(toSummary)
 
             if (status) {
               items = items.filter((item) => item.status === status)
+            }
+            if (documentType) {
+              items = items.filter((item) => item.documentType === documentType)
             }
             if (q) {
               items = items.filter((item) => {
@@ -183,6 +129,7 @@ export function documentRoutingMockPlugin(): Plugin {
           if (method === 'POST' && path === '/api/documents') {
             const body = await readJson<{
               title: string
+              documentType: string
               freeformRequest: string
               requesterEmail: string
               priority?: 'low' | 'normal' | 'high'
@@ -192,9 +139,10 @@ export function documentRoutingMockPlugin(): Plugin {
 
             const id = randomUUID()
             const createdAt = now()
-            const document: DocumentRecord = {
+            const document: MockDocumentRecord = {
               id,
               title: body.title,
+              documentType: body.documentType,
               status: 'requested',
               requesterEmail: body.requesterEmail,
               priority: body.priority ?? 'normal',
@@ -209,8 +157,10 @@ export function documentRoutingMockPlugin(): Plugin {
               history: [],
               publishedPdfUrl: null,
               sharePointItemId: null,
-              requestedPublishSiteUrl: body.requestedPublishSiteUrl ?? null,
-              requestedLibraryName: body.requestedLibraryName ?? 'Published Documents',
+              requestedPublishSiteUrl:
+                body.requestedPublishSiteUrl ?? appConfig.sharePoint.siteUrl,
+              requestedLibraryName:
+                body.requestedLibraryName ?? appConfig.sharePoint.libraryName,
             }
             pushHistory(
               document,
@@ -305,7 +255,8 @@ export function documentRoutingMockPlugin(): Plugin {
               decidedAt: null,
             }))
             document.status = 'in_review'
-            document.currentApproverEmail = document.approvalSteps[0]?.approverEmail ?? null
+            document.currentApproverEmail =
+              document.approvalSteps[0]?.approverEmail ?? null
             pushHistory(
               document,
               document.authorEmail ?? document.requesterEmail,
@@ -334,13 +285,20 @@ export function documentRoutingMockPlugin(): Plugin {
               return
             }
 
-            const step = document.approvalSteps.find((item) => item.id === decisionMatch[2])
+            const step = document.approvalSteps.find(
+              (item) => item.id === decisionMatch[2],
+            )
             if (!step) {
-              sendJson(res, 404, { message: 'Approval step not found', code: 'not_found' })
+              sendJson(res, 404, {
+                message: 'Approval step not found',
+                code: 'not_found',
+              })
               return
             }
 
-            const active = document.approvalSteps.find((item) => item.status === 'pending')
+            const active = document.approvalSteps.find(
+              (item) => item.status === 'pending',
+            )
             if (!active || active.id !== step.id) {
               sendJson(res, 409, {
                 message: 'Only the current pending step can be decided',
@@ -399,7 +357,10 @@ export function documentRoutingMockPlugin(): Plugin {
             return
           }
 
-          const publishMatch = matchRoute(path, /^\/api\/documents\/([^/]+)\/publish$/)
+          const publishMatch = matchRoute(
+            path,
+            /^\/api\/documents\/([^/]+)\/publish$/,
+          )
           if (method === 'POST' && publishMatch) {
             const document = store.get(publishMatch[1]!)
             if (!document) {
@@ -424,9 +385,13 @@ export function documentRoutingMockPlugin(): Plugin {
             const pdfFileName =
               body.fileName ??
               `${document.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.pdf`
-            const folder = (body.folderPath ?? '/').replace(/\/+$/, '')
             const sharePointItemId = randomUUID()
-            const sharePointUrl = `${body.sharePointSiteUrl.replace(/\/$/, '')}/${encodeURIComponent(body.libraryName)}${folder}/${pdfFileName}`
+            const sharePointUrl = buildSharePointDocumentUrl({
+              siteUrl: body.sharePointSiteUrl,
+              libraryName: body.libraryName,
+              folderPath: body.folderPath,
+              fileName: pdfFileName,
+            })
 
             document.status = 'published'
             document.publishedPdfUrl = sharePointUrl

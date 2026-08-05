@@ -1,11 +1,17 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMutation, useQueryCache } from '@pinia/colada'
 import {
   createDocumentRequestMutation,
   listDocumentsQueryKey,
 } from '@/client/@pinia/colada.gen'
+import { appConfig } from '@/config/app.config'
+import {
+  DEFAULT_DOCUMENT_TYPE_ID,
+  documentTypeSelectItems,
+  getDocumentType,
+} from '@/config/document-types'
 import { usePowerAppsContext } from '@/composables/use-power-apps-context'
 
 const router = useRouter()
@@ -15,12 +21,15 @@ const formError = ref<string | null>(null)
 
 const form = reactive({
   title: '',
+  documentType: DEFAULT_DOCUMENT_TYPE_ID,
   freeformRequest: '',
   requesterEmail: '',
   priority: 'normal' as 'low' | 'normal' | 'high',
-  requestedPublishSiteUrl: 'https://contoso.sharepoint.com/sites/Policies',
-  requestedLibraryName: 'Published Documents',
+  requestedPublishSiteUrl: appConfig.sharePoint.siteUrl,
+  requestedLibraryName: appConfig.sharePoint.libraryName,
 })
+
+const selectedType = computed(() => getDocumentType(form.documentType))
 
 const { mutateAsync, isLoading } = useMutation({
   ...createDocumentRequestMutation(),
@@ -43,6 +52,7 @@ async function submit(): Promise<void> {
     const document = await mutateAsync({
       body: {
         title: form.title.trim(),
+        documentType: form.documentType,
         freeformRequest: form.freeformRequest.trim(),
         requesterEmail,
         priority: form.priority,
@@ -60,8 +70,9 @@ async function submit(): Promise<void> {
 <template>
   <v-card class="pa-6">
     <p class="text-body-2 text-medium-emphasis mb-6">
-      Capture an unstructured request. Authors will turn it into a draft, then route it
-      through approvals before publishing a PDF to SharePoint.
+      Capture an unstructured request. The selected document type chooses the draft
+      scaffold and default approval chain from
+      <code>src/config/document-types.ts</code>.
     </p>
 
     <v-alert v-if="formError" type="error" variant="tonal" class="mb-4">
@@ -84,12 +95,26 @@ async function submit(): Promise<void> {
             label="Priority"
           />
         </v-col>
+        <v-col cols="12" md="6">
+          <v-select
+            v-model="form.documentType"
+            :items="documentTypeSelectItems()"
+            item-title="title"
+            item-value="value"
+            label="Document type"
+          />
+        </v-col>
+        <v-col cols="12" md="6" class="d-flex align-center">
+          <p class="text-body-2 text-medium-emphasis mb-0">
+            {{ selectedType.description }}
+          </p>
+        </v-col>
         <v-col cols="12">
           <v-textarea
             v-model="form.freeformRequest"
             label="Freeform request"
             rows="8"
-            hint="Describe what the document should cover. No formatting required."
+            :hint="selectedType.requestHint"
             persistent-hint
           />
         </v-col>

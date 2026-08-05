@@ -11,6 +11,10 @@ export type ApprovalStepStatus = 'pending' | 'approved' | 'rejected' | 'skipped'
 export type CreateDocumentRequest = {
     title: string;
     /**
+     * Document type id from the app config (drives approval chain + draft template)
+     */
+    documentType: string;
+    /**
      * Unstructured request text that authors turn into a draft
      */
     freeformRequest: string;
@@ -69,6 +73,7 @@ export type PublishRequest = {
 export type DocumentSummary = {
     id: string;
     title: string;
+    documentType: string;
     status: DocumentStatus;
     requesterEmail: string;
     priority?: 'low' | 'normal' | 'high';
@@ -129,6 +134,10 @@ export type ListDocumentsData = {
     path?: never;
     query?: {
         status?: DocumentStatus;
+        /**
+         * Filter by configured document type id (policy, sop, …)
+         */
+        documentType?: string;
         /**
          * Free-text search across title and request body
          */

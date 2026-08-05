@@ -1,20 +1,22 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { appConfig } from '@/config/app.config'
 import { usePowerAppsContext } from '@/composables/use-power-apps-context'
+import SetupBanner from '@/components/SetupBanner.vue'
 
 const route = useRoute()
 const router = useRouter()
 const { context } = usePowerAppsContext()
 
-const pageTitle = computed(() => String(route.meta.title ?? 'Document Routing'))
+const pageTitle = computed(() => String(route.meta.title ?? appConfig.brand.name))
 </script>
 
 <template>
   <v-app>
     <v-app-bar flat border color="surface" height="64">
       <v-app-bar-title class="font-weight-bold text-primary">
-        Document Routing
+        {{ appConfig.brand.name }}
       </v-app-bar-title>
       <v-spacer />
       <v-chip
@@ -39,11 +41,12 @@ const pageTitle = computed(() => String(route.meta.title ?? 'Document Routing'))
 
     <v-main>
       <v-container class="py-6" style="max-width: 1100px">
+        <SetupBanner />
         <div class="mb-4 d-flex align-center justify-space-between flex-wrap ga-2">
           <div>
             <h1 class="text-h5 font-weight-bold">{{ pageTitle }}</h1>
             <p class="text-body-2 text-medium-emphasis mb-0">
-              Freeform request → draft → approvals → SharePoint PDF
+              {{ appConfig.brand.tagline }}
             </p>
           </div>
           <v-btn
