@@ -106,6 +106,10 @@ VITE_DOCUMENT_API_BASE_URL=https://your-api-host.example/document-routing
 
 Import stubs from [`deploy/flows/`](./deploy/flows/README.md) (SLA sweeper, notify, publish, on-submit guard). Admin → Flow health shows recent mock/hosted run rows.
 
+**Publish:** the Code App Publish button only selects an allowlisted destination and
+calls the API/Flow — it does not upload PDF bytes from the browser. See
+[`deploy/flows/publish-approved.json`](./deploy/flows/publish-approved.json).
+
 ## 7. Security roles
 
 Map Entra groups to Document Routing User / Author / Approver / Publisher / Admin as described in [`deploy/SECURITY_ROLES.md`](./deploy/SECURITY_ROLES.md).

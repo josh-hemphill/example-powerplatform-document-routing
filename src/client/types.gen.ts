@@ -97,16 +97,18 @@ export type ProcessSlaRequest = {
 };
 
 export type PublishRequest = {
-    sharePointSiteUrl: string;
-    libraryName: string;
     /**
-     * Optional folder under the library
+     * Allowlisted publish destination id. When omitted, the document type’s
+     * default destination is used. Free-form SharePoint URLs are not accepted.
+     *
      */
-    folderPath?: string;
+    publishDestinationId?: string;
     /**
-     * Overrides the default PDF file name
+     * Optional folder under the destination’s allowlisted root only.
+     * Rejected when outside that root.
+     *
      */
-    fileName?: string;
+    folderPathOverride?: string;
 };
 
 export type CreateDocumentRequest = {
@@ -168,6 +170,10 @@ export type DocumentSummary = {
      * contentRevision frozen at submit-for-approval
      */
     submittedContentRevision?: number;
+    /**
+     * contentRevision of the artifact currently published
+     */
+    publishedContentRevision?: number;
 };
 
 export type ApprovalStep = {
@@ -211,6 +217,7 @@ export type Document = DocumentSummary & {
     authorEmail?: string;
     contentRevision: number;
     submittedContentRevision?: number;
+    publishedContentRevision?: number;
     approvalSteps: Array<ApprovalStep>;
     history: Array<HistoryEvent>;
     publishedPdfUrl?: string;
@@ -233,6 +240,10 @@ export type PublishResult = {
     sharePointUrl: string;
     sharePointItemId?: string;
     publishedAt: string;
+    /**
+     * True when the same revision was already published and no new file was created
+     */
+    idempotent?: boolean;
 };
 
 export type ControlChainStep = {
@@ -680,6 +691,14 @@ export type PublishDocumentPdfData = {
 
 export type PublishDocumentPdfErrors = {
     /**
+     * Validation error
+     */
+    400: Error;
+    /**
+     * Caller is not allowed to perform this action
+     */
+    403: Error;
+    /**
      * Resource not found
      */
     404: Error;
@@ -693,7 +712,7 @@ export type PublishDocumentPdfError = PublishDocumentPdfErrors[keyof PublishDocu
 
 export type PublishDocumentPdfResponses = {
     /**
-     * Published document
+     * Published document (or existing artifact for same revision)
      */
     200: PublishResult;
 };

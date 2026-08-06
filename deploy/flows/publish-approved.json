@@ -2,12 +2,19 @@
 	"$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
 	"metadata": {
 		"flowName": "Document Routing — Publish approved",
-		"description": "Publishes an approved revision to allowlisted SharePoint. Phase 5 completes HTML→PDF binary steps; this stub defines the trigger contract.",
-		"trigger": "When dr_document status becomes approved OR manual Publish command",
-		"tables": ["dr_document", "dr_publishdestination", "dr_historyevent"]
+		"description": "Trusted HTML→PDF→SharePoint publish under service identity. Triggered by POST /publish (Custom Connector) or status watch. Never accepts browser-uploaded PDF bytes.",
+		"trigger": "When publish command is received OR optional watch on approved documents",
+		"tables": ["dr_document", "dr_publishdestination", "dr_historyevent"],
+		"filenamePattern": "{title-slug}-{documentId8}-r{contentrevision}.pdf",
+		"idempotency": "If publishedcontentrevision equals requested revision and publishedpdfurl is set, return existing artifact (no new file)."
 	},
 	"definition": {
 		"triggers": {
+			"When_publish_command": {
+				"type": "Request",
+				"kind": "Http",
+				"description": "Preferred: Custom Connector / unbound action from Code App Publish button with publishDestinationId"
+			},
 			"When_document_approved": {
 				"type": "OpenApiConnectionWebhook",
 				"inputs": {
@@ -16,29 +23,34 @@
 						"entityName": "dr_documents",
 						"filterExpression": "dr_status eq 'approved'"
 					}
-				}
+				},
+				"description": "Optional secondary trigger; still resolve destination from allowlist, never from free-form URL columns alone"
 			}
 		},
 		"actions": {
 			"Resolve_publish_destination": {
 				"type": "Compose",
-				"description": "Load dr_publishdestination lookup; reject free-form site URLs not on allowlist"
+				"description": "Load dr_publishdestination by id (or document type default). Reject inactive rows and folder overrides outside the allowlisted root."
+			},
+			"Check_idempotency": {
+				"type": "If",
+				"description": "If status=published AND publishedcontentrevision == submitted/content revision AND publishedpdfurl set → return existing URL/item id"
 			},
 			"Render_html_and_pdf": {
 				"type": "Compose",
-				"description": "Phase 5: render approved revision markdown/HTML to PDF under service identity"
+				"description": "Render approved revision markdown/HTML to PDF under service identity (Playwright/Flows PDF, etc.). Do not accept client contentBase64."
 			},
 			"Upload_to_SharePoint": {
 				"type": "OpenApiConnection",
-				"description": "Create file in allowlisted library; filename includes document id + contentrevision"
+				"description": "Create/overwrite file named {slug}-{id8}-r{rev}.pdf in allowlisted library/folder. Same revision overwrites safely; new revision uses a new name."
 			},
 			"Patch_document_publish_fields": {
 				"type": "OpenApiConnection",
-				"description": "Set publishedpdfurl, sharepointitemid, status=published; idempotent on same revision"
+				"description": "Set publishedpdfurl, sharepointitemid, publishedcontentrevision, status=published"
 			},
 			"Create_history_event": {
 				"type": "OpenApiConnection",
-				"description": "POST history action=published"
+				"description": "POST history action=published with actor = service principal (or initiating publisher)"
 			}
 		},
 		"outputs": {}

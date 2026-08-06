@@ -9,6 +9,7 @@ import {
 	getDocumentQueryKey,
 	listDocumentsQueryKey,
 	listDocumentTypesQuery,
+	listPublishDestinationsQuery,
 	processApprovalSlaMutation,
 	publishDocumentPdfMutation,
 	releaseApprovalStepMutation,
@@ -22,12 +23,14 @@ import WorkflowTimeline from '@/components/WorkflowTimeline.vue';
 import { usePowerAppsContext } from '@/composables/use-power-apps-context';
 import { buildDraftFromTemplate, getDocumentType } from '@/config/document-types';
 import { isEmailInPool } from '@/domain/approval-queue';
-import { resolvePublishTargets } from '@/publishing/html-pdf-template';
 import { publishApprovedDocument } from '@/publishing/publish-document';
+import { buildRevisionPdfFileName } from '@/publishing/publish-engine';
+import { useIdentityStore } from '@/stores/identity';
 
 const route = useRoute();
 const queryCache = useQueryCache();
 const { context, canAct } = usePowerAppsContext();
+const identity = useIdentityStore();
 const actionError = ref<string | null>(null);
 const actionSuccess = ref<string | null>(null);
 
@@ -40,6 +43,7 @@ const { data: document, isPending, error, refetch } = useQuery(() =>
 );
 
 const { data: typesData } = useQuery(() => listDocumentTypesQuery());
+const { data: destinationsData } = useQuery(() => listPublishDestinationsQuery());
 const documentType = computed(() => {
 	const fromApi = typesData.value?.items?.find(
 		(item) => item.id === document.value?.documentType,
@@ -55,6 +59,15 @@ const approvalChainPreview = computed(() => {
 	);
 	return type?.approvalChain ?? [];
 });
+const destinationItems = computed(() =>
+	(destinationsData.value?.items ?? [])
+		.filter((item) => item.active)
+		.map((item) => ({
+			title: `${item.name} · ${item.libraryName}`,
+			value: item.id,
+			subtitle: item.siteUrl,
+		})),
+);
 
 const draftForm = reactive({
 	title: '',
@@ -71,10 +84,25 @@ const decisionForm = reactive({
 });
 
 const publishForm = reactive({
-	sharePointSiteUrl: '',
-	libraryName: '',
-	folderPath: '',
-	fileName: '',
+	publishDestinationId: null as string | null,
+	folderPathOverride: '',
+});
+
+const selectedDestination = computed(() =>
+	destinationsData.value?.items?.find(
+		(item) => item.id === publishForm.publishDestinationId,
+	) ?? null,
+);
+
+const previewFileName = computed(() => {
+	if (!document.value) {
+		return '';
+	}
+	const revision
+		= document.value.submittedContentRevision
+			?? document.value.contentRevision
+			?? 0;
+	return buildRevisionPdfFileName(document.value.id, revision, document.value.title);
 });
 
 const activeStep = computed(
@@ -85,7 +113,7 @@ const activeStep = computed(
 );
 
 watch(
-	[document, typesData],
+	[document, typesData, destinationsData],
 	() => {
 		const value = document.value;
 		if (!value) {
@@ -108,11 +136,17 @@ watch(
 					value.freeformRequest,
 				);
 		draftForm.summary = value.draftSummary ?? '';
-		const targets = resolvePublishTargets(value);
-		publishForm.sharePointSiteUrl = targets.siteUrl;
-		publishForm.libraryName = targets.libraryName;
-		publishForm.folderPath = targets.folderPath;
-		publishForm.fileName = targets.fileName;
+		const typeDefault = typesData.value?.items?.find(
+			(item) => item.id === value.documentType,
+		)?.defaultDestinationId;
+		const activeDestinations = (destinationsData.value?.items ?? []).filter(
+			(item) => item.active,
+		);
+		publishForm.publishDestinationId
+			= typeDefault
+				?? activeDestinations[0]?.id
+				?? null;
+		publishForm.folderPathOverride = '';
 	},
 	{ immediate: true },
 );
@@ -340,7 +374,8 @@ async function onPublish(): Promise<void> {
 	try {
 		const result = await publishApprovedDocument({
 			document: document.value,
-			targets: { ...publishForm },
+			publishDestinationId: publishForm.publishDestinationId ?? undefined,
+			folderPathOverride: publishForm.folderPathOverride || undefined,
 			publishApi: async(body) => {
 				const published = await publishPdfAsync({
 					path: { documentId: documentId.value },
@@ -350,11 +385,14 @@ async function onPublish(): Promise<void> {
 					sharePointUrl: published.sharePointUrl,
 					pdfFileName: published.pdfFileName,
 					sharePointItemId: published.sharePointItemId,
+					idempotent: published.idempotent,
 				};
 			},
 		});
 
-		actionSuccess.value = `Published to SharePoint: ${result.sharePointUrl}`;
+		actionSuccess.value = result.idempotent
+			? `Already published (same revision): ${result.sharePointUrl}`
+			: `Published to SharePoint: ${result.sharePointUrl}`;
 	}
 	catch(publishError) {
 		actionError.value
@@ -400,7 +438,11 @@ const canDecide = computed(
 		=== (context.value.email || '').toLowerCase(),
 );
 const canPublish = computed(
-	() => Boolean(canAct.value) && document.value?.status === 'approved',
+	() =>
+		Boolean(canAct.value)
+		&& (document.value?.status === 'approved' || document.value?.status === 'published')
+		&& (identity.hasRole('publisher') || identity.hasRole('admin'))
+		&& Boolean(publishForm.publishDestinationId),
 );
 const canProcessSla = computed(
 	() => Boolean(canAct.value) && document.value?.status === 'in_review',
@@ -618,16 +660,30 @@ const canWithdraw = computed(() => {
 						<div class="text-subtitle-1 font-weight-bold mb-3">
 							4. Publish PDF to SharePoint
 						</div>
-						<v-text-field
-							v-model="publishForm.sharePointSiteUrl"
-							label="SharePoint site URL"
+						<p class="text-body-2 text-medium-emphasis mb-3">
+							Publish runs server-side / via Flow against an allowlisted destination.
+							The browser never uploads PDF bytes.
+						</p>
+						<v-select
+							v-model="publishForm.publishDestinationId"
+							:items="destinationItems"
+							item-title="title"
+							item-value="value"
+							label="Publish destination"
 							class="mb-2"
 						/>
-						<v-text-field v-model="publishForm.libraryName" label="Library name" class="mb-2" />
-						<v-text-field v-model="publishForm.folderPath" label="Folder path" class="mb-2" />
 						<v-text-field
-							v-model="publishForm.fileName"
-							label="PDF file name"
+							v-model="publishForm.folderPathOverride"
+							label="Folder override (optional, under destination root)"
+							:hint="selectedDestination ? `Root: ${selectedDestination.folderPath}` : undefined"
+							persistent-hint
+							class="mb-2"
+						/>
+						<v-text-field
+							:model-value="previewFileName"
+							label="PDF file name (id + revision)"
+							readonly
+							disabled
 							class="mb-3"
 						/>
 						<v-btn

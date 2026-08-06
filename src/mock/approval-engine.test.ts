@@ -36,6 +36,7 @@ function baseDocument(
 		authorEmail: 'casey.author@contoso.com',
 		contentRevision: 3,
 		submittedContentRevision: 3,
+		publishedContentRevision: null,
 		approvalSteps: [],
 		history: [],
 		publishedPdfUrl: null,

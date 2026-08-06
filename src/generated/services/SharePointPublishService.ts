@@ -1,48 +1,38 @@
-import { buildSharePointDocumentUrl } from '@/publishing/sharepoint-paths';
-
 /**
- * Example of the typed SharePoint service shape produced by:
+ * Placeholder for the typed SharePoint service shape produced by:
  * `pnpm exec pa app add data-source --connector shared_sharepointonline ...`
  *
- * Replace this stub with the generated service under `src/generated/services`
- * once a real SharePoint connection is added to the Code App.
+ * Phase 5: the Code App must **not** upload PDF/HTML bytes through this stub.
+ * Trusted publish runs in Power Automate / the mock API under a service identity.
+ * DEV may record publish intent only (no content).
  */
-export interface SharePointFileCreateRequest {
+export interface SharePointPublishIntent {
 	siteUrl: string;
 	libraryName: string;
 	folderPath: string;
 	fileName: string;
-	contentBase64: string;
-	contentType?: string;
 }
 
-export interface SharePointFileCreateResult {
-	itemId: string;
-	webUrl: string;
+export interface SharePointPublishIntentResult {
+	recorded: true;
+	at: string;
 }
 
 export const SharePointPublishService = {
 	/**
-	 * Uploads a rendered PDF into a SharePoint document library.
-	 * In production this calls the generated SharePoint connector or a flow.
+	 * DEV-only intent log. Production publish goes through Flow — never call this
+	 * with browser-generated "PDF" bytes.
 	 */
-	async createFile(
-		request: SharePointFileCreateRequest,
-	): Promise<SharePointFileCreateResult> {
+	async recordPublishIntent(
+		intent: SharePointPublishIntent,
+	): Promise<SharePointPublishIntentResult> {
 		if (import.meta.env.DEV) {
-			return {
-				itemId: crypto.randomUUID(),
-				webUrl: buildSharePointDocumentUrl({
-					siteUrl: request.siteUrl,
-					libraryName: request.libraryName,
-					folderPath: request.folderPath,
-					fileName: request.fileName,
-				}),
-			};
+			console.warn('[SharePointPublishService] publish intent (no upload)', intent);
+			return { recorded: true, at: new Date().toISOString() };
 		}
 
 		throw new Error(
-			'SharePointPublishService stub is not connected. Add the SharePoint data source with the Power Apps CLI and regenerate services.',
+			'Browser SharePoint uploads are disabled. Use POST /documents/{id}/publish so a Cloud Flow publishes under a service identity.',
 		);
 	},
 };
