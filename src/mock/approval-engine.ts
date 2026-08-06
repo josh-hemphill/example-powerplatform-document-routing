@@ -239,13 +239,8 @@ export function processStepSla(
 		};
 	}
 
-	// Already elevated or no elevation members: record breach, keep deadline.
-	return {
-		changed: true,
-		message: hadElevationMembers
-			? `SLA still breached after elevation (${roleLabel} ${step.order})`
-			: `SLA breached; no elevation pool configured (${roleLabel} ${step.order})`,
-	};
+	// Already elevated / no elevation pool, and already queued: no mutation.
+	return { changed: false, message: null };
 }
 
 const ALLOWED_DECISIONS = new Set(['approve', 'reject']);

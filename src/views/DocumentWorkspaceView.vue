@@ -268,7 +268,7 @@ async function onWithdrawAndRevise(): Promise<void> {
 			path: { documentId: documentId.value },
 			body: {},
 		});
-		actionSuccess.value = 'Withdrawn for revision. Draft editing is available again.'
+		actionSuccess.value = 'Withdrawn for revision. Draft editing is available again.';
 	}
 	catch(withdrawError) {
 		actionError.value

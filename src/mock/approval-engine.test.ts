@@ -138,6 +138,38 @@ describe('approval engine', () => {
 		expect(step.dueAt).toBe(deadline);
 	});
 
+	it('does not report changed on repeated sweeps of an already-queued overdue step', () => {
+		const activated = new Date('2020-01-01T00:00:00.000Z');
+		const step = createStepFromInput(
+			{
+				assignmentMode: 'pool',
+				role: 'Legal',
+				slaHours: 1,
+				pool: [{ email: 'jordan.legal@contoso.com', displayName: 'Jordan' }],
+				elevationPool: [
+					{ email: 'pat.counsel@contoso.com', displayName: 'Pat' },
+				],
+			},
+			1,
+			activated,
+			true,
+			1,
+		);
+
+		const overdue = new Date('2020-01-01T02:00:00.000Z');
+		expect(processStepSla(step, overdue).changed).toBe(true);
+		expect(step.elevated).toBe(true);
+
+		const laterOverdue = new Date('2020-01-01T05:00:00.000Z');
+		// Still within the post-elevation window — not overdue yet.
+		expect(processStepSla(step, laterOverdue).changed).toBe(false);
+
+		const afterElevatedDeadline = new Date(step.activateDueAt!);
+		afterElevatedDeadline.setHours(afterElevatedDeadline.getHours() + 1);
+		expect(processStepSla(step, afterElevatedDeadline).changed).toBe(false);
+		expect(step.status).toBe('queued');
+	});
+
 	it('rejects invalid decisions and forbidden actors', () => {
 		const clock = new Date('2020-01-01T00:00:00.000Z');
 		const step = createStepFromInput(
