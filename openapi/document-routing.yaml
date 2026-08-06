@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Document Routing API
-  version: 1.4.0
+  version: 1.5.0
   description: |
     Routes freeform document requests through drafting and a chain of approvals,
     then publishes an approved PDF to SharePoint. In Power Platform, this API is
@@ -26,6 +26,9 @@ info:
     an allowlisted `publishDestinationId`; the mock/Flow renders HTML→PDF under a
     service identity. Filenames include document id + content revision; republishing
     the same revision is idempotent.
+
+    **Contract (Phase 6):** OpenAPI 3.1 null unions (`type: [T, 'null']`), shared
+    `401`/`403`/`409` responses, and schema-aligned request validation (title length).
 servers:
   - url: /api
     description: Local Vite mock (development)
@@ -41,6 +44,8 @@ tags:
   - name: Control
 security:
   - PrincipalHeader: []
+  - PrincipalHeader: []
+    RolesHeader: []
 paths:
   /documents:
     get:
@@ -75,6 +80,10 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/DocumentSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
     post:
       operationId: createDocumentRequest
       tags: [Documents]
@@ -94,6 +103,8 @@ paths:
                 $ref: '#/components/schemas/Document'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /documents/{documentId}:
     get:
       operationId: getDocument
@@ -108,6 +119,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Document'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
@@ -132,6 +145,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Document'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
@@ -164,6 +181,8 @@ paths:
                 $ref: '#/components/schemas/Document'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
@@ -194,6 +213,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Document'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
@@ -228,6 +249,8 @@ paths:
                 $ref: '#/components/schemas/Document'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
@@ -260,6 +283,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Document'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
@@ -292,6 +317,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Document'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
@@ -351,6 +378,8 @@ paths:
                 $ref: '#/components/schemas/PublishResult'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
@@ -394,6 +423,8 @@ paths:
                 $ref: '#/components/schemas/ControlDocumentType'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
   /control/document-types/{typeId}:
@@ -435,6 +466,8 @@ paths:
                 $ref: '#/components/schemas/ControlDocumentType'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
@@ -450,6 +483,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ControlDocumentType'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
@@ -472,6 +507,8 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/ControlApproverPool'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
     post:
@@ -493,6 +530,8 @@ paths:
                 $ref: '#/components/schemas/ControlApproverPool'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
   /control/approver-pools/{poolId}:
@@ -520,6 +559,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ControlApproverPool'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
@@ -531,6 +572,8 @@ paths:
       responses:
         '204':
           description: Deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
@@ -574,6 +617,8 @@ paths:
                 $ref: '#/components/schemas/ControlPublishDestination'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
   /control/publish-destinations/{destinationId}:
@@ -601,6 +646,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ControlPublishDestination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
@@ -616,6 +663,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ControlPublishDestination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
@@ -632,6 +681,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ControlSettings'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
     put:
@@ -651,6 +702,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ControlSettings'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
   /control/flow-runs:
@@ -671,6 +724,8 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/ControlFlowRun'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
 components:
@@ -708,6 +763,12 @@ components:
             $ref: '#/components/schemas/Error'
     BadRequest:
       description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Missing or invalid caller principal
       content:
         application/json:
           schema:
@@ -899,11 +960,13 @@ components:
         title:
           type: string
           minLength: 3
+          maxLength: 200
         bodyMarkdown:
           type: string
           minLength: 1
         summary:
           type: string
+          maxLength: 500
           description: Optional summary; author is set from the authenticated principal
     DocumentSummary:
       type: object
@@ -938,20 +1001,17 @@ components:
           type: string
           enum: [low, normal, high]
         currentApproverEmail:
-          type: string
+          type: [string, 'null']
           format: email
-          nullable: true
         currentStepStatus:
-          allOf:
+          oneOf:
             - $ref: '#/components/schemas/ApprovalStepStatus'
-          nullable: true
+            - type: 'null'
         currentStepDueAt:
-          type: string
+          type: [string, 'null']
           format: date-time
-          nullable: true
         currentStepElevated:
-          type: boolean
-          nullable: true
+          type: [boolean, 'null']
         currentPoolEmails:
           type: array
           items:
@@ -969,12 +1029,10 @@ components:
           minimum: 0
           description: Incremented on each draft save
         submittedContentRevision:
-          type: integer
-          nullable: true
+          type: [integer, 'null']
           description: contentRevision frozen at submit-for-approval
         publishedContentRevision:
-          type: integer
-          nullable: true
+          type: [integer, 'null']
           description: contentRevision of the artifact currently published
     ApprovalStep:
       type: object
@@ -995,15 +1053,12 @@ components:
         assignmentMode:
           $ref: '#/components/schemas/ApprovalAssignmentMode'
         approverEmail:
-          type: string
+          type: [string, 'null']
           format: email
-          nullable: true
         approverDisplayName:
-          type: string
-          nullable: true
+          type: [string, 'null']
         role:
-          type: string
-          nullable: true
+          type: [string, 'null']
         status:
           $ref: '#/components/schemas/ApprovalStepStatus'
         pool:
@@ -1015,42 +1070,33 @@ components:
           items:
             $ref: '#/components/schemas/Approver'
         slaHours:
-          type: number
-          nullable: true
+          type: [number, 'null']
         activateDueAt:
-          type: string
+          type: [string, 'null']
           format: date-time
-          nullable: true
           description: Immutable SLA deadline set when the step activates
         dueAt:
-          type: string
+          type: [string, 'null']
           format: date-time
-          nullable: true
           description: Denormalized mirror of activateDueAt for inbox filters
         claimedAt:
-          type: string
+          type: [string, 'null']
           format: date-time
-          nullable: true
         elevated:
           type: boolean
         elevatedAt:
-          type: string
+          type: [string, 'null']
           format: date-time
-          nullable: true
         comment:
-          type: string
-          nullable: true
+          type: [string, 'null']
         decidedAt:
-          type: string
+          type: [string, 'null']
           format: date-time
-          nullable: true
         submittedRevision:
-          type: integer
-          nullable: true
+          type: [integer, 'null']
           description: Document contentRevision at submit
         approvedRevision:
-          type: integer
-          nullable: true
+          type: [integer, 'null']
           description: contentRevision recorded when this step approved
     Document:
       allOf:
@@ -1065,24 +1111,19 @@ components:
             freeformRequest:
               type: string
             draftBodyMarkdown:
-              type: string
-              nullable: true
+              type: [string, 'null']
             draftSummary:
-              type: string
-              nullable: true
+              type: [string, 'null']
             authorEmail:
-              type: string
+              type: [string, 'null']
               format: email
-              nullable: true
             contentRevision:
               type: integer
               minimum: 0
             submittedContentRevision:
-              type: integer
-              nullable: true
+              type: [integer, 'null']
             publishedContentRevision:
-              type: integer
-              nullable: true
+              type: [integer, 'null']
             approvalSteps:
               type: array
               items:
@@ -1092,19 +1133,15 @@ components:
               items:
                 $ref: '#/components/schemas/HistoryEvent'
             publishedPdfUrl:
-              type: string
+              type: [string, 'null']
               format: uri
-              nullable: true
             sharePointItemId:
-              type: string
-              nullable: true
+              type: [string, 'null']
             requestedPublishSiteUrl:
-              type: string
+              type: [string, 'null']
               format: uri
-              nullable: true
             requestedLibraryName:
-              type: string
-              nullable: true
+              type: [string, 'null']
     HistoryEvent:
       type: object
       required: [id, at, actorEmail, action, message]
@@ -1202,9 +1239,8 @@ components:
           type: integer
           minimum: 1
         defaultDestinationId:
-          type: string
+          type: [string, 'null']
           format: uuid
-          nullable: true
         approvalChain:
           type: array
           items:
@@ -1245,9 +1281,8 @@ components:
           type: integer
           minimum: 1
         defaultDestinationId:
-          type: string
+          type: [string, 'null']
           format: uuid
-          nullable: true
         approvalChain:
           type: array
           items:

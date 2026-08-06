@@ -2,19 +2,27 @@
 import { useMutation, useQuery, useQueryCache } from '@pinia/colada';
 import { computed, reactive, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
+import { getApiErrorMessage } from '@/api/api-error';
+import {
+	FREEFORM_MIN_LENGTH,
+	freeformRequestRules,
+	TITLE_MAX_LENGTH,
+	TITLE_MIN_LENGTH,
+	titleRules,
+} from '@/api/form-rules';
 import {
 	createDocumentRequestMutation,
 	listDocumentsQueryKey,
 	listDocumentTypesQuery,
 } from '@/client/@pinia/colada.gen';
 import { usePowerAppsContext } from '@/composables/use-power-apps-context';
-import { appConfig } from '@/config/app.config';
 import { DEFAULT_DOCUMENT_TYPE_ID } from '@/config/document-types';
 
 const router = useRouter();
 const queryCache = useQueryCache();
 const { context, canAct, isLoading: identityLoading } = usePowerAppsContext();
 const formError = ref<string | null>(null);
+const formValid = ref(false);
 
 const { data: typesData } = useQuery(() => listDocumentTypesQuery());
 const typeItems = computed(() =>
@@ -32,8 +40,6 @@ const form = reactive({
 	documentType: DEFAULT_DOCUMENT_TYPE_ID,
 	freeformRequest: '',
 	priority: 'normal' as 'low' | 'normal' | 'high',
-	requestedPublishSiteUrl: appConfig.sharePoint.siteUrl,
-	requestedLibraryName: appConfig.sharePoint.libraryName,
 });
 
 watch(
@@ -65,8 +71,8 @@ async function submit(): Promise<void> {
 		formError.value = 'Sign-in identity is required before creating a request.';
 		return;
 	}
-	if (!form.title.trim() || form.freeformRequest.trim().length < 10) {
-		formError.value = 'Title and a freeform request (10+ chars) are required.';
+	if (!formValid.value) {
+		formError.value = `Title (${TITLE_MIN_LENGTH}–${TITLE_MAX_LENGTH} chars) and freeform request (${FREEFORM_MIN_LENGTH}+ chars) are required.`;
 		return;
 	}
 
@@ -77,14 +83,12 @@ async function submit(): Promise<void> {
 				documentType: form.documentType,
 				freeformRequest: form.freeformRequest.trim(),
 				priority: form.priority,
-				requestedPublishSiteUrl: form.requestedPublishSiteUrl,
-				requestedLibraryName: form.requestedLibraryName,
 			},
 		});
 		await router.push({ name: 'document', params: { documentId: document.id } });
 	}
 	catch(error) {
-		formError.value = error instanceof Error ? error.message : 'Failed to create request';
+		formError.value = getApiErrorMessage(error, 'Failed to create request');
 	}
 }
 </script>
@@ -94,7 +98,7 @@ async function submit(): Promise<void> {
 		<p class="text-body-2 text-medium-emphasis mb-6">
 			Capture an unstructured request. Requester is the signed-in principal
 			(<strong>{{ context.email ?? '…' }}</strong>). The document type chooses the draft
-			scaffold, author collaboration team, and default approval chain.
+			scaffold, author collaboration team, default approval chain, and allowlisted publish destination.
 		</p>
 
 		<v-alert
@@ -106,10 +110,17 @@ async function submit(): Promise<void> {
 			{{ formError }}
 		</v-alert>
 
-		<v-form @submit.prevent="submit">
+		<v-form v-model="formValid" @submit.prevent="submit">
 			<v-row>
 				<v-col cols="12" md="8">
-					<v-text-field v-model="form.title" label="Request title" required />
+					<v-text-field
+						v-model="form.title"
+						label="Request title"
+						:rules="titleRules('Request title')"
+						counter="200"
+						maxlength="200"
+						required
+					/>
 				</v-col>
 				<v-col cols="12" md="4">
 					<v-select
@@ -141,6 +152,7 @@ async function submit(): Promise<void> {
 						v-model="form.freeformRequest"
 						label="Freeform request"
 						rows="8"
+						:rules="freeformRequestRules()"
 						:hint="selectedType?.requestHint"
 						persistent-hint
 					/>
@@ -153,17 +165,11 @@ async function submit(): Promise<void> {
 						disabled
 					/>
 				</v-col>
-				<v-col cols="12" md="6">
-					<v-text-field
-						v-model="form.requestedLibraryName"
-						label="Target SharePoint library"
-					/>
-				</v-col>
-				<v-col cols="12">
-					<v-text-field
-						v-model="form.requestedPublishSiteUrl"
-						label="Target SharePoint site URL"
-					/>
+				<v-col cols="12" md="6" class="d-flex align-center">
+					<p class="text-body-2 text-medium-emphasis mb-0">
+						Publish destination is chosen from the Admin allowlist at publish time
+						(document type default when set).
+					</p>
 				</v-col>
 			</v-row>
 
@@ -175,7 +181,7 @@ async function submit(): Promise<void> {
 					color="primary"
 					type="submit"
 					:loading="isLoading || identityLoading"
-					:disabled="!canAct"
+					:disabled="!canAct || !formValid"
 				>
 					Submit request
 				</v-btn>

@@ -3,6 +3,7 @@ import type { ControlApproverPool, ControlDocumentType, ControlPublishDestinatio
 import { useMutation, useQuery, useQueryCache } from '@pinia/colada';
 import { computed, reactive, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
+import { getApiErrorMessage } from '@/api/api-error';
 import {
 	getControlSettingsQuery,
 	listApproverPoolsQuery,
@@ -254,7 +255,7 @@ async function saveType(): Promise<void> {
 		actionSuccess.value = 'Document type saved. Next submit uses this chain/pools.';
 	}
 	catch(error) {
-		actionError.value = error instanceof Error ? error.message : 'Failed to save type';
+		actionError.value = getApiErrorMessage(error, 'Failed to save type');
 	}
 }
 
@@ -277,7 +278,7 @@ async function savePool(): Promise<void> {
 		actionSuccess.value = 'Pool updated. New submits resolve live membership.';
 	}
 	catch(error) {
-		actionError.value = error instanceof Error ? error.message : 'Failed to save pool';
+		actionError.value = getApiErrorMessage(error, 'Failed to save pool');
 	}
 }
 
@@ -301,7 +302,7 @@ async function saveDestination(): Promise<void> {
 		actionSuccess.value = 'Publish destination saved.';
 	}
 	catch(error) {
-		actionError.value = error instanceof Error ? error.message : 'Failed to save destination';
+		actionError.value = getApiErrorMessage(error, 'Failed to save destination');
 	}
 }
 
@@ -319,7 +320,7 @@ async function saveSettings(): Promise<void> {
 		actionSuccess.value = 'Settings saved.';
 	}
 	catch(error) {
-		actionError.value = error instanceof Error ? error.message : 'Failed to save settings';
+		actionError.value = getApiErrorMessage(error, 'Failed to save settings');
 	}
 }
 

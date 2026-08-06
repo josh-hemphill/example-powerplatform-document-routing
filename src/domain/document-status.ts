@@ -1,10 +1,6 @@
-export type DocumentStatus
-	= | 'requested'
-		| 'drafting'
-		| 'in_review'
-		| 'approved'
-		| 'rejected'
-		| 'published';
+import type { DocumentStatus } from '../client/types.gen.ts';
+
+export type { DocumentStatus };
 
 export const DOCUMENT_STATUS_LABELS: Record<DocumentStatus, string> = {
 	requested: 'Requested',

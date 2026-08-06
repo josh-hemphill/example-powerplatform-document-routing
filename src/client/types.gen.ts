@@ -152,10 +152,10 @@ export type DocumentSummary = {
      */
     collaboratorEmails?: Array<string>;
     priority?: 'low' | 'normal' | 'high';
-    currentApproverEmail?: string;
-    currentStepStatus?: ApprovalStepStatus;
-    currentStepDueAt?: string;
-    currentStepElevated?: boolean;
+    currentApproverEmail?: string | null;
+    currentStepStatus?: ApprovalStepStatus | null;
+    currentStepDueAt?: string | null;
+    currentStepElevated?: boolean | null;
     /**
      * Eligible claimers when the active step is a pool queue
      */
@@ -169,61 +169,61 @@ export type DocumentSummary = {
     /**
      * contentRevision frozen at submit-for-approval
      */
-    submittedContentRevision?: number;
+    submittedContentRevision?: number | null;
     /**
      * contentRevision of the artifact currently published
      */
-    publishedContentRevision?: number;
+    publishedContentRevision?: number | null;
 };
 
 export type ApprovalStep = {
     id: string;
     order: number;
     assignmentMode: ApprovalAssignmentMode;
-    approverEmail?: string;
-    approverDisplayName?: string;
-    role?: string;
+    approverEmail?: string | null;
+    approverDisplayName?: string | null;
+    role?: string | null;
     status: ApprovalStepStatus;
     pool: Array<Approver>;
     elevationPool?: Array<Approver>;
-    slaHours?: number;
+    slaHours?: number | null;
     /**
      * Immutable SLA deadline set when the step activates
      */
-    activateDueAt?: string;
+    activateDueAt?: string | null;
     /**
      * Denormalized mirror of activateDueAt for inbox filters
      */
-    dueAt?: string;
-    claimedAt?: string;
+    dueAt?: string | null;
+    claimedAt?: string | null;
     elevated: boolean;
-    elevatedAt?: string;
-    comment?: string;
-    decidedAt?: string;
+    elevatedAt?: string | null;
+    comment?: string | null;
+    decidedAt?: string | null;
     /**
      * Document contentRevision at submit
      */
-    submittedRevision?: number;
+    submittedRevision?: number | null;
     /**
      * contentRevision recorded when this step approved
      */
-    approvedRevision?: number;
+    approvedRevision?: number | null;
 };
 
 export type Document = DocumentSummary & {
     freeformRequest: string;
-    draftBodyMarkdown?: string;
-    draftSummary?: string;
-    authorEmail?: string;
+    draftBodyMarkdown?: string | null;
+    draftSummary?: string | null;
+    authorEmail?: string | null;
     contentRevision: number;
-    submittedContentRevision?: number;
-    publishedContentRevision?: number;
+    submittedContentRevision?: number | null;
+    publishedContentRevision?: number | null;
     approvalSteps: Array<ApprovalStep>;
     history: Array<HistoryEvent>;
-    publishedPdfUrl?: string;
-    sharePointItemId?: string;
-    requestedPublishSiteUrl?: string;
-    requestedLibraryName?: string;
+    publishedPdfUrl?: string | null;
+    sharePointItemId?: string | null;
+    requestedPublishSiteUrl?: string | null;
+    requestedLibraryName?: string | null;
 };
 
 export type HistoryEvent = {
@@ -269,7 +269,7 @@ export type ControlDocumentType = {
     authorTeamEmails: Array<string>;
     active: boolean;
     policyVersion: number;
-    defaultDestinationId?: string;
+    defaultDestinationId?: string | null;
     approvalChain: Array<ControlChainStep>;
 };
 
@@ -283,7 +283,7 @@ export type ControlDocumentTypeWrite = {
     authorTeamEmails?: Array<string>;
     active: boolean;
     policyVersion?: number;
-    defaultDestinationId?: string;
+    defaultDestinationId?: string | null;
     approvalChain: Array<ControlChainStep>;
 };
 
@@ -361,6 +361,19 @@ export type ListDocumentsData = {
     url: '/documents';
 };
 
+export type ListDocumentsErrors = {
+    /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
+    /**
+     * Caller is not allowed to perform this action
+     */
+    403: Error;
+};
+
+export type ListDocumentsError = ListDocumentsErrors[keyof ListDocumentsErrors];
+
 export type ListDocumentsResponses = {
     /**
      * Document list
@@ -384,6 +397,10 @@ export type CreateDocumentRequestErrors = {
      * Validation error
      */
     400: Error;
+    /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
 };
 
 export type CreateDocumentRequestError = CreateDocumentRequestErrors[keyof CreateDocumentRequestErrors];
@@ -407,6 +424,10 @@ export type GetDocumentData = {
 };
 
 export type GetDocumentErrors = {
+    /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
     /**
      * Caller is not allowed to perform this action
      */
@@ -438,6 +459,14 @@ export type UpdateDocumentDraftData = {
 };
 
 export type UpdateDocumentDraftErrors = {
+    /**
+     * Validation error
+     */
+    400: Error;
+    /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
     /**
      * Caller is not allowed to perform this action
      */
@@ -478,6 +507,10 @@ export type SubmitForApprovalErrors = {
      */
     400: Error;
     /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
+    /**
      * Caller is not allowed to perform this action
      */
     403: Error;
@@ -512,6 +545,10 @@ export type WithdrawAndReviseData = {
 };
 
 export type WithdrawAndReviseErrors = {
+    /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
     /**
      * Caller is not allowed to perform this action
      */
@@ -553,6 +590,10 @@ export type DecideApprovalStepErrors = {
      */
     400: Error;
     /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
+    /**
      * Caller is not allowed to perform this action
      */
     403: Error;
@@ -589,6 +630,10 @@ export type ClaimApprovalStepData = {
 
 export type ClaimApprovalStepErrors = {
     /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
+    /**
      * Caller is not allowed to perform this action
      */
     403: Error;
@@ -624,6 +669,10 @@ export type ReleaseApprovalStepData = {
 };
 
 export type ReleaseApprovalStepErrors = {
+    /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
     /**
      * Caller is not allowed to perform this action
      */
@@ -695,6 +744,10 @@ export type PublishDocumentPdfErrors = {
      */
     400: Error;
     /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
+    /**
      * Caller is not allowed to perform this action
      */
     403: Error;
@@ -750,6 +803,10 @@ export type CreateDocumentTypeErrors = {
      */
     400: Error;
     /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
+    /**
      * Caller is not allowed to perform this action
      */
     403: Error;
@@ -776,6 +833,10 @@ export type DeactivateDocumentTypeData = {
 };
 
 export type DeactivateDocumentTypeErrors = {
+    /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
     /**
      * Caller is not allowed to perform this action
      */
@@ -839,6 +900,10 @@ export type UpdateDocumentTypeErrors = {
      */
     400: Error;
     /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
+    /**
      * Caller is not allowed to perform this action
      */
     403: Error;
@@ -867,6 +932,10 @@ export type ListApproverPoolsData = {
 };
 
 export type ListApproverPoolsErrors = {
+    /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
     /**
      * Caller is not allowed to perform this action
      */
@@ -899,6 +968,10 @@ export type CreateApproverPoolErrors = {
      */
     400: Error;
     /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
+    /**
      * Caller is not allowed to perform this action
      */
     403: Error;
@@ -925,6 +998,10 @@ export type DeleteApproverPoolData = {
 };
 
 export type DeleteApproverPoolErrors = {
+    /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
     /**
      * Caller is not allowed to perform this action
      */
@@ -960,6 +1037,10 @@ export type UpdateApproverPoolData = {
 };
 
 export type UpdateApproverPoolErrors = {
+    /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
     /**
      * Caller is not allowed to perform this action
      */
@@ -1012,6 +1093,10 @@ export type CreatePublishDestinationErrors = {
      */
     400: Error;
     /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
+    /**
      * Caller is not allowed to perform this action
      */
     403: Error;
@@ -1038,6 +1123,10 @@ export type DeactivatePublishDestinationData = {
 };
 
 export type DeactivatePublishDestinationErrors = {
+    /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
     /**
      * Caller is not allowed to perform this action
      */
@@ -1070,6 +1159,10 @@ export type UpdatePublishDestinationData = {
 
 export type UpdatePublishDestinationErrors = {
     /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
+    /**
      * Caller is not allowed to perform this action
      */
     403: Error;
@@ -1099,6 +1192,10 @@ export type GetControlSettingsData = {
 
 export type GetControlSettingsErrors = {
     /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
+    /**
      * Caller is not allowed to perform this action
      */
     403: Error;
@@ -1124,6 +1221,10 @@ export type UpdateControlSettingsData = {
 
 export type UpdateControlSettingsErrors = {
     /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
+    /**
      * Caller is not allowed to perform this action
      */
     403: Error;
@@ -1148,6 +1249,10 @@ export type ListFlowRunsData = {
 };
 
 export type ListFlowRunsErrors = {
+    /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
     /**
      * Caller is not allowed to perform this action
      */

@@ -2,6 +2,11 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Plugin } from 'vite';
 import type { MockDocumentRecord } from './seed-documents.ts';
 import { randomUUID } from 'node:crypto';
+import {
+	validateBodyMarkdown,
+	validateFreeformRequest,
+	validateTitle,
+} from '../api/form-rules.ts';
 import { appConfig } from '../config/app.config.ts';
 import { toApprovalStepInputs } from '../config/document-types.ts';
 import {
@@ -235,6 +240,17 @@ export function documentRoutingMockPlugin(): Plugin {
 							requestedLibraryName?: string;
 						}>(req);
 
+						const titleError = validateTitle(body.title);
+						if (titleError) {
+							sendJson(res, 400, { message: titleError, code: 'validation_error' });
+							return;
+						}
+						const freeformError = validateFreeformRequest(body.freeformRequest);
+						if (freeformError) {
+							sendJson(res, 400, { message: freeformError, code: 'validation_error' });
+							return;
+						}
+
 						const typeRow = findControlDocumentType(body.documentType);
 						if (!typeRow || !typeRow.active) {
 							sendJson(res, 400, {
@@ -338,6 +354,17 @@ export function documentRoutingMockPlugin(): Plugin {
 							bodyMarkdown: string;
 							summary?: string;
 						}>(req);
+
+						const titleError = validateTitle(body.title);
+						if (titleError) {
+							sendJson(res, 400, { message: titleError, code: 'validation_error' });
+							return;
+						}
+						const bodyError = validateBodyMarkdown(body.bodyMarkdown);
+						if (bodyError) {
+							sendJson(res, 400, { message: bodyError, code: 'validation_error' });
+							return;
+						}
 
 						document.title = body.title;
 						document.draftBodyMarkdown = body.bodyMarkdown;
