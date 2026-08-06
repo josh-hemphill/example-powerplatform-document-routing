@@ -4,7 +4,7 @@ Example Power Platform **Code App** that routes freeform document requests throu
 
 **Adopting for your org?** Start with [`SETUP.md`](./SETUP.md) — config in `src/config/*`, deploy scaffolding in [`deploy/`](./deploy/README.md).
 
-**Hardening / Dataverse-first roadmap:** see [`docs/remediation-roadmap.md`](./docs/remediation-roadmap.md) (phased plan: tooling → schema → identity & collaborative drafts → workflow/Flows → admin → publish → app polish).
+**Hardening / Dataverse-first roadmap:** see [`docs/remediation-roadmap.md`](./docs/remediation-roadmap.md) (Phases 0–8: tooling → schema → identity → workflow → admin → publish → polish → controlled documents). **Next:** [`docs/post-phase-8-review-roadmap.md`](./docs/post-phase-8-review-roadmap.md) (Phases 9–13: authz, concurrency, approval UX, nav, admin/a11y).
 
 Stack:
 
