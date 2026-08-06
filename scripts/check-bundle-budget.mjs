@@ -3,7 +3,7 @@
  * Fails when production dist JS/CSS gzip sizes exceed the Phase 7 budget.
  */
 import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
@@ -32,7 +32,7 @@ for (const filePath of assets) {
 	const raw = readFileSync(filePath);
 	const gzipKb = gzipSync(raw).length / 1024;
 	total += gzipKb;
-	const label = `${filePath.split('/').pop()} ${gzipKb.toFixed(1)} KiB gzip`;
+	const label = `${basename(filePath)} ${gzipKb.toFixed(1)} KiB gzip`;
 	if (gzipKb > MAX_SINGLE_GZIP_KB) {
 		offenders.push(label);
 	}
