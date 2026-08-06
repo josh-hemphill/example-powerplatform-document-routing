@@ -337,8 +337,10 @@ paths:
       tags: [Approvals]
       summary: Process SLA timeouts and elevate overdue steps (scheduler / flow entrypoint)
       description: |
-        Production callers are Cloud Flows under a service identity; they omit `now`.
-        The local mock accepts `now` only when running in development (`import.meta.env.DEV`).
+        Production callers are Cloud Flows under a service identity (or Admin);
+        they omit `now`. The local mock accepts `now` only when running in
+        development (`import.meta.env.DEV`). End users must not call this
+        endpoint — requires Admin or Flow/service principal.
       parameters:
         - $ref: '#/components/parameters/DocumentId'
       requestBody:
@@ -356,6 +358,10 @@ paths:
                 $ref: '#/components/schemas/Document'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
   /documents/{documentId}/publish:
@@ -365,8 +371,9 @@ paths:
       summary: Publish the approved revision to an allowlisted SharePoint destination
       description: |
         Starts trusted publish (mock or Cloud Flow). The client does **not** upload
-        PDF/HTML bytes. Requires Publisher (or Admin) role. Idempotent for the same
-        content revision. First publish allocates `documentNumber` + version 1.
+        PDF/HTML bytes. Requires Publisher (or Admin) role **and** document case
+        access (same visibility as GET). Idempotent for the same content revision.
+        First publish allocates `documentNumber` + version 1.
         Publishing a superseding case marks the prior document `superseded` and
         keeps the same number with version + 1.
       parameters:
@@ -835,17 +842,18 @@ components:
       in: header
       name: X-Document-Routing-Actor
       description: |
-        Local mock stand-in for the authenticated caller email/UPN.
+        **Local mock only.** Stand-in for the authenticated caller email/UPN.
         Production Custom Connectors / Dataverse derive the principal from the
-        token — this header is not used as a trust boundary when hosted.
+        token — this header is not a trust boundary when hosted and must be ignored.
     RolesHeader:
       type: apiKey
       in: header
       name: X-Document-Routing-Roles
       description: |
-        Optional local mock stand-in for Dataverse security roles (comma-separated).
-        Example: `user,author,admin`. Not required on every request — used by the
-        mock for Admin gating. Production derives roles from the token.
+        **Local mock only.** Comma-separated stand-in for Dataverse security roles
+        (example: `user,author,admin`). Production APIs **must ignore** this header
+        and derive roles from the caller token / Dataverse security roles. Never
+        treat client-supplied roles as a trust boundary when hosted.
   parameters:
     DocumentId:
       name: documentId

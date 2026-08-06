@@ -65,7 +65,7 @@ Retain these citations when implementing Phases 11–13 so UX decisions stay gro
 
 ## Phase 9 — Hosted identity & authorization
 
-**Status:** Planned.
+**Status:** Implemented.
 
 **Goal:** Hosted builds never grant publisher/approver by default; privileged endpoints require real principals and case access; demo identity cannot leak into a live host.
 

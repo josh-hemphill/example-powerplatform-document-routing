@@ -425,7 +425,10 @@ export function useDocumentWorkspace(documentId: Ref<string>) {
 			&& Boolean(forms.publishForm.publishDestinationId),
 	);
 	const canProcessSla = computed(
-		() => Boolean(canAct.value) && document.value?.status === 'in_review',
+		() =>
+			Boolean(canAct.value)
+			&& document.value?.status === 'in_review'
+			&& identity.hasRole('admin'),
 	);
 	const canWithdraw = computed(() => {
 		const status = document.value?.status;

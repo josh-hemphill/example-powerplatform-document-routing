@@ -757,6 +757,14 @@ export type ProcessApprovalSlaErrors = {
      */
     400: Error;
     /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
+    /**
+     * Caller is not allowed to perform this action
+     */
+    403: Error;
+    /**
      * Resource not found
      */
     404: Error;

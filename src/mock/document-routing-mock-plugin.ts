@@ -15,6 +15,10 @@ import {
 	isDraftEditableStatus,
 } from '../domain/document-access.ts';
 import {
+	canActorProcessSla,
+	canActorPublishDocument,
+} from '../domain/document-authz.ts';
+import {
 	PublishValidationError,
 	resolveTrustedPublishTarget,
 } from '../publishing/publish-engine.ts';
@@ -624,6 +628,15 @@ export function documentRoutingMockPlugin(): Plugin {
 							sendJson(res, 404, { message: 'Document not found', code: 'not_found' });
 							return;
 						}
+						const roles = readActorRoles(req);
+						if (!canActorProcessSla(roles, actor)) {
+							sendJson(res, 403, {
+								message:
+									'SLA processing requires Admin or a Flow/service principal',
+								code: 'forbidden',
+							});
+							return;
+						}
 						const body = await readJson<{ now?: string }>(req);
 						let clock: Date;
 						try {
@@ -858,11 +871,10 @@ export function documentRoutingMockPlugin(): Plugin {
 						}
 
 						const roles = readActorRoles(req);
-						const canPublish
-							= roles.includes('publisher') || roles.includes('admin');
-						if (!canPublish) {
+						if (!canActorPublishDocument(document, actor, roles)) {
 							sendJson(res, 403, {
-								message: 'Publisher or Admin role required to publish',
+								message:
+									'Publisher or Admin role and document access required to publish',
 								code: 'forbidden',
 							});
 							return;

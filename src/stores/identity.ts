@@ -5,15 +5,14 @@
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import { appConfig } from '@/config/app.config';
+import {
+	type DocumentRoutingRole,
+	resolveHostedRoles,
+} from '@/domain/security-roles';
+
+export type { DocumentRoutingRole } from '@/domain/security-roles';
 
 export type IdentityStatus = 'loading' | 'hosted' | 'standalone' | 'failed';
-
-export type DocumentRoutingRole
-	= | 'user'
-		| 'author'
-		| 'approver'
-		| 'publisher'
-		| 'admin';
 
 export interface IdentityState {
 	userId?: string;
@@ -27,6 +26,13 @@ export interface IdentityState {
 const HOST_CONTEXT_TIMEOUT_MS = 1_500;
 
 let loadPromise: Promise<void> | null = null;
+
+/**
+ * Clears in-flight load state between vitest cases.
+ */
+export function resetIdentityLoadStateForTests(): void {
+	loadPromise = null;
+}
 
 /**
  * Resolves whether the current build may use the local demo identity fallback.
@@ -71,6 +77,33 @@ export const LOCAL_DEMO_PERSONAS: Array<{
 	},
 ];
 
+type HostContextResult
+	= | { kind: 'context'; context: {
+		user?: {
+			objectId?: string;
+			fullName?: string;
+			userPrincipalName?: string;
+		};
+		app?: { environmentId?: string };
+	}; }
+	| { kind: 'timeout' };
+
+/**
+ * Loads host context, distinguishing timeout from plugin failure.
+ */
+async function raceHostContext(): Promise<HostContextResult> {
+	const { getContext } = await import('@microsoft/power-apps/app');
+	return Promise.race([
+		getContext().then((context) => ({ kind: 'context' as const, context })),
+		new Promise<HostContextResult>((resolve) => {
+			window.setTimeout(
+				() => resolve({ kind: 'timeout' }),
+				HOST_CONTEXT_TIMEOUT_MS,
+			);
+		}),
+	]);
+}
+
 export const useIdentityStore = defineStore('identity', () => {
 	const status = ref<IdentityStatus>('loading');
 	const error = ref<string | null>(null);
@@ -89,15 +122,30 @@ export const useIdentityStore = defineStore('identity', () => {
 
 	/**
 	 * Loads host context once; subsequent callers await the same promise.
+	 * Failed loads clear the in-flight promise so {@link retryLoad} can run.
 	 */
 	async function ensureLoaded(): Promise<void> {
-		if (status.value !== 'loading' && loadPromise === null) {
+		if (status.value === 'hosted' || status.value === 'standalone') {
 			return;
 		}
 		if (!loadPromise) {
-			loadPromise = loadContext();
+			loadPromise = loadContext().finally(() => {
+				if (status.value === 'failed') {
+					loadPromise = null;
+				}
+			});
 		}
 		await loadPromise;
+	}
+
+	/**
+	 * Retries host context after a failed load.
+	 */
+	async function retryLoad(): Promise<void> {
+		loadPromise = null;
+		status.value = 'loading';
+		error.value = null;
+		await ensureLoaded();
 	}
 
 	async function loadContext(): Promise<void> {
@@ -105,25 +153,17 @@ export const useIdentityStore = defineStore('identity', () => {
 		error.value = null;
 
 		try {
-			const { getContext } = await import('@microsoft/power-apps/app');
-			const hostContext = await Promise.race([
-				getContext(),
-				new Promise<null>((resolve) => {
-					window.setTimeout(resolve, HOST_CONTEXT_TIMEOUT_MS, null);
-				}),
-			]);
+			const result = await raceHostContext();
 
-			if (!hostContext) {
-				if (!allowsDemoIdentityFallback()) {
-					status.value = 'failed';
-					error.value = 'Power Apps host context unavailable';
-					identity.value = { roles: [] };
-					return;
-				}
-				applyStandaloneDemo(LOCAL_DEMO_PERSONAS[0]);
+			if (result.kind === 'timeout') {
+				// Timeout is not "standalone" — never install demo identity on a slow host.
+				status.value = 'failed';
+				error.value = 'Power Apps host context timed out';
+				identity.value = { roles: [] };
 				return;
 			}
 
+			const hostContext = result.context;
 			const hostEmail = hostContext.user?.userPrincipalName?.trim();
 			if (!hostEmail) {
 				status.value = 'failed';
@@ -137,7 +177,8 @@ export const useIdentityStore = defineStore('identity', () => {
 				userName: hostContext.user?.fullName,
 				email: hostEmail,
 				environmentId: hostContext.app?.environmentId,
-				roles: ['user', 'author', 'approver', 'publisher'],
+				// Host context has no security roles; default to user until Dataverse roles load.
+				roles: resolveHostedRoles(null),
 			};
 			status.value = 'hosted';
 		}
@@ -179,6 +220,20 @@ export const useIdentityStore = defineStore('identity', () => {
 		applyStandaloneDemo(persona);
 	}
 
+	/**
+	 * Applies Dataverse security role names to a hosted identity (UI gating).
+	 * No-op unless status is hosted.
+	 */
+	function applyHostedSecurityRoles(roleNames: readonly string[]): void {
+		if (status.value !== 'hosted') {
+			return;
+		}
+		identity.value = {
+			...identity.value,
+			roles: resolveHostedRoles(roleNames),
+		};
+	}
+
 	function hasRole(role: DocumentRoutingRole): boolean {
 		return identity.value.roles.includes(role);
 	}
@@ -194,7 +249,9 @@ export const useIdentityStore = defineStore('identity', () => {
 		userName,
 		canAct,
 		ensureLoaded,
+		retryLoad,
 		switchLocalPersona,
+		applyHostedSecurityRoles,
 		hasRole,
 	};
 });

@@ -1,5 +1,9 @@
 /**
  * Attaches the authenticated principal to API requests (mock header stand-in).
+ *
+ * `X-Document-Routing-Actor` and `X-Document-Routing-Roles` are **local mock only**.
+ * Production Custom Connectors / Dataverse must derive the caller and security roles
+ * from the token and **must ignore** these headers as a trust boundary.
  */
 import { client } from '@/client/client.gen';
 import { useIdentityStore } from '@/stores/identity';

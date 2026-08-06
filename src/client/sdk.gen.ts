@@ -141,8 +141,10 @@ export const releaseApprovalStep = <ThrowOnError extends boolean = false>(option
 /**
  * Process SLA timeouts and elevate overdue steps (scheduler / flow entrypoint)
  *
- * Production callers are Cloud Flows under a service identity; they omit `now`.
- * The local mock accepts `now` only when running in development (`import.meta.env.DEV`).
+ * Production callers are Cloud Flows under a service identity (or Admin);
+ * they omit `now`. The local mock accepts `now` only when running in
+ * development (`import.meta.env.DEV`). End users must not call this
+ * endpoint — requires Admin or Flow/service principal.
  *
  */
 export const processApprovalSla = <ThrowOnError extends boolean = false>(options: Options<ProcessApprovalSlaData, ThrowOnError>): RequestResult<ProcessApprovalSlaResponses, ProcessApprovalSlaErrors, ThrowOnError> => (options.client ?? client).post<ProcessApprovalSlaResponses, ProcessApprovalSlaErrors, ThrowOnError>({
@@ -159,8 +161,9 @@ export const processApprovalSla = <ThrowOnError extends boolean = false>(options
  * Publish the approved revision to an allowlisted SharePoint destination
  *
  * Starts trusted publish (mock or Cloud Flow). The client does **not** upload
- * PDF/HTML bytes. Requires Publisher (or Admin) role. Idempotent for the same
- * content revision. First publish allocates `documentNumber` + version 1.
+ * PDF/HTML bytes. Requires Publisher (or Admin) role **and** document case
+ * access (same visibility as GET). Idempotent for the same content revision.
+ * First publish allocates `documentNumber` + version 1.
  * Publishing a superseding case marks the prior document `superseded` and
  * keeps the same number with version + 1.
  *
