@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	buildRevisionPdfFileName,
+	canonicalizeFolderPath,
 	isFolderWithinDestinationRoot,
 	isSameRevisionAlreadyPublished,
 	PublishValidationError,
@@ -8,9 +9,11 @@ import {
 	resolveTrustedPublishTarget,
 } from './publish-engine.ts';
 
+const DESTINATION_ID = '11111111-1111-4111-8111-111111111111';
+
 const destinations = [
 	{
-		id: 'dest-1',
+		id: DESTINATION_ID,
 		name: 'Policies',
 		siteUrl: 'https://docs.example.com/sites/Policies',
 		libraryName: 'Published Documents',
@@ -58,7 +61,7 @@ describe('publish engine', () => {
 					submittedContentRevision: 1,
 				},
 				destinations,
-				publishDestinationId: 'missing',
+				publishDestinationId: '22222222-2222-4222-8222-222222222222',
 			}),
 		).toThrow(PublishValidationError);
 	});
@@ -66,13 +69,15 @@ describe('publish engine', () => {
 	it('enforces folder overrides under the destination root', () => {
 		expect(isFolderWithinDestinationRoot('/Policies', '/Policies/2026')).toBe(true);
 		expect(isFolderWithinDestinationRoot('/Policies', '/Other')).toBe(false);
+		expect(isFolderWithinDestinationRoot('/Policies', '/Policies/../Other')).toBe(false);
+		expect(canonicalizeFolderPath('/Policies/./2026/../Q3')).toBe('/Policies/Q3');
 		const target = resolveTrustedPublishTarget({
 			document: {
 				id: '1',
 				title: 'Doc',
 				status: 'approved',
 				contentRevision: 1,
-				defaultDestinationId: 'dest-1',
+				defaultDestinationId: DESTINATION_ID,
 			},
 			destinations,
 			folderPathOverride: '/Policies/Q3',

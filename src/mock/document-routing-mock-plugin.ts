@@ -10,7 +10,6 @@ import {
 	isDraftEditableStatus,
 } from '../domain/document-access.ts';
 import {
-	isSameRevisionAlreadyPublished,
 	PublishValidationError,
 	resolveTrustedPublishTarget,
 } from '../publishing/publish-engine.ts';
@@ -765,15 +764,7 @@ export function documentRoutingMockPlugin(): Plugin {
 								folderPathOverride: body.folderPathOverride,
 							});
 
-							if (target.idempotent && isSameRevisionAlreadyPublished({
-								id: document.id,
-								title: document.title,
-								status: document.status,
-								contentRevision: document.contentRevision,
-								submittedContentRevision: document.submittedContentRevision,
-								publishedContentRevision: document.publishedContentRevision,
-								publishedPdfUrl: document.publishedPdfUrl,
-							})) {
+							if (target.idempotent) {
 								sendJson(res, 200, {
 									document,
 									pdfFileName: target.fileName,

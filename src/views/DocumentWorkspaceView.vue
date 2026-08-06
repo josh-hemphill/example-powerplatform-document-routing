@@ -142,8 +142,12 @@ watch(
 		const activeDestinations = (destinationsData.value?.items ?? []).filter(
 			(item) => item.active,
 		);
+		const activeDefault
+			= typeDefault && activeDestinations.some((item) => item.id === typeDefault)
+				? typeDefault
+				: null;
 		publishForm.publishDestinationId
-			= typeDefault
+			= activeDefault
 				?? activeDestinations[0]?.id
 				?? null;
 		publishForm.folderPathOverride = '';

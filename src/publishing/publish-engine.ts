@@ -72,6 +72,7 @@ export function isSameRevisionAlreadyPublished(document: PublishableRevision): b
 
 /**
  * True when folderOverride stays within the allowlisted destination folder root.
+ * Dot-segments (`..` / `.`) are canonicalized; escapes above the library root fail.
  */
 export function isFolderWithinDestinationRoot(
 	destinationFolder: string,
@@ -80,12 +81,40 @@ export function isFolderWithinDestinationRoot(
 	if (folderOverride == null || folderOverride === '') {
 		return true;
 	}
-	const root = normalizeSharePointFolderPath(destinationFolder) || '/';
-	const override = normalizeSharePointFolderPath(folderOverride) || '/';
+	const root = canonicalizeFolderPath(destinationFolder);
+	const override = canonicalizeFolderPath(folderOverride);
+	if (root == null || override == null) {
+		return false;
+	}
 	if (root === '/') {
 		return true;
 	}
 	return override === root || override.startsWith(`${root}/`);
+}
+
+/**
+ * Collapses `.` / `..` folder segments. Returns null when `..` escapes the library root.
+ */
+export function canonicalizeFolderPath(folderPath: string): string | null {
+	const normalized = normalizeSharePointFolderPath(folderPath);
+	if (!normalized) {
+		return '/';
+	}
+	const stack: string[] = [];
+	for (const segment of normalized.split('/').filter(Boolean)) {
+		if (segment === '.') {
+			continue;
+		}
+		if (segment === '..') {
+			if (stack.length === 0) {
+				return null;
+			}
+			stack.pop();
+			continue;
+		}
+		stack.push(segment);
+	}
+	return stack.length > 0 ? `/${stack.join('/')}` : '/';
 }
 
 export interface ResolvedPublishTarget {
@@ -175,9 +204,16 @@ export function resolveTrustedPublishTarget(input: {
 		);
 	}
 
+	const canonicalFolder = canonicalizeFolderPath(folderPath);
+	if (canonicalFolder == null) {
+		throw new PublishValidationError(
+			'folderPathOverride must stay under the allowlisted destination folder',
+		);
+	}
+
 	return {
 		destination,
-		folderPath,
+		folderPath: canonicalFolder === '/' ? destination.folderPath : canonicalFolder,
 		fileName: buildRevisionPdfFileName(document.id, revision, document.title),
 		revision,
 		idempotent: false,
