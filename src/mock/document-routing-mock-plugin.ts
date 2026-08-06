@@ -924,7 +924,31 @@ export function documentRoutingMockPlugin(): Plugin {
 									});
 									return;
 								}
-								applySupersessionOnPublish(document, prior);
+								if (!prior.documentNumber?.trim()) {
+									sendJson(res, 409, {
+										message:
+											'Prior published document is missing a controlled document number',
+										code: 'invalid_state',
+									});
+									return;
+								}
+								try {
+									applySupersessionOnPublish(document, prior);
+								}
+								catch(error) {
+									const code
+										= error instanceof Error && 'code' in error
+											? String((error as { code: string }).code)
+											: 'invalid_state';
+									sendJson(res, 409, {
+										message:
+											error instanceof Error
+												? error.message
+												: 'Supersession failed',
+										code,
+									});
+									return;
+								}
 								pushHistory(
 									prior,
 									actor,

@@ -17,6 +17,28 @@ describe('document-number', () => {
 		).toBe('POL-2026-00042');
 	});
 
+	it('supports bare {seq} with default width 5', () => {
+		expect(
+			formatDocumentNumber({
+				prefix: 'SOP',
+				pattern: '{prefix}-{yyyy}-{seq}',
+				year: 2026,
+				sequence: 7,
+			}),
+		).toBe('SOP-2026-00007');
+	});
+
+	it('falls back to the default pattern when seq token is malformed', () => {
+		expect(
+			formatDocumentNumber({
+				prefix: 'POL',
+				pattern: '{prefix}-{yyyy}-{seq:abc}',
+				year: 2026,
+				sequence: 3,
+			}),
+		).toBe('POL-2026-00003');
+	});
+
 	it('allocates and bumps nextSequence', () => {
 		const result = allocateDocumentNumber(
 			{

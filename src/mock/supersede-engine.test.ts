@@ -101,6 +101,15 @@ describe('supersede engine', () => {
 		expect(prior.supersededByDocumentId).toBe(successor.id);
 	});
 
+	it('rejects supersession when prior has no controlled number', () => {
+		const prior = publishedDoc();
+		prior.documentNumber = null;
+		const successor = supersedeDocument(prior, ACTOR);
+		expect(() => applySupersessionOnPublish(successor, prior)).toThrow(
+			/missing a controlled document number/i,
+		);
+	});
+
 	it('allocates sequential numbers per type', () => {
 		const type = findControlDocumentType('policy');
 		expect(type?.nextSequence).toBe(2);

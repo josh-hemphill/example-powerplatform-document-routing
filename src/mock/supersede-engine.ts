@@ -120,6 +120,12 @@ export function applySupersessionOnPublish(
 	successor: MockDocumentRecord,
 	prior: MockDocumentRecord,
 ): void {
+	if (!prior.documentNumber?.trim()) {
+		throw engineError(
+			'Prior published document is missing a controlled document number',
+			'invalid_state',
+		);
+	}
 	successor.documentNumber = prior.documentNumber;
 	successor.documentVersion = (prior.documentVersion ?? 1) + 1;
 	prior.status = 'superseded';

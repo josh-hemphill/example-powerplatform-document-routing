@@ -238,6 +238,13 @@ async function saveType(): Promise<void> {
 	if (!selectedTypeId.value) {
 		return;
 	}
+	const numberPrefix = typeForm.numberPrefix.trim();
+	const numberPattern = typeForm.numberPattern.trim() || '{prefix}-{yyyy}-{seq:5}';
+	const nextSequence = Number(typeForm.nextSequence);
+	if (!Number.isFinite(nextSequence) || !Number.isInteger(nextSequence) || nextSequence < 1) {
+		actionError.value = 'Next sequence must be an integer greater than or equal to 1.';
+		return;
+	}
 	try {
 		const approvalChain = JSON.parse(typeForm.chainJson) as ControlDocumentType['approvalChain'];
 		await saveTypeAsync({
@@ -255,9 +262,9 @@ async function saveType(): Promise<void> {
 					.filter(Boolean),
 				active: typeForm.active,
 				defaultDestinationId: typeForm.defaultDestinationId ?? undefined,
-				numberPrefix: typeForm.numberPrefix || undefined,
-				numberPattern: typeForm.numberPattern || undefined,
-				nextSequence: typeForm.nextSequence,
+				numberPrefix: numberPrefix || undefined,
+				numberPattern,
+				nextSequence,
 				approvalChain,
 			},
 		});
