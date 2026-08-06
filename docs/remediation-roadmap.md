@@ -262,6 +262,8 @@ Prefer Dataverse **business rules / column constraints** for simple field locks;
 
 ## Phase 5 — Publish path
 
+**Status:** Implemented (allowlisted destinations, revision filenames, idempotent mock publish, no browser PDF bytes).
+
 **Goal:** One trusted server-side publish; no browser PDF bytes; no dual-write stub.
 
 ### Work

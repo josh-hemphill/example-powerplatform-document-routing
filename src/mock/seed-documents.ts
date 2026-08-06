@@ -65,6 +65,8 @@ export interface MockDocumentRecord {
 	contentRevision: number;
 	/** Revision frozen at submit-for-approval. */
 	submittedContentRevision: number | null;
+	/** Revision of the currently published artifact (idempotency key). */
+	publishedContentRevision: number | null;
 	approvalSteps: MockApprovalStep[];
 	history: Array<{
 		id: string;
@@ -110,6 +112,7 @@ export function createSeedDocuments(): MockDocumentRecord[] {
 		authorEmail: null,
 		contentRevision: 0,
 		submittedContentRevision: null,
+		publishedContentRevision: null,
 		approvalSteps: [],
 		history: [
 			{
@@ -157,6 +160,7 @@ Document the 36-month laptop refresh process for corporate devices.
 		authorEmail: appConfig.localDemoUser.email,
 		contentRevision: 1,
 		submittedContentRevision: null,
+		publishedContentRevision: null,
 		approvalSteps: [],
 		history: [
 			{
@@ -207,6 +211,7 @@ Meal caps for customer visits are $75 / person.
 		authorEmail: appConfig.localDemoUser.email,
 		contentRevision: 2,
 		submittedContentRevision: 2,
+		publishedContentRevision: null,
 		approvalSteps: [
 			{
 				id: randomUUID(),

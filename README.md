@@ -27,7 +27,7 @@ Freeform request ⇄ Author draft → Approval chain → Approved → Publish PD
 1. **Request** — pick a document type, capture unstructured text + SharePoint target
 2. **Draft** — type-specific Markdown scaffold; collaborative authors co-edit before submit
 3. **Approvals** — chain materializes from the document type (override only when enabled); claim/release preserve SLA; named overdue → elevated pool
-4. **Publish** — HTML template hook + SharePoint stub / OpenAPI publish API (Flow in Phase 5)
+4. **Publish** — allowlisted destination + server/Flow HTML→PDF (no browser PDF bytes)
 
 Inbox personas: All · Waiting on me · Available in my pool · My requests · Needs draft · Ready to publish.
 

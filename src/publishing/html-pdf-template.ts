@@ -5,18 +5,23 @@ import { getDocumentType } from '@/config/document-types';
 export interface PublishableDocument {
 	id: string;
 	title: string;
+	status?: string;
 	documentType?: string | null;
 	freeformRequest: string;
 	draftBodyMarkdown?: string | null;
 	draftSummary?: string | null;
 	requesterEmail: string;
 	authorEmail?: string | null;
+	contentRevision?: number;
+	submittedContentRevision?: number | null;
+	publishedContentRevision?: number | null;
 	requestedPublishSiteUrl?: string | null;
 	requestedLibraryName?: string | null;
 }
 
 /**
- * Builds a stable PDF file name from a document title.
+ * Builds a title-only PDF slug (legacy helper). Prefer `buildRevisionPdfFileName`
+ * for trusted publish filenames that include document id + revision.
  */
 export function buildPdfFileName(title: string): string {
 	const slug = title

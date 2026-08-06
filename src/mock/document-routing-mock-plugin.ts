@@ -9,6 +9,10 @@ import {
 	canActorMutateDraft,
 	isDraftEditableStatus,
 } from '../domain/document-access.ts';
+import {
+	PublishValidationError,
+	resolveTrustedPublishTarget,
+} from '../publishing/publish-engine.ts';
 import { buildSharePointDocumentUrl } from '../publishing/sharepoint-paths.ts';
 import {
 	claimStep,
@@ -113,6 +117,7 @@ function toSummary(document: MockDocumentRecord) {
 		updatedAt: document.updatedAt,
 		contentRevision: document.contentRevision,
 		submittedContentRevision: document.submittedContentRevision,
+		publishedContentRevision: document.publishedContentRevision,
 	};
 }
 
@@ -266,6 +271,7 @@ export function documentRoutingMockPlugin(): Plugin {
 							authorEmail: null,
 							contentRevision: 0,
 							submittedContentRevision: null,
+							publishedContentRevision: null,
 							approvalSteps: [],
 							history: [],
 							publishedPdfUrl: null,
@@ -720,51 +726,107 @@ export function documentRoutingMockPlugin(): Plugin {
 							sendJson(res, 404, { message: 'Document not found', code: 'not_found' });
 							return;
 						}
-						if (document.status !== 'approved' && document.status !== 'published') {
-							sendJson(res, 409, {
-								message: 'Only approved documents can be published',
-								code: 'invalid_state',
+
+						const roles = readActorRoles(req);
+						const canPublish
+							= roles.includes('publisher') || roles.includes('admin');
+						if (!canPublish) {
+							sendJson(res, 403, {
+								message: 'Publisher or Admin role required to publish',
+								code: 'forbidden',
 							});
 							return;
 						}
 
 						const body = await readJson<{
-							sharePointSiteUrl: string;
-							libraryName: string;
-							folderPath?: string;
-							fileName?: string;
+							publishDestinationId?: string;
+							folderPathOverride?: string;
 						}>(req);
 
-						const pdfFileName
-							= body.fileName
-								?? `${document.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.pdf`;
-						const sharePointItemId = randomUUID();
-						const sharePointUrl = buildSharePointDocumentUrl({
-							siteUrl: body.sharePointSiteUrl,
-							libraryName: body.libraryName,
-							folderPath: body.folderPath,
-							fileName: pdfFileName,
-						});
+						const typeRow = findControlDocumentType(document.documentType);
+						const destinations = getControlStore().publishDestinations;
 
-						document.status = 'published';
-						document.publishedPdfUrl = sharePointUrl;
-						document.sharePointItemId = sharePointItemId;
-						document.requestedPublishSiteUrl = body.sharePointSiteUrl;
-						document.requestedLibraryName = body.libraryName;
-						pushHistory(
-							document,
-							actor,
-							'published',
-							`Published PDF to ${body.libraryName}`,
-						);
+						try {
+							const target = resolveTrustedPublishTarget({
+								document: {
+									id: document.id,
+									title: document.title,
+									status: document.status,
+									contentRevision: document.contentRevision,
+									submittedContentRevision: document.submittedContentRevision,
+									publishedContentRevision: document.publishedContentRevision,
+									publishedPdfUrl: document.publishedPdfUrl,
+									sharePointItemId: document.sharePointItemId,
+									defaultDestinationId: typeRow?.defaultDestinationId ?? null,
+								},
+								destinations,
+								publishDestinationId: body.publishDestinationId,
+								folderPathOverride: body.folderPathOverride,
+							});
 
-						sendJson(res, 200, {
-							document,
-							pdfFileName,
-							sharePointUrl,
-							sharePointItemId,
-							publishedAt: stamp(),
-						});
+							if (target.idempotent) {
+								sendJson(res, 200, {
+									document,
+									pdfFileName: target.fileName,
+									sharePointUrl: document.publishedPdfUrl,
+									sharePointItemId: document.sharePointItemId,
+									publishedAt: document.updatedAt,
+									idempotent: true,
+								});
+								return;
+							}
+
+							const sharePointItemId = document.sharePointItemId ?? randomUUID();
+							const sharePointUrl = buildSharePointDocumentUrl({
+								siteUrl: target.destination.siteUrl,
+								libraryName: target.destination.libraryName,
+								folderPath: target.folderPath,
+								fileName: target.fileName,
+							});
+
+							document.status = 'published';
+							document.publishedPdfUrl = sharePointUrl;
+							document.sharePointItemId = sharePointItemId;
+							document.publishedContentRevision = target.revision;
+							document.requestedPublishSiteUrl = target.destination.siteUrl;
+							document.requestedLibraryName = target.destination.libraryName;
+							pushHistory(
+								document,
+								actor,
+								'published',
+								`Published PDF revision ${target.revision} to ${target.destination.name}`,
+							);
+							recordFlowRun(
+								'Document Routing — Publish approved',
+								'succeeded',
+								`Published ${target.fileName} to ${target.destination.name}`,
+							);
+
+							sendJson(res, 200, {
+								document,
+								pdfFileName: target.fileName,
+								sharePointUrl,
+								sharePointItemId,
+								publishedAt: stamp(),
+								idempotent: false,
+							});
+						}
+						catch(error) {
+							if (error instanceof PublishValidationError) {
+								const status
+									= error.code === 'invalid_state'
+										? 409
+										: error.code === 'forbidden'
+											? 403
+											: 400;
+								sendJson(res, status, {
+									message: error.message,
+									code: error.code,
+								});
+								return;
+							}
+							throw error;
+						}
 						return;
 					}
 

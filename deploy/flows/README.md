@@ -35,8 +35,12 @@ Connector that starts a flow.
 Production sweeps use the flow’s wall clock. Do **not** accept a client-supplied
 `now`. The Vite mock accepts `now` only when `import.meta.env.DEV` is true.
 
-## Packaging later
+## Publish path (Phase 5)
 
-When ready for ALM, export each flow from the maker portal into a solution and
-replace these stubs with the exported definition. Keep logical names aligned with
-`dr_document`, `dr_approvalstep`, `dr_historyevent`.
+- Code App **Publish** calls `POST /documents/{id}/publish` with an allowlisted
+  `publishDestinationId` (optional folder override under that root).
+- **No browser PDF/HTML upload.** The Vite mock (and hosted Cloud Flow) render and
+  store the artifact under a service identity.
+- Filename: `{title-slug}-{documentId8}-r{revision}.pdf`. Republishing the same
+  revision is **idempotent** (returns the existing URL).
+- Stub: [`flows/publish-approved.json`](./flows/publish-approved.json).

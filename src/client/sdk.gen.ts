@@ -155,7 +155,12 @@ export const processApprovalSla = <ThrowOnError extends boolean = false>(options
 });
 
 /**
- * Render the approved document as PDF and publish to SharePoint
+ * Publish the approved revision to an allowlisted SharePoint destination
+ *
+ * Starts trusted publish (mock or Cloud Flow). The client does **not** upload
+ * PDF/HTML bytes. Requires Publisher (or Admin) role. Idempotent for the same
+ * content revision.
+ *
  */
 export const publishDocumentPdf = <ThrowOnError extends boolean = false>(options: Options<PublishDocumentPdfData, ThrowOnError>): RequestResult<PublishDocumentPdfResponses, PublishDocumentPdfErrors, ThrowOnError> => (options.client ?? client).post<PublishDocumentPdfResponses, PublishDocumentPdfErrors, ThrowOnError>({
     security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }],

@@ -203,7 +203,12 @@ export const processApprovalSlaMutation = (options?: Partial<Options<ProcessAppr
 });
 
 /**
- * Render the approved document as PDF and publish to SharePoint
+ * Publish the approved revision to an allowlisted SharePoint destination
+ *
+ * Starts trusted publish (mock or Cloud Flow). The client does **not** upload
+ * PDF/HTML bytes. Requires Publisher (or Admin) role. Idempotent for the same
+ * content revision.
+ *
  */
 export const publishDocumentPdfMutation = (options?: Partial<Options<PublishDocumentPdfData>>): UseMutationOptions<PublishDocumentPdfResponse, Options<PublishDocumentPdfData>, PublishDocumentPdfError> => ({
     mutation: async (vars) => {
