@@ -33,7 +33,8 @@ export function assertProductionApiBaseUrl(
 		return;
 	}
 	const normalized = baseUrl.replace(/\/+$/, '') || '/';
-	if (normalized === LOCAL_MOCK_BASE || normalized.endsWith(LOCAL_MOCK_BASE)) {
+	// Only the local Vite mock mount (`/api`), not hosted roots that happen to end in `/api`.
+	if (normalized === LOCAL_MOCK_BASE) {
 		throw new Error(
 			'Production build is still pointing at the local mock API (/api). '
 			+ 'Inject window.__DOCUMENT_ROUTING_ENV__.documentApiBaseUrl (or VITE_DOCUMENT_API_BASE_URL) '

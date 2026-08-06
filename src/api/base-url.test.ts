@@ -36,4 +36,10 @@ describe('assertProductionApiBaseUrl', () => {
 			),
 		).not.toThrow();
 	});
+
+	it('allows hosted roots whose path ends with /api', () => {
+		expect(() =>
+			assertProductionApiBaseUrl('https://example.com/api', { isProduction: true }),
+		).not.toThrow();
+	});
 });

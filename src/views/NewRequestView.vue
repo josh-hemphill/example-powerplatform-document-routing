@@ -117,8 +117,8 @@ async function submit(): Promise<void> {
 						v-model="form.title"
 						label="Request title"
 						:rules="titleRules('Request title')"
-						counter="200"
-						maxlength="200"
+						:counter="TITLE_MAX_LENGTH"
+						:maxlength="TITLE_MAX_LENGTH"
 						required
 					/>
 				</v-col>

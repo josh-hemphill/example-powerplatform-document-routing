@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import {
 	bodyMarkdownRules,
+	SUMMARY_MAX_LENGTH,
 	summaryRules,
+	TITLE_MAX_LENGTH,
 	titleRules,
 } from '@/api/form-rules';
 
@@ -45,8 +47,8 @@ const bodyMarkdown = defineModel<string>('bodyMarkdown', { required: true });
 			:rules="titleRules()"
 			:disabled="!canDraft"
 			class="mb-2"
-			counter="200"
-			maxlength="200"
+			:counter="TITLE_MAX_LENGTH"
+			:maxlength="TITLE_MAX_LENGTH"
 		/>
 		<v-text-field
 			:model-value="authorEmail ?? '—'"
@@ -61,8 +63,8 @@ const bodyMarkdown = defineModel<string>('bodyMarkdown', { required: true });
 			:rules="summaryRules()"
 			:disabled="!canDraft"
 			class="mb-2"
-			counter="500"
-			maxlength="500"
+			:counter="SUMMARY_MAX_LENGTH"
+			:maxlength="SUMMARY_MAX_LENGTH"
 		/>
 		<v-textarea
 			v-model="bodyMarkdown"
