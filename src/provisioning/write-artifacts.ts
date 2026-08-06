@@ -1,5 +1,6 @@
 import type { ConnectionProfile } from './connection-config.ts';
 import type { DataverseProvisionPlan, WebApiRequestPlan } from './dataverse-provision-plan.ts';
+import type { ExistingAttributeMetadata } from './schema-drift.ts';
 import { mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -12,6 +13,11 @@ import {
 	buildPaConnectCommands,
 	renderPaCommandsScript,
 } from './pa-connect-commands.ts';
+import {
+	assertAttributeTypeCompatible,
+
+	plannedTypeFromAttributeBody,
+} from './schema-drift.ts';
 
 export interface ProvisionArtifacts {
 	plan: DataverseProvisionPlan;
@@ -261,10 +267,20 @@ async function executePlanRequest(
 		);
 		const logical = schemaName.toLowerCase();
 		const attr = await fetchImpl(
-			`${apiRoot}/EntityDefinitions(LogicalName='${request.entityLogicalName}')/Attributes(LogicalName='${logical}')?$select=LogicalName`,
+			`${apiRoot}/EntityDefinitions(LogicalName='${request.entityLogicalName}')/Attributes(LogicalName='${logical}')?$select=LogicalName,AttributeType`,
 			{ headers: { 'Authorization': headers.Authorization, 'Accept': headers.Accept, 'OData-MaxVersion': '4.0', 'OData-Version': '4.0' } },
 		);
 		if (attr.ok) {
+			const plannedType = plannedTypeFromAttributeBody(
+				request.body as Record<string, unknown>,
+			);
+			if (plannedType) {
+				const meta = (await attr.json()) as ExistingAttributeMetadata;
+				assertAttributeTypeCompatible(plannedType, {
+					LogicalName: meta.LogicalName ?? logical,
+					AttributeType: meta.AttributeType,
+				});
+			}
 			return 'skipped';
 		}
 	}

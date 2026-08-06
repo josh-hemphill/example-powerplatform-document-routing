@@ -36,24 +36,13 @@ import {
 	recordFlowRun,
 	toDocumentTypeDefinition,
 } from './control-store.ts';
-import { createSeedDocuments } from './seed-documents.ts';
+import { getDocumentStore } from './document-store.ts';
 import { resolveSlaClock } from './sla-clock.ts';
 
 const ACTOR_HEADER = 'x-document-routing-actor';
 const ROLES_HEADER = 'x-document-routing-roles';
 
-const store = new Map<string, MockDocumentRecord>();
-
 const stamp = (): string => new Date().toISOString();
-
-function seed(): void {
-	if (store.size > 0) {
-		return;
-	}
-	for (const document of createSeedDocuments()) {
-		store.set(document.id, document);
-	}
-}
 
 async function readJson<T>(req: IncomingMessage): Promise<T> {
 	const chunks: Buffer[] = [];
@@ -165,7 +154,7 @@ function uniqueEmails(emails: string[]): string[] {
  * Serves an in-memory Document Routing API so the Code App is runnable offline.
  */
 export function documentRoutingMockPlugin(): Plugin {
-	seed();
+	getDocumentStore();
 
 	return {
 		name: 'document-routing-mock',
@@ -205,7 +194,7 @@ export function documentRoutingMockPlugin(): Plugin {
 						const status = url.searchParams.get('status');
 						const documentType = url.searchParams.get('documentType');
 						const q = url.searchParams.get('q')?.toLowerCase();
-						let items = [...store.values()]
+						let items = [...getDocumentStore().values()]
 							.filter((document) => canActorAccessDocument(document, actor))
 							.map(toSummary);
 
@@ -217,7 +206,7 @@ export function documentRoutingMockPlugin(): Plugin {
 						}
 						if (q) {
 							items = items.filter((item) => {
-								const full = store.get(item.id);
+								const full = getDocumentStore().get(item.id);
 								return (
 									item.title.toLowerCase().includes(q)
 									|| Boolean(full?.freeformRequest.toLowerCase().includes(q))
@@ -303,14 +292,14 @@ export function documentRoutingMockPlugin(): Plugin {
 							'requested',
 							'Freeform request submitted',
 						);
-						store.set(id, document);
+						getDocumentStore().set(id, document);
 						sendJson(res, 201, document);
 						return;
 					}
 
 					const documentMatch = matchRoute(path, /^\/api\/documents\/([^/]+)$/);
 					if (method === 'GET' && documentMatch) {
-						const document = store.get(documentMatch[1]);
+						const document = getDocumentStore().get(documentMatch[1]);
 						if (!document) {
 							sendJson(res, 404, { message: 'Document not found', code: 'not_found' });
 							return;
@@ -328,7 +317,7 @@ export function documentRoutingMockPlugin(): Plugin {
 
 					const draftMatch = matchRoute(path, /^\/api\/documents\/([^/]+)\/draft$/);
 					if (method === 'PUT' && draftMatch) {
-						const document = store.get(draftMatch[1]);
+						const document = getDocumentStore().get(draftMatch[1]);
 						if (!document) {
 							sendJson(res, 404, { message: 'Document not found', code: 'not_found' });
 							return;
@@ -387,7 +376,7 @@ export function documentRoutingMockPlugin(): Plugin {
 						/^\/api\/documents\/([^/]+)\/submit-for-approval$/,
 					);
 					if (method === 'POST' && submitMatch) {
-						const document = store.get(submitMatch[1]);
+						const document = getDocumentStore().get(submitMatch[1]);
 						if (!document) {
 							sendJson(res, 404, { message: 'Document not found', code: 'not_found' });
 							return;
@@ -481,7 +470,7 @@ export function documentRoutingMockPlugin(): Plugin {
 						/^\/api\/documents\/([^/]+)\/withdraw-and-revise$/,
 					);
 					if (method === 'POST' && withdrawMatch) {
-						const document = store.get(withdrawMatch[1]);
+						const document = getDocumentStore().get(withdrawMatch[1]);
 						if (!document) {
 							sendJson(res, 404, { message: 'Document not found', code: 'not_found' });
 							return;
@@ -516,7 +505,7 @@ export function documentRoutingMockPlugin(): Plugin {
 						/^\/api\/documents\/([^/]+)\/approvals\/process-sla$/,
 					);
 					if (method === 'POST' && slaMatch) {
-						const document = store.get(slaMatch[1]);
+						const document = getDocumentStore().get(slaMatch[1]);
 						if (!document) {
 							sendJson(res, 404, { message: 'Document not found', code: 'not_found' });
 							return;
@@ -560,7 +549,7 @@ export function documentRoutingMockPlugin(): Plugin {
 						/^\/api\/documents\/([^/]+)\/approvals\/([^/]+)\/claim$/,
 					);
 					if (method === 'POST' && claimMatch) {
-						const document = store.get(claimMatch[1]);
+						const document = getDocumentStore().get(claimMatch[1]);
 						if (!document) {
 							sendJson(res, 404, { message: 'Document not found', code: 'not_found' });
 							return;
@@ -609,7 +598,7 @@ export function documentRoutingMockPlugin(): Plugin {
 						/^\/api\/documents\/([^/]+)\/approvals\/([^/]+)\/release$/,
 					);
 					if (method === 'POST' && releaseMatch) {
-						const document = store.get(releaseMatch[1]);
+						const document = getDocumentStore().get(releaseMatch[1]);
 						if (!document) {
 							sendJson(res, 404, { message: 'Document not found', code: 'not_found' });
 							return;
@@ -652,7 +641,7 @@ export function documentRoutingMockPlugin(): Plugin {
 						/^\/api\/documents\/([^/]+)\/approvals\/([^/]+)\/decision$/,
 					);
 					if (method === 'POST' && decisionMatch) {
-						const document = store.get(decisionMatch[1]);
+						const document = getDocumentStore().get(decisionMatch[1]);
 						if (!document) {
 							sendJson(res, 404, { message: 'Document not found', code: 'not_found' });
 							return;
@@ -748,7 +737,7 @@ export function documentRoutingMockPlugin(): Plugin {
 						/^\/api\/documents\/([^/]+)\/publish$/,
 					);
 					if (method === 'POST' && publishMatch) {
-						const document = store.get(publishMatch[1]);
+						const document = getDocumentStore().get(publishMatch[1]);
 						if (!document) {
 							sendJson(res, 404, { message: 'Document not found', code: 'not_found' });
 							return;

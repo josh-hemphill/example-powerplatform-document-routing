@@ -261,6 +261,50 @@ describe('approval engine', () => {
 			/collaborators/,
 		);
 	});
+
+	it('rejects a second claimer once the pool step is pending (409/invalid_state)', () => {
+		const clock = new Date('2020-01-01T00:00:00.000Z');
+		const step = createStepFromInput(
+			{
+				assignmentMode: 'pool',
+				role: 'Legal',
+				slaHours: 8,
+				pool: [
+					{ email: 'jordan.legal@contoso.com', displayName: 'Jordan' },
+					{ email: 'avery.counsel@contoso.com', displayName: 'Avery' },
+				],
+			},
+			1,
+			clock,
+			true,
+			1,
+		);
+		claimStep(step, 'jordan.legal@contoso.com', clock);
+		expect(step.status).toBe('pending');
+		expect(() => claimStep(step, 'avery.counsel@contoso.com', clock)).toThrow(
+			/Only queued pool steps can be claimed/,
+		);
+	});
+
+	it('rejects a double decide on an already decided step (409/invalid_state)', () => {
+		const clock = new Date('2020-01-01T00:00:00.000Z');
+		const step = createStepFromInput(
+			{
+				assignmentMode: 'named',
+				assignee: { email: 'sam.compliance@contoso.com', displayName: 'Sam' },
+			},
+			1,
+			clock,
+			true,
+			1,
+		);
+		const document = baseDocument({ approvalSteps: [step] });
+		decideStep(document, step, 'sam.compliance@contoso.com', 'approve', clock);
+		expect(document.status).toBe('approved');
+		expect(() =>
+			decideStep(document, step, 'sam.compliance@contoso.com', 'approve', clock),
+		).toThrow(/not awaiting approval|Only a claimed/);
+	});
 });
 
 function isEmailInElevatedPool(step: {

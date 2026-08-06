@@ -9,7 +9,8 @@ export default antfu(
 			tsconfigPath: 'tsconfig.json',
 		},
 		vue: {
-			a11y: false,
+			// Progressive a11y: warn in Phase 7; tighten further with axe in Phase 8 reader work.
+			a11y: true,
 			overrides: {
 				'vue/max-attributes-per-line': [
 					'warn',
@@ -18,6 +19,18 @@ export default antfu(
 						multiline: 1,
 					},
 				],
+				'vue-a11y/form-control-has-label': 'warn',
+				'vue-a11y/click-events-have-key-events': 'warn',
+				'vue-a11y/no-static-element-interactions': 'warn',
+				'vue-a11y/label-has-for': 'warn',
+				'vue-a11y/alt-text': 'warn',
+				'vue-a11y/anchor-has-content': 'warn',
+				'vue-a11y/heading-has-content': 'warn',
+				'vue-a11y/iframe-has-title': 'warn',
+				'vue-a11y/media-has-caption': 'warn',
+				'vue-a11y/mouse-events-have-key-events': 'warn',
+				'vue-a11y/no-autofocus': 'warn',
+				'vue-a11y/tabindex-no-positive': 'warn',
 			},
 		},
 		stylistic: {

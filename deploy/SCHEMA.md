@@ -57,3 +57,37 @@ before production (Admin UI in Phase 4).
 ## Title length
 
 Document titles are capped at **200** characters (aligned with OpenAPI / UI).
+
+## Optimistic concurrency (CAS)
+
+Hosted Dataverse writes should use **row version** concurrency so claim / decide /
+publish races fail closed instead of last-write-wins.
+
+| Surface           | Strategy                                                                                                                                                                                    |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dr_document`     | Include `versionnumber` (or ETag) on PATCH; send `If-Match` from the version loaded for the command                                                                                         |
+| `dr_approvalstep` | Same — claim and decide must condition on the step row version observed when the UI loaded the active step                                                                                  |
+| Mock              | No row versions; the state machine returns `invalid_state` → HTTP **409** when a second claimer hits a non-`queued` step or a second decide hits a non-`pending` / non-`in_review` document |
+
+### Expected conflict outcomes
+
+| Race                                           | Result                                                                    |
+| ---------------------------------------------- | ------------------------------------------------------------------------- |
+| Two pool members claim the same queued step    | First wins; second → **409** (`Only queued pool steps can be claimed`)    |
+| Double decide on the same pending step         | First wins; second → **409** (`invalid_state`)                            |
+| Stale draft PUT after withdraw / status change | **409** (`invalid_state`) when status is no longer `requested`/`drafting` |
+
+UI surfaces these via `getApiErrorMessage` (Phase 6). Do not silently overwrite local dirty drafts on unrelated refetch (Phase 6 form state).
+
+## Flow health (`flowrun`)
+
+Optional / soft table (or `appsetting`-backed log) for Admin **Flow health**:
+
+| Field      | Meaning                              |
+| ---------- | ------------------------------------ |
+| `flowname` | Display name of the Cloud Flow       |
+| `status`   | `succeeded` \| `failed` \| `running` |
+| `at`       | Run timestamp                        |
+| `message`  | Short outcome for operators          |
+
+Hosted Flows should append a row (or update `appsetting`) at the end of SLA / publish runs. The Vite mock seeds success and failure samples and calls `recordFlowRun` on SLA changes and publish.
