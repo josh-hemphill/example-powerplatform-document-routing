@@ -235,6 +235,97 @@ export type PublishResult = {
     publishedAt: string;
 };
 
+export type ControlChainStep = {
+    order: number;
+    assignmentMode: ApprovalAssignmentMode;
+    role: string;
+    slaHours?: number;
+    assignee?: Approver;
+    /**
+     * Key of an approver pool for pool steps
+     */
+    poolKey?: string;
+    elevationPoolKey?: string;
+};
+
+export type ControlDocumentType = {
+    id: string;
+    label: string;
+    description: string;
+    requestHint: string;
+    draftTemplate: string;
+    folderPath?: string;
+    authorTeamEmails: Array<string>;
+    active: boolean;
+    policyVersion: number;
+    defaultDestinationId?: string;
+    approvalChain: Array<ControlChainStep>;
+};
+
+export type ControlDocumentTypeWrite = {
+    id: string;
+    label: string;
+    description: string;
+    requestHint: string;
+    draftTemplate: string;
+    folderPath?: string;
+    authorTeamEmails?: Array<string>;
+    active: boolean;
+    policyVersion?: number;
+    defaultDestinationId?: string;
+    approvalChain: Array<ControlChainStep>;
+};
+
+export type ControlApproverPool = {
+    id: string;
+    key: string;
+    name: string;
+    description: string;
+    members: Array<Approver>;
+};
+
+export type ControlApproverPoolWrite = {
+    name: string;
+    description?: string;
+    members: Array<Approver>;
+};
+
+export type ControlPublishDestination = {
+    id: string;
+    name: string;
+    siteUrl: string;
+    libraryName: string;
+    folderPath: string;
+    active: boolean;
+};
+
+export type ControlPublishDestinationWrite = {
+    name: string;
+    siteUrl: string;
+    libraryName: string;
+    folderPath: string;
+    active: boolean;
+};
+
+export type ControlSettings = {
+    /**
+     * When true, Admin-authorized limited chain override at submit is allowed.
+     * Default false — submit always materializes from control tables.
+     *
+     */
+    allowApproverOverride: boolean;
+    collaborationMode: string;
+    namedElevationSemantics: 'convert_to_elevated_pool';
+};
+
+export type ControlFlowRun = {
+    id: string;
+    flowName: string;
+    status: 'succeeded' | 'failed' | 'running';
+    at: string;
+    message: string;
+};
+
 export type Error = {
     message: string;
     code?: string;
@@ -608,3 +699,451 @@ export type PublishDocumentPdfResponses = {
 };
 
 export type PublishDocumentPdfResponse = PublishDocumentPdfResponses[keyof PublishDocumentPdfResponses];
+
+export type ListDocumentTypesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/control/document-types';
+};
+
+export type ListDocumentTypesResponses = {
+    /**
+     * Document type catalog
+     */
+    200: {
+        items: Array<ControlDocumentType>;
+    };
+};
+
+export type ListDocumentTypesResponse = ListDocumentTypesResponses[keyof ListDocumentTypesResponses];
+
+export type CreateDocumentTypeData = {
+    body: ControlDocumentTypeWrite;
+    path?: never;
+    query?: never;
+    url: '/control/document-types';
+};
+
+export type CreateDocumentTypeErrors = {
+    /**
+     * Validation error
+     */
+    400: Error;
+    /**
+     * Caller is not allowed to perform this action
+     */
+    403: Error;
+};
+
+export type CreateDocumentTypeError = CreateDocumentTypeErrors[keyof CreateDocumentTypeErrors];
+
+export type CreateDocumentTypeResponses = {
+    /**
+     * Created
+     */
+    201: ControlDocumentType;
+};
+
+export type CreateDocumentTypeResponse = CreateDocumentTypeResponses[keyof CreateDocumentTypeResponses];
+
+export type DeactivateDocumentTypeData = {
+    body?: never;
+    path: {
+        typeId: string;
+    };
+    query?: never;
+    url: '/control/document-types/{typeId}';
+};
+
+export type DeactivateDocumentTypeErrors = {
+    /**
+     * Caller is not allowed to perform this action
+     */
+    403: Error;
+    /**
+     * Resource not found
+     */
+    404: Error;
+};
+
+export type DeactivateDocumentTypeError = DeactivateDocumentTypeErrors[keyof DeactivateDocumentTypeErrors];
+
+export type DeactivateDocumentTypeResponses = {
+    /**
+     * Deactivated
+     */
+    200: ControlDocumentType;
+};
+
+export type DeactivateDocumentTypeResponse = DeactivateDocumentTypeResponses[keyof DeactivateDocumentTypeResponses];
+
+export type GetDocumentTypeConfigData = {
+    body?: never;
+    path: {
+        typeId: string;
+    };
+    query?: never;
+    url: '/control/document-types/{typeId}';
+};
+
+export type GetDocumentTypeConfigErrors = {
+    /**
+     * Resource not found
+     */
+    404: Error;
+};
+
+export type GetDocumentTypeConfigError = GetDocumentTypeConfigErrors[keyof GetDocumentTypeConfigErrors];
+
+export type GetDocumentTypeConfigResponses = {
+    /**
+     * Document type
+     */
+    200: ControlDocumentType;
+};
+
+export type GetDocumentTypeConfigResponse = GetDocumentTypeConfigResponses[keyof GetDocumentTypeConfigResponses];
+
+export type UpdateDocumentTypeData = {
+    body: ControlDocumentTypeWrite;
+    path: {
+        typeId: string;
+    };
+    query?: never;
+    url: '/control/document-types/{typeId}';
+};
+
+export type UpdateDocumentTypeErrors = {
+    /**
+     * Validation error
+     */
+    400: Error;
+    /**
+     * Caller is not allowed to perform this action
+     */
+    403: Error;
+    /**
+     * Resource not found
+     */
+    404: Error;
+};
+
+export type UpdateDocumentTypeError = UpdateDocumentTypeErrors[keyof UpdateDocumentTypeErrors];
+
+export type UpdateDocumentTypeResponses = {
+    /**
+     * Updated
+     */
+    200: ControlDocumentType;
+};
+
+export type UpdateDocumentTypeResponse = UpdateDocumentTypeResponses[keyof UpdateDocumentTypeResponses];
+
+export type ListApproverPoolsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/control/approver-pools';
+};
+
+export type ListApproverPoolsErrors = {
+    /**
+     * Caller is not allowed to perform this action
+     */
+    403: Error;
+};
+
+export type ListApproverPoolsError = ListApproverPoolsErrors[keyof ListApproverPoolsErrors];
+
+export type ListApproverPoolsResponses = {
+    /**
+     * Pools
+     */
+    200: {
+        items: Array<ControlApproverPool>;
+    };
+};
+
+export type ListApproverPoolsResponse = ListApproverPoolsResponses[keyof ListApproverPoolsResponses];
+
+export type CreateApproverPoolData = {
+    body: ControlApproverPoolWrite;
+    path?: never;
+    query?: never;
+    url: '/control/approver-pools';
+};
+
+export type CreateApproverPoolErrors = {
+    /**
+     * Validation error
+     */
+    400: Error;
+    /**
+     * Caller is not allowed to perform this action
+     */
+    403: Error;
+};
+
+export type CreateApproverPoolError = CreateApproverPoolErrors[keyof CreateApproverPoolErrors];
+
+export type CreateApproverPoolResponses = {
+    /**
+     * Created
+     */
+    201: ControlApproverPool;
+};
+
+export type CreateApproverPoolResponse = CreateApproverPoolResponses[keyof CreateApproverPoolResponses];
+
+export type DeleteApproverPoolData = {
+    body?: never;
+    path: {
+        poolId: string;
+    };
+    query?: never;
+    url: '/control/approver-pools/{poolId}';
+};
+
+export type DeleteApproverPoolErrors = {
+    /**
+     * Caller is not allowed to perform this action
+     */
+    403: Error;
+    /**
+     * Resource not found
+     */
+    404: Error;
+    /**
+     * Invalid state transition
+     */
+    409: Error;
+};
+
+export type DeleteApproverPoolError = DeleteApproverPoolErrors[keyof DeleteApproverPoolErrors];
+
+export type DeleteApproverPoolResponses = {
+    /**
+     * Deleted
+     */
+    204: void;
+};
+
+export type DeleteApproverPoolResponse = DeleteApproverPoolResponses[keyof DeleteApproverPoolResponses];
+
+export type UpdateApproverPoolData = {
+    body: ControlApproverPoolWrite;
+    path: {
+        poolId: string;
+    };
+    query?: never;
+    url: '/control/approver-pools/{poolId}';
+};
+
+export type UpdateApproverPoolErrors = {
+    /**
+     * Caller is not allowed to perform this action
+     */
+    403: Error;
+    /**
+     * Resource not found
+     */
+    404: Error;
+};
+
+export type UpdateApproverPoolError = UpdateApproverPoolErrors[keyof UpdateApproverPoolErrors];
+
+export type UpdateApproverPoolResponses = {
+    /**
+     * Updated
+     */
+    200: ControlApproverPool;
+};
+
+export type UpdateApproverPoolResponse = UpdateApproverPoolResponses[keyof UpdateApproverPoolResponses];
+
+export type ListPublishDestinationsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/control/publish-destinations';
+};
+
+export type ListPublishDestinationsResponses = {
+    /**
+     * Destinations
+     */
+    200: {
+        items: Array<ControlPublishDestination>;
+    };
+};
+
+export type ListPublishDestinationsResponse = ListPublishDestinationsResponses[keyof ListPublishDestinationsResponses];
+
+export type CreatePublishDestinationData = {
+    body: ControlPublishDestinationWrite;
+    path?: never;
+    query?: never;
+    url: '/control/publish-destinations';
+};
+
+export type CreatePublishDestinationErrors = {
+    /**
+     * Validation error
+     */
+    400: Error;
+    /**
+     * Caller is not allowed to perform this action
+     */
+    403: Error;
+};
+
+export type CreatePublishDestinationError = CreatePublishDestinationErrors[keyof CreatePublishDestinationErrors];
+
+export type CreatePublishDestinationResponses = {
+    /**
+     * Created
+     */
+    201: ControlPublishDestination;
+};
+
+export type CreatePublishDestinationResponse = CreatePublishDestinationResponses[keyof CreatePublishDestinationResponses];
+
+export type DeactivatePublishDestinationData = {
+    body?: never;
+    path: {
+        destinationId: string;
+    };
+    query?: never;
+    url: '/control/publish-destinations/{destinationId}';
+};
+
+export type DeactivatePublishDestinationErrors = {
+    /**
+     * Caller is not allowed to perform this action
+     */
+    403: Error;
+    /**
+     * Resource not found
+     */
+    404: Error;
+};
+
+export type DeactivatePublishDestinationError = DeactivatePublishDestinationErrors[keyof DeactivatePublishDestinationErrors];
+
+export type DeactivatePublishDestinationResponses = {
+    /**
+     * Deactivated
+     */
+    200: ControlPublishDestination;
+};
+
+export type DeactivatePublishDestinationResponse = DeactivatePublishDestinationResponses[keyof DeactivatePublishDestinationResponses];
+
+export type UpdatePublishDestinationData = {
+    body: ControlPublishDestinationWrite;
+    path: {
+        destinationId: string;
+    };
+    query?: never;
+    url: '/control/publish-destinations/{destinationId}';
+};
+
+export type UpdatePublishDestinationErrors = {
+    /**
+     * Caller is not allowed to perform this action
+     */
+    403: Error;
+    /**
+     * Resource not found
+     */
+    404: Error;
+};
+
+export type UpdatePublishDestinationError = UpdatePublishDestinationErrors[keyof UpdatePublishDestinationErrors];
+
+export type UpdatePublishDestinationResponses = {
+    /**
+     * Updated
+     */
+    200: ControlPublishDestination;
+};
+
+export type UpdatePublishDestinationResponse = UpdatePublishDestinationResponses[keyof UpdatePublishDestinationResponses];
+
+export type GetControlSettingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/control/settings';
+};
+
+export type GetControlSettingsErrors = {
+    /**
+     * Caller is not allowed to perform this action
+     */
+    403: Error;
+};
+
+export type GetControlSettingsError = GetControlSettingsErrors[keyof GetControlSettingsErrors];
+
+export type GetControlSettingsResponses = {
+    /**
+     * Settings
+     */
+    200: ControlSettings;
+};
+
+export type GetControlSettingsResponse = GetControlSettingsResponses[keyof GetControlSettingsResponses];
+
+export type UpdateControlSettingsData = {
+    body: ControlSettings;
+    path?: never;
+    query?: never;
+    url: '/control/settings';
+};
+
+export type UpdateControlSettingsErrors = {
+    /**
+     * Caller is not allowed to perform this action
+     */
+    403: Error;
+};
+
+export type UpdateControlSettingsError = UpdateControlSettingsErrors[keyof UpdateControlSettingsErrors];
+
+export type UpdateControlSettingsResponses = {
+    /**
+     * Updated settings
+     */
+    200: ControlSettings;
+};
+
+export type UpdateControlSettingsResponse = UpdateControlSettingsResponses[keyof UpdateControlSettingsResponses];
+
+export type ListFlowRunsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/control/flow-runs';
+};
+
+export type ListFlowRunsErrors = {
+    /**
+     * Caller is not allowed to perform this action
+     */
+    403: Error;
+};
+
+export type ListFlowRunsError = ListFlowRunsErrors[keyof ListFlowRunsErrors];
+
+export type ListFlowRunsResponses = {
+    /**
+     * Flow runs
+     */
+    200: {
+        items: Array<ControlFlowRun>;
+    };
+};
+
+export type ListFlowRunsResponse = ListFlowRunsResponses[keyof ListFlowRunsResponses];

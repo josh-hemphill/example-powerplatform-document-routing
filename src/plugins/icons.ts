@@ -7,6 +7,7 @@ import {
 	mdiCheckCircle,
 	mdiClockOutline,
 	mdiCloseCircle,
+	mdiCogOutline,
 	mdiMagnify,
 	mdiMinusCircle,
 	mdiPlus,
@@ -23,6 +24,7 @@ export const appIconAliases = {
 	checkCircle: mdiCheckCircle,
 	closeCircle: mdiCloseCircle,
 	minusCircle: mdiMinusCircle,
+	cogOutline: mdiCogOutline,
 } as const;
 
 export type AppIconAlias = keyof typeof appIconAliases;

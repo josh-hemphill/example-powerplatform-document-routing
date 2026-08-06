@@ -1,10 +1,8 @@
 # Setup checklist — adopt this app for your org
 
-This starter is designed so most tenant-specific work happens in **config + deploy scaffolding**. You should not need to rewrite the workflow UI for a normal document-routing use case.
+This starter is designed so most tenant-specific work happens in **deploy scaffolding + Admin control data**. You should not need to rewrite the workflow UI for a normal document-routing use case.
 
-## 1. Edit org defaults (required)
-
-### Connection profile (recommended)
+## 1. Connection profile (required)
 
 ```bash
 cp deploy/connections.example.json deploy/connections.json
@@ -30,38 +28,44 @@ pnpm provision
 
 Details: [`deploy/README.md`](./deploy/README.md).
 
+## 2. Brand + local env
+
 ### `src/config/app.config.ts` / `.env`
 
 | Field / env                      | What to change                                                                                                                    |
 | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | `brand.*`                        | Product name shown in the shell                                                                                                   |
-| `VITE_SHAREPOINT_SITE_URL`       | Overrides SharePoint site (any HTTPS host)                                                                                        |
-| `VITE_SHAREPOINT_LIBRARY_NAME`   | Library name                                                                                                                      |
-| `VITE_SHAREPOINT_FOLDER_PATH`    | Default folder                                                                                                                    |
+| `VITE_SHAREPOINT_*`              | Local SharePoint defaults (any HTTPS host)                                                                                        |
 | `VITE_DATAVERSE_ENVIRONMENT_URL` | Optional org URL for adapters                                                                                                     |
 | `VITE_DOCUMENT_API_BASE_URL`     | API / Custom Connector base                                                                                                       |
 | `localDemoUser`                  | Fallback identity for local Vite play only (`import.meta.env.DEV`)                                                                |
 | Runtime hosts                    | Prefer Dataverse/`dr_*` via `window.__DOCUMENT_ROUTING_ENV__`; `.env` `VITE_*` is local-only — see `src/config/runtime-config.ts` |
 | `features.showSetupBanner`       | Set `false` once placeholders are gone                                                                                            |
-| `features.allowApproverOverride` | Let authors edit the default chain at submit time                                                                                 |
 
-### `src/config/document-types.ts`
+**Routing policy is not edited in the SPA bundle for production.** Use the in-app **Admin** page (`#/admin`) or provisioned Dataverse control tables.
 
-**Local / mock seed** for document types and demo approval chains. Hosted orgs should
-treat Dataverse control tables (`documenttype`, `approvalchainstep`, pools) as the
-source of truth — see [`deploy/SCHEMA.md`](./deploy/SCHEMA.md) and
-`deploy/generated/control-seed.json` from `pnpm provision`.
+`features.allowApproverOverride` in `app.config.ts` is only a **seed hint**. Runtime value lives in control settings (`appsetting` / Admin → Settings), default **off** (submit materializes chains from control data).
 
-Each type controls:
+## 3. Document types, pools, destinations
 
-- Label / description / request hint
-- Draft Markdown scaffold (`{{title}}`, `{{request}}`)
-- Default ordered **approval chain** (named and/or pool + SLA)
-- Optional SharePoint `folderPath`
+### Production / hosted
 
-Out of the box: `policy`, `sop`, `announcement` (Contoso sample emails — replace before production).
+1. Run `pnpm provision` to seed control tables from `deploy/generated/control-seed.json`.
+2. Assign the **Document Routing Admin** security role ([`deploy/SECURITY_ROLES.md`](./deploy/SECURITY_ROLES.md)).
+3. Open **Admin** in the Code App and maintain:
+   - Document types + approval chains (`poolKey` references)
+   - Approver pools & members
+   - Allowlisted publish destinations
+   - Feature flags (`allowApproverOverride`)
+4. Next **submit-for-approval** uses the live pool membership — no app rebuild.
 
-## 2. Run locally
+### Local / mock seed mirror
+
+`src/config/document-types.ts` remains the **dev seed** used to bootstrap the Vite mock control store and `pnpm provision` seed JSON. Prefer Admin for day-to-day edits even locally (persona: Local developer).
+
+Schema: [`deploy/SCHEMA.md`](./deploy/SCHEMA.md).
+
+## 4. Run locally
 
 ```bash
 pnpm install
@@ -69,119 +73,47 @@ pnpm generate:api
 pnpm dev
 ```
 
-Walk the seeded inbox: request → draft → approvals → publish. Seed data lives in `src/mock/seed-documents.ts` (demo only).
+Walk the seeded inbox: request → draft → approvals → publish. Demo cases live in `src/mock/seed-documents.ts`. Use the persona switcher; only **Local developer** has Admin.
 
-## 3. Provision Dataverse + connect SharePoint
+## 5. Provision Dataverse + connect SharePoint
 
 ### Create tables
 
 ```bash
-# After editing deploy/connections.json
 pnpm provision
-
-# Optional automated create via Dataverse Web API
-export DATAVERSE_ACCESS_TOKEN='…'   # token for your org URL (custom domain OK)
+export DATAVERSE_ACCESS_TOKEN='…'
 pnpm provision:apply
 ```
 
-This scaffolds:
-
-- `dr_document`, `dr_approvalstep`, `dr_historyevent`
-- Environment variables for SharePoint site/library/folder + API/Dataverse URLs
+This scaffolds case tables plus control tables (`documenttype`, `approvalchainstep`, pools, destinations, `appsetting`). See [`deploy/README.md`](./deploy/README.md).
 
 ### Attach Code App data sources
 
 ```bash
 pnpm exec pa auth login
 pnpm power:init
-# Replace CONNECTION_ID inside the generated script, then:
 bash deploy/generated/pa-connect.sh
 ```
 
-Or manually (dataset / org-url are **your** hosts from `connections.json`):
-
-```bash
-pnpm exec pa connection create --connector shared_sharepointonline
-
-pnpm exec pa app add data-source \
-  --connector dataverse \
-  --table dr_document \
-  --org-url "https://your-dataverse-host.example"
-
-pnpm exec pa app add data-source \
-  --connector shared_sharepointonline \
-  --connection-id "<connectionId>" \
-  --table "Published Documents" \
-  --dataset "https://your-docs-host.example/sites/YourSite"
-```
-
-Point the OpenAPI client at your Custom Connector / API that reads/writes the Dataverse tables:
+Point the OpenAPI client at your Custom Connector / API:
 
 ```bash
 # .env
-VITE_DOCUMENT_API_BASE_URL=https://your-api.example.com
+VITE_DOCUMENT_API_BASE_URL=https://your-api-host.example/document-routing
 ```
 
-Optional: add an approvals / SLA notification flow with `pa app add flow`.
+## 6. Power Automate
 
-## 4. Wire Power Platform app host
+Import stubs from [`deploy/flows/`](./deploy/flows/README.md) (SLA sweeper, notify, publish, on-submit guard). Admin → Flow health shows recent mock/hosted run rows.
 
-```bash
-pnpm power:run          # Local Play in the Power Apps host
-pnpm power:push         # After build
-```
+## 7. Security roles
 
-Replace `src/generated/services/SharePointPublishService.ts` with the generated SharePoint service after `pa app add data-source`.
+Map Entra groups to Document Routing User / Author / Approver / Publisher / Admin as described in [`deploy/SECURITY_ROLES.md`](./deploy/SECURITY_ROLES.md).
 
-## 5. PDF rendering (server-side)
+## 8. Checklist before go-live
 
-Do not compile PDFs in the browser bundle.
-
-1. Customize HTML in `src/publishing/html-pdf-template.ts`
-2. Keep orchestration in `src/publishing/publish-document.ts`
-3. Implement real HTML→PDF (or Typst) on your API / Azure Function / flow
-4. Have that service upload to SharePoint and return the file URL
-
-## 6. What you usually should _not_ change
-
-- Workflow statuses and transitions (`openapi/document-routing.yaml`) — already generic
-- Inbox / workspace views — driven by config + document type
-- Pinia Colada / HeyAPI wiring — regenerate with `pnpm generate:api`
-
-## 7. Optional polish
-
-| Need                   | Where                           |
-| ---------------------- | ------------------------------- |
-| Persona inbox labels   | `src/config/inbox-personas.ts`  |
-| Status colors / labels | `src/domain/document-status.ts` |
-| Theme colors           | `src/plugins/vuetify.ts`        |
-| Richer demo seed       | `src/mock/seed-documents.ts`    |
-
-When placeholders are gone, set `features.showSetupBanner: false` in `app.config.ts`.
-
-## 8. Approval queues, SLA, and elevation
-
-Supported out of the box:
-
-| Capability         | How                                                                                |
-| ------------------ | ---------------------------------------------------------------------------------- |
-| Named step         | `mode: 'named'` in `document-types.ts`                                             |
-| Pool / self-assign | `mode: 'pool'` + `pool` members; claim/release in the workspace                    |
-| SLA                | `slaHours` on the step; due clock starts when the step activates (or when claimed) |
-| Elevation          | `elevationPool` merged into the pool when `process-sla` runs after `dueAt`         |
-| Inbox              | **Available in my pool** + **Waiting on me** personas                              |
-
-Local demo: open **Expense Policy Clarification**, switch the app-bar persona to
-`jordan.legal@contoso.com`, click **Process SLA** (seed is already overdue), then **Claim from pool**.
-Identity is the principal header — there is no per-form “Acting as” field.
-
-Production schedulers should call `POST /documents/{id}/approvals/process-sla` (or a batch job) from Power Automate / Azure Functions — not from the browser session alone.
-
-## 9. Datastore split
-
-| Store                         | Use for                                                 |
-| ----------------------------- | ------------------------------------------------------- |
-| **Dataverse** (`dr_*` tables) | Cases, drafts, approval steps, history, claim/SLA state |
-| **SharePoint library**        | Published PDF binaries only                             |
-
-Prefer an API / Custom Connector in front of Dataverse so the Code App keeps the OpenAPI command surface (`claim`, `release`, `decide`, `process-sla`).
+- [ ] Contoso/example emails removed from control tables / Admin pools
+- [ ] Publish destinations allowlist matches real HTTPS sites
+- [ ] `allowApproverOverride` left off unless intentionally enabled by Admin
+- [ ] Setup banner disabled
+- [ ] Flows deployed and healthy

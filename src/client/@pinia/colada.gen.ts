@@ -4,8 +4,8 @@ import { type _JSONValue, defineQueryOptions, type UseMutationOptions } from '@p
 
 import { serializeQueryKeyValue } from '../client';
 import { client } from '../client.gen';
-import { claimApprovalStep, createDocumentRequest, decideApprovalStep, getDocument, listDocuments, type Options, processApprovalSla, publishDocumentPdf, releaseApprovalStep, submitForApproval, updateDocumentDraft, withdrawAndRevise } from '../sdk.gen';
-import type { ClaimApprovalStepData, ClaimApprovalStepError, ClaimApprovalStepResponse, CreateDocumentRequestData, CreateDocumentRequestError, CreateDocumentRequestResponse, DecideApprovalStepData, DecideApprovalStepError, DecideApprovalStepResponse, GetDocumentData, GetDocumentError, GetDocumentResponse, ListDocumentsData, ListDocumentsResponse, ProcessApprovalSlaData, ProcessApprovalSlaError, ProcessApprovalSlaResponse, PublishDocumentPdfData, PublishDocumentPdfError, PublishDocumentPdfResponse, ReleaseApprovalStepData, ReleaseApprovalStepError, ReleaseApprovalStepResponse, SubmitForApprovalData, SubmitForApprovalError, SubmitForApprovalResponse, UpdateDocumentDraftData, UpdateDocumentDraftError, UpdateDocumentDraftResponse, WithdrawAndReviseData, WithdrawAndReviseError, WithdrawAndReviseResponse } from '../types.gen';
+import { claimApprovalStep, createApproverPool, createDocumentRequest, createDocumentType, createPublishDestination, deactivateDocumentType, deactivatePublishDestination, decideApprovalStep, deleteApproverPool, getControlSettings, getDocument, getDocumentTypeConfig, listApproverPools, listDocuments, listDocumentTypes, listFlowRuns, listPublishDestinations, type Options, processApprovalSla, publishDocumentPdf, releaseApprovalStep, submitForApproval, updateApproverPool, updateControlSettings, updateDocumentDraft, updateDocumentType, updatePublishDestination, withdrawAndRevise } from '../sdk.gen';
+import type { ClaimApprovalStepData, ClaimApprovalStepError, ClaimApprovalStepResponse, CreateApproverPoolData, CreateApproverPoolError, CreateApproverPoolResponse, CreateDocumentRequestData, CreateDocumentRequestError, CreateDocumentRequestResponse, CreateDocumentTypeData, CreateDocumentTypeError, CreateDocumentTypeResponse, CreatePublishDestinationData, CreatePublishDestinationError, CreatePublishDestinationResponse, DeactivateDocumentTypeData, DeactivateDocumentTypeError, DeactivateDocumentTypeResponse, DeactivatePublishDestinationData, DeactivatePublishDestinationError, DeactivatePublishDestinationResponse, DecideApprovalStepData, DecideApprovalStepError, DecideApprovalStepResponse, DeleteApproverPoolData, DeleteApproverPoolError, DeleteApproverPoolResponse, GetControlSettingsData, GetControlSettingsError, GetControlSettingsResponse, GetDocumentData, GetDocumentError, GetDocumentResponse, GetDocumentTypeConfigData, GetDocumentTypeConfigError, GetDocumentTypeConfigResponse, ListApproverPoolsData, ListApproverPoolsError, ListApproverPoolsResponse, ListDocumentsData, ListDocumentsResponse, ListDocumentTypesData, ListDocumentTypesResponse, ListFlowRunsData, ListFlowRunsError, ListFlowRunsResponse, ListPublishDestinationsData, ListPublishDestinationsResponse, ProcessApprovalSlaData, ProcessApprovalSlaError, ProcessApprovalSlaResponse, PublishDocumentPdfData, PublishDocumentPdfError, PublishDocumentPdfResponse, ReleaseApprovalStepData, ReleaseApprovalStepError, ReleaseApprovalStepResponse, SubmitForApprovalData, SubmitForApprovalError, SubmitForApprovalResponse, UpdateApproverPoolData, UpdateApproverPoolError, UpdateApproverPoolResponse, UpdateControlSettingsData, UpdateControlSettingsError, UpdateControlSettingsResponse, UpdateDocumentDraftData, UpdateDocumentDraftError, UpdateDocumentDraftResponse, UpdateDocumentTypeData, UpdateDocumentTypeError, UpdateDocumentTypeResponse, UpdatePublishDestinationData, UpdatePublishDestinationError, UpdatePublishDestinationResponse, WithdrawAndReviseData, WithdrawAndReviseError, WithdrawAndReviseResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'path'> & {
@@ -215,3 +215,245 @@ export const publishDocumentPdfMutation = (options?: Partial<Options<PublishDocu
         return data;
     }
 });
+
+export const listDocumentTypesQueryKey = (options?: Options<ListDocumentTypesData>) => createQueryKey('listDocumentTypes', options, ['Control']);
+
+/**
+ * List document types (active for users; all for admins)
+ */
+export const listDocumentTypesQuery = defineQueryOptions<Options<ListDocumentTypesData>, ListDocumentTypesResponse, Error>((options?: Options<ListDocumentTypesData>) => ({
+    key: listDocumentTypesQueryKey(options),
+    query: async (context) => {
+        const { data } = await listDocumentTypes({
+            ...options,
+            ...context,
+            throwOnError: true
+        });
+        return data;
+    }
+}));
+
+/**
+ * Create a document type (Admin)
+ */
+export const createDocumentTypeMutation = (options?: Partial<Options<CreateDocumentTypeData>>): UseMutationOptions<CreateDocumentTypeResponse, Options<CreateDocumentTypeData>, CreateDocumentTypeError> => ({
+    mutation: async (vars) => {
+        const { data } = await createDocumentType({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+/**
+ * Deactivate a document type (Admin)
+ */
+export const deactivateDocumentTypeMutation = (options?: Partial<Options<DeactivateDocumentTypeData>>): UseMutationOptions<DeactivateDocumentTypeResponse, Options<DeactivateDocumentTypeData>, DeactivateDocumentTypeError> => ({
+    mutation: async (vars) => {
+        const { data } = await deactivateDocumentType({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+export const getDocumentTypeConfigQueryKey = (options: Options<GetDocumentTypeConfigData>) => createQueryKey('getDocumentTypeConfig', options, ['Control']);
+
+/**
+ * Get one document type
+ */
+export const getDocumentTypeConfigQuery = defineQueryOptions<Options<GetDocumentTypeConfigData>, GetDocumentTypeConfigResponse, GetDocumentTypeConfigError>((options: Options<GetDocumentTypeConfigData>) => ({
+    key: getDocumentTypeConfigQueryKey(options),
+    query: async (context) => {
+        const { data } = await getDocumentTypeConfig({
+            ...options,
+            ...context,
+            throwOnError: true
+        });
+        return data;
+    }
+}));
+
+/**
+ * Update a document type including approval chain (Admin)
+ */
+export const updateDocumentTypeMutation = (options?: Partial<Options<UpdateDocumentTypeData>>): UseMutationOptions<UpdateDocumentTypeResponse, Options<UpdateDocumentTypeData>, UpdateDocumentTypeError> => ({
+    mutation: async (vars) => {
+        const { data } = await updateDocumentType({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+export const listApproverPoolsQueryKey = (options?: Options<ListApproverPoolsData>) => createQueryKey('listApproverPools', options, ['Control']);
+
+/**
+ * List approver pools (Admin)
+ */
+export const listApproverPoolsQuery = defineQueryOptions<Options<ListApproverPoolsData>, ListApproverPoolsResponse, ListApproverPoolsError>((options?: Options<ListApproverPoolsData>) => ({
+    key: listApproverPoolsQueryKey(options),
+    query: async (context) => {
+        const { data } = await listApproverPools({
+            ...options,
+            ...context,
+            throwOnError: true
+        });
+        return data;
+    }
+}));
+
+/**
+ * Create an approver pool (Admin)
+ */
+export const createApproverPoolMutation = (options?: Partial<Options<CreateApproverPoolData>>): UseMutationOptions<CreateApproverPoolResponse, Options<CreateApproverPoolData>, CreateApproverPoolError> => ({
+    mutation: async (vars) => {
+        const { data } = await createApproverPool({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+/**
+ * Delete an unused approver pool (Admin)
+ */
+export const deleteApproverPoolMutation = (options?: Partial<Options<DeleteApproverPoolData>>): UseMutationOptions<DeleteApproverPoolResponse, Options<DeleteApproverPoolData>, DeleteApproverPoolError> => ({
+    mutation: async (vars) => {
+        const { data } = await deleteApproverPool({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+/**
+ * Update pool name/members (Admin)
+ */
+export const updateApproverPoolMutation = (options?: Partial<Options<UpdateApproverPoolData>>): UseMutationOptions<UpdateApproverPoolResponse, Options<UpdateApproverPoolData>, UpdateApproverPoolError> => ({
+    mutation: async (vars) => {
+        const { data } = await updateApproverPool({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+export const listPublishDestinationsQueryKey = (options?: Options<ListPublishDestinationsData>) => createQueryKey('listPublishDestinations', options, ['Control']);
+
+/**
+ * List allowlisted publish destinations
+ */
+export const listPublishDestinationsQuery = defineQueryOptions<Options<ListPublishDestinationsData>, ListPublishDestinationsResponse, Error>((options?: Options<ListPublishDestinationsData>) => ({
+    key: listPublishDestinationsQueryKey(options),
+    query: async (context) => {
+        const { data } = await listPublishDestinations({
+            ...options,
+            ...context,
+            throwOnError: true
+        });
+        return data;
+    }
+}));
+
+/**
+ * Create a publish destination (Admin)
+ */
+export const createPublishDestinationMutation = (options?: Partial<Options<CreatePublishDestinationData>>): UseMutationOptions<CreatePublishDestinationResponse, Options<CreatePublishDestinationData>, CreatePublishDestinationError> => ({
+    mutation: async (vars) => {
+        const { data } = await createPublishDestination({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+/**
+ * Deactivate a publish destination (Admin)
+ */
+export const deactivatePublishDestinationMutation = (options?: Partial<Options<DeactivatePublishDestinationData>>): UseMutationOptions<DeactivatePublishDestinationResponse, Options<DeactivatePublishDestinationData>, DeactivatePublishDestinationError> => ({
+    mutation: async (vars) => {
+        const { data } = await deactivatePublishDestination({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+/**
+ * Update a publish destination (Admin)
+ */
+export const updatePublishDestinationMutation = (options?: Partial<Options<UpdatePublishDestinationData>>): UseMutationOptions<UpdatePublishDestinationResponse, Options<UpdatePublishDestinationData>, UpdatePublishDestinationError> => ({
+    mutation: async (vars) => {
+        const { data } = await updatePublishDestination({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+export const getControlSettingsQueryKey = (options?: Options<GetControlSettingsData>) => createQueryKey('getControlSettings', options, ['Control']);
+
+/**
+ * Read feature flags / collaboration settings (Admin)
+ */
+export const getControlSettingsQuery = defineQueryOptions<Options<GetControlSettingsData>, GetControlSettingsResponse, GetControlSettingsError>((options?: Options<GetControlSettingsData>) => ({
+    key: getControlSettingsQueryKey(options),
+    query: async (context) => {
+        const { data } = await getControlSettings({
+            ...options,
+            ...context,
+            throwOnError: true
+        });
+        return data;
+    }
+}));
+
+/**
+ * Update feature flags (Admin)
+ */
+export const updateControlSettingsMutation = (options?: Partial<Options<UpdateControlSettingsData>>): UseMutationOptions<UpdateControlSettingsResponse, Options<UpdateControlSettingsData>, UpdateControlSettingsError> => ({
+    mutation: async (vars) => {
+        const { data } = await updateControlSettings({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+export const listFlowRunsQueryKey = (options?: Options<ListFlowRunsData>) => createQueryKey('listFlowRuns', options, ['Control']);
+
+/**
+ * Recent Flow health rows (Admin, read-only)
+ */
+export const listFlowRunsQuery = defineQueryOptions<Options<ListFlowRunsData>, ListFlowRunsResponse, ListFlowRunsError>((options?: Options<ListFlowRunsData>) => ({
+    key: listFlowRunsQueryKey(options),
+    query: async (context) => {
+        const { data } = await listFlowRuns({
+            ...options,
+            ...context,
+            throwOnError: true
+        });
+        return data;
+    }
+}));

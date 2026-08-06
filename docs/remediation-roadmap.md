@@ -229,6 +229,8 @@ Prefer Dataverse **business rules / column constraints** for simple field locks;
 
 ## Phase 4 — Admin page (control & flow)
 
+**Status:** Implemented (Admin UI, control APIs, mutable mock control store, SETUP rewrite).
+
 **Goal:** Admins update routing without redeploying the Code App.
 
 ### UX

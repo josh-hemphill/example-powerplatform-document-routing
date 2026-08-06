@@ -22,5 +22,11 @@ export const router = createRouter({
 			component: async() => import('@/views/DocumentWorkspaceView.vue'),
 			meta: { title: 'Document' },
 		},
+		{
+			path: '/admin',
+			name: 'admin',
+			component: async() => import('@/views/AdminView.vue'),
+			meta: { title: 'Admin' },
+		},
 	],
 });

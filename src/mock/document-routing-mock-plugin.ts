@@ -3,7 +3,7 @@ import type { Plugin } from 'vite';
 import type { MockDocumentRecord } from './seed-documents.ts';
 import { randomUUID } from 'node:crypto';
 import { appConfig } from '../config/app.config.ts';
-import { findDocumentType, toApprovalStepInputs } from '../config/document-types.ts';
+import { toApprovalStepInputs } from '../config/document-types.ts';
 import {
 	canActorAccessDocument,
 	canActorMutateDraft,
@@ -19,10 +19,19 @@ import {
 	syncCurrentApprovalFields,
 	withdrawAndRevise,
 } from './approval-engine.ts';
+import { handleControlApiRequest } from './control-api.ts';
+import {
+	findControlDocumentType,
+	getControlStore,
+	materializeApprovalSteps,
+	recordFlowRun,
+	toDocumentTypeDefinition,
+} from './control-store.ts';
 import { createSeedDocuments } from './seed-documents.ts';
 import { resolveSlaClock } from './sla-clock.ts';
 
 const ACTOR_HEADER = 'x-document-routing-actor';
+const ROLES_HEADER = 'x-document-routing-roles';
 
 const store = new Map<string, MockDocumentRecord>();
 
@@ -57,6 +66,18 @@ function readActorEmail(req: IncomingMessage): string | null {
 	const value = Array.isArray(raw) ? raw[0] : raw;
 	const email = value?.trim();
 	return email && email.includes('@') ? email : null;
+}
+
+function readActorRoles(req: IncomingMessage): string[] {
+	const raw = req.headers[ROLES_HEADER];
+	const value = Array.isArray(raw) ? raw[0] : raw;
+	if (!value) {
+		return [];
+	}
+	return value
+		.split(',')
+		.map((item) => item.trim().toLowerCase())
+		.filter(Boolean);
 }
 
 function requireActor(
@@ -154,6 +175,22 @@ export function documentRoutingMockPlugin(): Plugin {
 						return;
 					}
 
+					const isAdmin = readActorRoles(req).includes('admin');
+					const handledControl = await handleControlApiRequest({
+						method,
+						path,
+						actor,
+						isAdmin,
+						req,
+						res,
+						readJson,
+						sendJson,
+						matchRoute,
+					});
+					if (handledControl) {
+						return;
+					}
+
 					if (method === 'GET' && path === '/api/documents') {
 						const status = url.searchParams.get('status');
 						const documentType = url.searchParams.get('documentType');
@@ -193,14 +230,15 @@ export function documentRoutingMockPlugin(): Plugin {
 							requestedLibraryName?: string;
 						}>(req);
 
-						const type = findDocumentType(body.documentType);
-						if (!type) {
+						const typeRow = findControlDocumentType(body.documentType);
+						if (!typeRow || !typeRow.active) {
 							sendJson(res, 400, {
 								message: `Unknown document type: ${body.documentType}`,
 								code: 'unknown_document_type',
 							});
 							return;
 						}
+						const type = toDocumentTypeDefinition(typeRow);
 						const id = randomUUID();
 						const createdAt = stamp();
 						const collaboratorEmails = uniqueEmails([
@@ -336,8 +374,8 @@ export function documentRoutingMockPlugin(): Plugin {
 							return;
 						}
 
-						const type = findDocumentType(document.documentType);
-						if (!type) {
+						const typeRow = findControlDocumentType(document.documentType);
+						if (!typeRow || !typeRow.active) {
 							sendJson(res, 400, {
 								message: `Unknown document type: ${document.documentType}`,
 								code: 'unknown_document_type',
@@ -361,13 +399,16 @@ export function documentRoutingMockPlugin(): Plugin {
 							comment?: string;
 						}>(req);
 
-						const allowOverride = appConfig.features.allowApproverOverride;
+						const allowOverride = getControlStore().settings.allowApproverOverride;
+						const materialized = materializeApprovalSteps(typeRow.id);
 						const stepsInput
 							= allowOverride && body.steps && body.steps.length > 0
 								? body.steps
-								: toApprovalStepInputs(type.approvalChain);
+								: materialized ?? toApprovalStepInputs(
+									toDocumentTypeDefinition(typeRow).approvalChain,
+								);
 
-						if (stepsInput.length === 0) {
+						if (!stepsInput || stepsInput.length === 0) {
 							sendJson(res, 400, {
 								message: 'Approval chain cannot be empty',
 								code: 'empty_approval_chain',
@@ -467,6 +508,11 @@ export function documentRoutingMockPlugin(): Plugin {
 									document,
 									'system@sla-processor',
 									'sla_elevated',
+									result.message,
+								);
+								recordFlowRun(
+									'Document Routing — SLA sweeper',
+									'succeeded',
 									result.message,
 								);
 							}

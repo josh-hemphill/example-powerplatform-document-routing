@@ -5,6 +5,7 @@ import { client } from '@/client/client.gen';
 import { useIdentityStore } from '@/stores/identity';
 
 const ACTOR_HEADER = 'X-Document-Routing-Actor';
+const ROLES_HEADER = 'X-Document-Routing-Roles';
 
 /**
  * Registers a request interceptor that sets the principal header from the identity store.
@@ -20,6 +21,13 @@ export function installPrincipalHeaderInterceptor(): void {
 		}
 		else {
 			request.headers.delete(ACTOR_HEADER);
+		}
+		const roles = store.identity.roles;
+		if (roles.length > 0) {
+			request.headers.set(ROLES_HEADER, roles.join(','));
+		}
+		else {
+			request.headers.delete(ROLES_HEADER);
 		}
 		return request;
 	});

@@ -8,6 +8,7 @@ import {
 	getDocumentQuery,
 	getDocumentQueryKey,
 	listDocumentsQueryKey,
+	listDocumentTypesQuery,
 	processApprovalSlaMutation,
 	publishDocumentPdfMutation,
 	releaseApprovalStepMutation,
@@ -19,11 +20,7 @@ import ApprovalStepper from '@/components/ApprovalStepper.vue';
 import DocumentStatusChip from '@/components/DocumentStatusChip.vue';
 import WorkflowTimeline from '@/components/WorkflowTimeline.vue';
 import { usePowerAppsContext } from '@/composables/use-power-apps-context';
-import {
-	buildDraftFromTemplate,
-	getDocumentType,
-	toApprovalStepInputs,
-} from '@/config/document-types';
+import { buildDraftFromTemplate, getDocumentType } from '@/config/document-types';
 import { isEmailInPool } from '@/domain/approval-queue';
 import { resolvePublishTargets } from '@/publishing/html-pdf-template';
 import { publishApprovedDocument } from '@/publishing/publish-document';
@@ -42,7 +39,22 @@ const { data: document, isPending, error, refetch } = useQuery(() =>
 	}),
 );
 
-const documentType = computed(() => getDocumentType(document.value?.documentType));
+const { data: typesData } = useQuery(() => listDocumentTypesQuery());
+const documentType = computed(() => {
+	const fromApi = typesData.value?.items?.find(
+		(item) => item.id === document.value?.documentType,
+	);
+	if (fromApi) {
+		return fromApi;
+	}
+	return getDocumentType(document.value?.documentType);
+});
+const approvalChainPreview = computed(() => {
+	const type = typesData.value?.items?.find(
+		(item) => item.id === document.value?.documentType,
+	);
+	return type?.approvalChain ?? [];
+});
 
 const draftForm = reactive({
 	title: '',
@@ -79,10 +91,21 @@ watch(
 			return;
 		}
 		const type = getDocumentType(value.documentType);
+		const live = typesData.value?.items?.find((item) => item.id === value.documentType);
 		draftForm.title = value.title;
 		draftForm.bodyMarkdown
 			= value.draftBodyMarkdown
-				?? buildDraftFromTemplate(type, value.title, value.freeformRequest);
+				?? buildDraftFromTemplate(
+					live
+						? {
+								...type,
+								draftTemplate: live.draftTemplate,
+								label: live.label,
+							}
+						: type,
+					value.title,
+					value.freeformRequest,
+				);
 		draftForm.summary = value.draftSummary ?? '';
 		const targets = resolvePublishTargets(value);
 		publishForm.sharePointSiteUrl = targets.siteUrl;
@@ -186,11 +209,10 @@ async function onSubmitForApproval(): Promise<void> {
 	actionError.value = null;
 	actionSuccess.value = null;
 	try {
-		const steps = toApprovalStepInputs(documentType.value.approvalChain);
+		// Chain materializes from control tables unless Admin enables override.
 		await submitApprovalAsync({
 			path: { documentId: documentId.value },
 			body: {
-				steps,
 				comment: approvalForm.comment || undefined,
 			},
 		});
@@ -500,20 +522,20 @@ const canWithdraw = computed(() => {
 						</div>
 						<template v-if="document.approvalSteps.length === 0">
 							<p class="text-body-2 text-medium-emphasis mb-3">
-								Chain comes from <code>document-types.ts</code> for
+								Chain comes from Admin control data for
 								<strong>{{ documentType.label }}</strong> (named and/or pool + SLA).
 							</p>
 							<v-list density="compact" class="mb-3 bg-transparent">
 								<v-list-item
-									v-for="(step, index) in documentType.approvalChain"
-									:key="index"
+									v-for="step in approvalChainPreview"
+									:key="step.order"
 								>
 									<v-list-item-title>
-										Step {{ index + 1 }} ·
-										{{ step.mode === 'pool' ? step.poolRole : `${step.displayName} (${step.role})` }}
+										Step {{ step.order }} ·
+										{{ step.assignmentMode === 'pool' ? `${step.role} (pool ${step.poolKey ?? '—'})` : `${step.assignee?.displayName ?? 'Named'} (${step.role})` }}
 									</v-list-item-title>
 									<v-list-item-subtitle>
-										{{ step.mode === 'pool' ? `Pool · SLA ${step.slaHours}h` : `Named · SLA ${step.slaHours ?? '—'}h` }}
+										{{ step.assignmentMode === 'pool' ? `Pool · SLA ${step.slaHours ?? '—'}h` : `Named · SLA ${step.slaHours ?? '—'}h` }}
 									</v-list-item-subtitle>
 								</v-list-item>
 							</v-list>

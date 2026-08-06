@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Document Routing API
-  version: 1.2.0
+  version: 1.3.0
   description: |
     Routes freeform document requests through drafting and a chain of approvals,
     then publishes an approved PDF to SharePoint. In Power Platform, this API is
@@ -9,14 +9,18 @@ info:
 
     **Identity:** The caller principal is derived from the Power Apps / Dataverse
     security context in production. The local Vite mock accepts
-    `X-Document-Routing-Actor` as a stand-in. Request bodies must not carry
-    spoofable `actorEmail` / requester identity.
+    `X-Document-Routing-Actor` (and optional `X-Document-Routing-Roles`) as a
+    stand-in. Request bodies must not carry spoofable `actorEmail` / requester identity.
 
     **Workflow (Phase 3):** Submit materializes approval steps from document-type
     control data (client step override only when `allowApproverOverride` is on).
     Claim/release preserve `activateDueAt`. SLA elevation converts overdue named
     steps to an elevated pool queue. Production SLA sweeps run via Cloud Flow;
     the mock accepts a DEV-only `now` clock override.
+
+    **Control / Admin (Phase 4):** `/control/*` mirrors Dataverse control tables.
+    Reads of active document types are available to authenticated users; writes
+    require the Admin role.
 servers:
   - url: /api
     description: Local Vite mock (development)
@@ -25,12 +29,14 @@ servers:
     variables:
       environment:
         default: contoso
-security:
-  - PrincipalHeader: []
 tags:
   - name: Documents
   - name: Approvals
   - name: Publishing
+  - name: Control
+security:
+  - PrincipalHeader: []
+    RolesHeader: []
 paths:
   /documents:
     get:
@@ -339,6 +345,322 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+  /control/document-types:
+    get:
+      operationId: listDocumentTypes
+      tags: [Control]
+      summary: List document types (active for users; all for admins)
+      responses:
+        '200':
+          description: Document type catalog
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ControlDocumentType'
+    post:
+      operationId: createDocumentType
+      tags: [Control]
+      summary: Create a document type (Admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ControlDocumentTypeWrite'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlDocumentType'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /control/document-types/{typeId}:
+    parameters:
+      - name: typeId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: getDocumentTypeConfig
+      tags: [Control]
+      summary: Get one document type
+      responses:
+        '200':
+          description: Document type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlDocumentType'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      operationId: updateDocumentType
+      tags: [Control]
+      summary: Update a document type including approval chain (Admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ControlDocumentTypeWrite'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlDocumentType'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deactivateDocumentType
+      tags: [Control]
+      summary: Deactivate a document type (Admin)
+      responses:
+        '200':
+          description: Deactivated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlDocumentType'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /control/approver-pools:
+    get:
+      operationId: listApproverPools
+      tags: [Control]
+      summary: List approver pools (Admin)
+      responses:
+        '200':
+          description: Pools
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ControlApproverPool'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      operationId: createApproverPool
+      tags: [Control]
+      summary: Create an approver pool (Admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ControlApproverPoolWrite'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlApproverPool'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /control/approver-pools/{poolId}:
+    parameters:
+      - name: poolId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      operationId: updateApproverPool
+      tags: [Control]
+      summary: Update pool name/members (Admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ControlApproverPoolWrite'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlApproverPool'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deleteApproverPool
+      tags: [Control]
+      summary: Delete an unused approver pool (Admin)
+      responses:
+        '204':
+          description: Deleted
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /control/publish-destinations:
+    get:
+      operationId: listPublishDestinations
+      tags: [Control]
+      summary: List allowlisted publish destinations
+      responses:
+        '200':
+          description: Destinations
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ControlPublishDestination'
+    post:
+      operationId: createPublishDestination
+      tags: [Control]
+      summary: Create a publish destination (Admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ControlPublishDestinationWrite'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlPublishDestination'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /control/publish-destinations/{destinationId}:
+    parameters:
+      - name: destinationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      operationId: updatePublishDestination
+      tags: [Control]
+      summary: Update a publish destination (Admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ControlPublishDestinationWrite'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlPublishDestination'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deactivatePublishDestination
+      tags: [Control]
+      summary: Deactivate a publish destination (Admin)
+      responses:
+        '200':
+          description: Deactivated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlPublishDestination'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /control/settings:
+    get:
+      operationId: getControlSettings
+      tags: [Control]
+      summary: Read feature flags / collaboration settings (Admin)
+      responses:
+        '200':
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlSettings'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      operationId: updateControlSettings
+      tags: [Control]
+      summary: Update feature flags (Admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ControlSettings'
+      responses:
+        '200':
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlSettings'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /control/flow-runs:
+    get:
+      operationId: listFlowRuns
+      tags: [Control]
+      summary: Recent Flow health rows (Admin, read-only)
+      responses:
+        '200':
+          description: Flow runs
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ControlFlowRun'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 components:
   securitySchemes:
     PrincipalHeader:
@@ -349,6 +671,13 @@ components:
         Local mock stand-in for the authenticated caller email/UPN.
         Production Custom Connectors / Dataverse derive the principal from the
         token — this header is not used as a trust boundary when hosted.
+    RolesHeader:
+      type: apiKey
+      in: header
+      name: X-Document-Routing-Roles
+      description: |
+        Local mock stand-in for Dataverse security roles (comma-separated).
+        Example: `user,author,admin`. Production derives roles from the token.
   parameters:
     DocumentId:
       name: documentId
@@ -795,6 +1124,207 @@ components:
         publishedAt:
           type: string
           format: date-time
+    ControlChainStep:
+      type: object
+      required: [order, assignmentMode, role]
+      properties:
+        order:
+          type: integer
+          minimum: 1
+        assignmentMode:
+          $ref: '#/components/schemas/ApprovalAssignmentMode'
+        role:
+          type: string
+        slaHours:
+          type: number
+          exclusiveMinimum: 0
+        assignee:
+          $ref: '#/components/schemas/Approver'
+        poolKey:
+          type: string
+          description: Key of an approver pool for pool steps
+        elevationPoolKey:
+          type: string
+    ControlDocumentType:
+      type: object
+      required:
+        - id
+        - label
+        - description
+        - requestHint
+        - draftTemplate
+        - active
+        - policyVersion
+        - approvalChain
+        - authorTeamEmails
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        description:
+          type: string
+        requestHint:
+          type: string
+        draftTemplate:
+          type: string
+        folderPath:
+          type: string
+        authorTeamEmails:
+          type: array
+          items:
+            type: string
+            format: email
+        active:
+          type: boolean
+        policyVersion:
+          type: integer
+          minimum: 1
+        defaultDestinationId:
+          type: string
+          format: uuid
+          nullable: true
+        approvalChain:
+          type: array
+          items:
+            $ref: '#/components/schemas/ControlChainStep'
+    ControlDocumentTypeWrite:
+      type: object
+      required:
+        - id
+        - label
+        - description
+        - requestHint
+        - draftTemplate
+        - active
+        - approvalChain
+      properties:
+        id:
+          type: string
+          minLength: 2
+          maxLength: 64
+        label:
+          type: string
+        description:
+          type: string
+        requestHint:
+          type: string
+        draftTemplate:
+          type: string
+        folderPath:
+          type: string
+        authorTeamEmails:
+          type: array
+          items:
+            type: string
+            format: email
+        active:
+          type: boolean
+        policyVersion:
+          type: integer
+          minimum: 1
+        defaultDestinationId:
+          type: string
+          format: uuid
+          nullable: true
+        approvalChain:
+          type: array
+          items:
+            $ref: '#/components/schemas/ControlChainStep'
+    ControlApproverPool:
+      type: object
+      required: [id, key, name, description, members]
+      properties:
+        id:
+          type: string
+          format: uuid
+        key:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/Approver'
+    ControlApproverPoolWrite:
+      type: object
+      required: [name, members]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        members:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/Approver'
+    ControlPublishDestination:
+      type: object
+      required: [id, name, siteUrl, libraryName, folderPath, active]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        siteUrl:
+          type: string
+          format: uri
+        libraryName:
+          type: string
+        folderPath:
+          type: string
+        active:
+          type: boolean
+    ControlPublishDestinationWrite:
+      type: object
+      required: [name, siteUrl, libraryName, folderPath, active]
+      properties:
+        name:
+          type: string
+        siteUrl:
+          type: string
+          format: uri
+        libraryName:
+          type: string
+        folderPath:
+          type: string
+        active:
+          type: boolean
+    ControlSettings:
+      type: object
+      required: [allowApproverOverride, collaborationMode, namedElevationSemantics]
+      properties:
+        allowApproverOverride:
+          type: boolean
+          description: |
+            When true, Admin-authorized limited chain override at submit is allowed.
+            Default false — submit always materializes from control tables.
+        collaborationMode:
+          type: string
+        namedElevationSemantics:
+          type: string
+          enum: [convert_to_elevated_pool]
+    ControlFlowRun:
+      type: object
+      required: [id, flowName, status, at, message]
+      properties:
+        id:
+          type: string
+          format: uuid
+        flowName:
+          type: string
+        status:
+          type: string
+          enum: [succeeded, failed, running]
+        at:
+          type: string
+          format: date-time
+        message:
+          type: string
     Error:
       type: object
       required: [message]
