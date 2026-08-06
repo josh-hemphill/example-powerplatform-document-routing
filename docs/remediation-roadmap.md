@@ -4,6 +4,9 @@ Plan to address the codebase review findings by making **Dataverse the system of
 
 This is intentional scaffolding evolution for an example Code App — not a rewrite of the Vue shell.
 
+> **Phases 0–8 status:** Implemented on `main`.  
+> **Next work:** Post–Phase 8 bugs and UI polish are tracked in [`post-phase-8-review-roadmap.md`](./post-phase-8-review-roadmap.md) (Phases **9–13**: identity/authz → workflow concurrency → approval UX → nav/responsive → admin/a11y).
+
 ---
 
 ## Guiding decisions
@@ -478,9 +481,11 @@ Phase 6 (app/contract polish)
 Phase 7 (hardening)              ←── lock routing model
     ↓
 Phase 8 (controlled documents)   ←── numbers, reader, supersede
+    ↓
+Phases 9–13                      ←── see post-phase-8-review-roadmap.md
 ```
 
-Phases 0 and 1 can proceed in parallel after the schema sketch is agreed. Phase 4 can start UI shell against mock control APIs as soon as Phase 1 table shapes exist. Phase 8 depends on Phase 5 publish semantics and benefits from Phase 7 coverage so supersession does not regress claim/publish races.
+Phases 0 and 1 can proceed in parallel after the schema sketch is agreed. Phase 4 can start UI shell against mock control APIs as soon as Phase 1 table shapes exist. Phase 8 depends on Phase 5 publish semantics and benefits from Phase 7 coverage so supersession does not regress claim/publish races. After Phase 8, continue with [`post-phase-8-review-roadmap.md`](./post-phase-8-review-roadmap.md).
 
 ---
 
