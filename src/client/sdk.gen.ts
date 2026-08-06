@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { ClaimApprovalStepData, ClaimApprovalStepErrors, ClaimApprovalStepResponses, CreateApproverPoolData, CreateApproverPoolErrors, CreateApproverPoolResponses, CreateDocumentRequestData, CreateDocumentRequestErrors, CreateDocumentRequestResponses, CreateDocumentTypeData, CreateDocumentTypeErrors, CreateDocumentTypeResponses, CreatePublishDestinationData, CreatePublishDestinationErrors, CreatePublishDestinationResponses, DeactivateDocumentTypeData, DeactivateDocumentTypeErrors, DeactivateDocumentTypeResponses, DeactivatePublishDestinationData, DeactivatePublishDestinationErrors, DeactivatePublishDestinationResponses, DecideApprovalStepData, DecideApprovalStepErrors, DecideApprovalStepResponses, DeleteApproverPoolData, DeleteApproverPoolErrors, DeleteApproverPoolResponses, GetControlSettingsData, GetControlSettingsErrors, GetControlSettingsResponses, GetDocumentByNumberData, GetDocumentByNumberErrors, GetDocumentByNumberResponses, GetDocumentData, GetDocumentErrors, GetDocumentResponses, GetDocumentTypeConfigData, GetDocumentTypeConfigErrors, GetDocumentTypeConfigResponses, ListApproverPoolsData, ListApproverPoolsErrors, ListApproverPoolsResponses, ListDocumentsData, ListDocumentsErrors, ListDocumentsResponses, ListDocumentTypesData, ListDocumentTypesResponses, ListFlowRunsData, ListFlowRunsErrors, ListFlowRunsResponses, ListLibraryDocumentsData, ListLibraryDocumentsErrors, ListLibraryDocumentsResponses, ListPublishDestinationsData, ListPublishDestinationsResponses, ProcessApprovalSlaData, ProcessApprovalSlaErrors, ProcessApprovalSlaResponses, PublishDocumentPdfData, PublishDocumentPdfErrors, PublishDocumentPdfResponses, ReleaseApprovalStepData, ReleaseApprovalStepErrors, ReleaseApprovalStepResponses, SubmitForApprovalData, SubmitForApprovalErrors, SubmitForApprovalResponses, SupersedeDocumentData, SupersedeDocumentErrors, SupersedeDocumentResponses, UpdateApproverPoolData, UpdateApproverPoolErrors, UpdateApproverPoolResponses, UpdateControlSettingsData, UpdateControlSettingsErrors, UpdateControlSettingsResponses, UpdateDocumentDraftData, UpdateDocumentDraftErrors, UpdateDocumentDraftResponses, UpdateDocumentTypeData, UpdateDocumentTypeErrors, UpdateDocumentTypeResponses, UpdatePublishDestinationData, UpdatePublishDestinationErrors, UpdatePublishDestinationResponses, WithdrawAndReviseData, WithdrawAndReviseErrors, WithdrawAndReviseResponses } from './types.gen';
+import type { ClaimApprovalStepData, ClaimApprovalStepErrors, ClaimApprovalStepResponses, CreateApproverPoolData, CreateApproverPoolErrors, CreateApproverPoolResponses, CreateDocumentRequestData, CreateDocumentRequestErrors, CreateDocumentRequestResponses, CreateDocumentTypeData, CreateDocumentTypeErrors, CreateDocumentTypeResponses, CreatePublishDestinationData, CreatePublishDestinationErrors, CreatePublishDestinationResponses, DeactivateDocumentTypeData, DeactivateDocumentTypeErrors, DeactivateDocumentTypeResponses, DeactivatePublishDestinationData, DeactivatePublishDestinationErrors, DeactivatePublishDestinationResponses, DecideApprovalStepData, DecideApprovalStepErrors, DecideApprovalStepResponses, DeleteApproverPoolData, DeleteApproverPoolErrors, DeleteApproverPoolResponses, GetControlSettingsData, GetControlSettingsErrors, GetControlSettingsResponses, GetDocumentByNumberData, GetDocumentByNumberErrors, GetDocumentByNumberResponses, GetDocumentData, GetDocumentErrors, GetDocumentResponses, GetDocumentTypeConfigData, GetDocumentTypeConfigErrors, GetDocumentTypeConfigResponses, GetPrincipalData, GetPrincipalErrors, GetPrincipalResponses, ListApproverPoolsData, ListApproverPoolsErrors, ListApproverPoolsResponses, ListDocumentsData, ListDocumentsErrors, ListDocumentsResponses, ListDocumentTypesData, ListDocumentTypesResponses, ListFlowRunsData, ListFlowRunsErrors, ListFlowRunsResponses, ListLibraryDocumentsData, ListLibraryDocumentsErrors, ListLibraryDocumentsResponses, ListPublishDestinationsData, ListPublishDestinationsResponses, ProcessApprovalSlaData, ProcessApprovalSlaErrors, ProcessApprovalSlaResponses, PublishDocumentPdfData, PublishDocumentPdfErrors, PublishDocumentPdfResponses, ReleaseApprovalStepData, ReleaseApprovalStepErrors, ReleaseApprovalStepResponses, SubmitForApprovalData, SubmitForApprovalErrors, SubmitForApprovalResponses, SupersedeDocumentData, SupersedeDocumentErrors, SupersedeDocumentResponses, UpdateApproverPoolData, UpdateApproverPoolErrors, UpdateApproverPoolResponses, UpdateControlSettingsData, UpdateControlSettingsErrors, UpdateControlSettingsResponses, UpdateDocumentDraftData, UpdateDocumentDraftErrors, UpdateDocumentDraftResponses, UpdateDocumentTypeData, UpdateDocumentTypeErrors, UpdateDocumentTypeResponses, UpdatePublishDestinationData, UpdatePublishDestinationErrors, UpdatePublishDestinationResponses, WithdrawAndReviseData, WithdrawAndReviseErrors, WithdrawAndReviseResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -17,6 +17,22 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
      */
     meta?: keyof ClientMeta extends never ? Record<string, unknown> : ClientMeta;
 };
+
+/**
+ * Resolve caller principal and Document Routing roles
+ *
+ * Returns the authenticated caller's email and effective Document Routing
+ * roles. Production derives roles from Dataverse security roles assigned to
+ * the caller. The local mock resolves roles from a server-side directory
+ * keyed by actor email and **ignores** `X-Document-Routing-Roles` on this
+ * request (roles are never client-trusted here).
+ *
+ */
+export const getPrincipal = <ThrowOnError extends boolean = false>(options?: Options<GetPrincipalData, ThrowOnError>): RequestResult<GetPrincipalResponses, GetPrincipalErrors, ThrowOnError> => (options?.client ?? client).get<GetPrincipalResponses, GetPrincipalErrors, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }, { name: 'X-Document-Routing-Roles', type: 'apiKey' }],
+    url: '/principal',
+    ...options
+});
 
 /**
  * List document routing cases

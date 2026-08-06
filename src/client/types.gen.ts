@@ -4,6 +4,18 @@ export type ClientOptions = {
     baseUrl: `${string}://${string}/api` | 'https://{environment}.crm.dynamics.com/api/document-routing' | (string & {});
 };
 
+export type Principal = {
+    email: string;
+    /**
+     * Effective Document Routing role tokens for UI / mock gating
+     */
+    roles: Array<'user' | 'author' | 'approver' | 'publisher' | 'admin'>;
+    /**
+     * Optional Dataverse security role display names
+     */
+    securityRoleNames?: Array<string>;
+};
+
 export type DocumentStatus = 'requested' | 'drafting' | 'in_review' | 'approved' | 'rejected' | 'published' | 'superseded';
 
 export type ApprovalStepStatus = 'waiting' | 'queued' | 'pending' | 'approved' | 'rejected' | 'skipped';
@@ -387,6 +399,31 @@ export type Error = {
 };
 
 export type DocumentId = string;
+
+export type GetPrincipalData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/principal';
+};
+
+export type GetPrincipalErrors = {
+    /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
+};
+
+export type GetPrincipalError = GetPrincipalErrors[keyof GetPrincipalErrors];
+
+export type GetPrincipalResponses = {
+    /**
+     * Caller principal with roles
+     */
+    200: Principal;
+};
+
+export type GetPrincipalResponse = GetPrincipalResponses[keyof GetPrincipalResponses];
 
 export type ListDocumentsData = {
     body?: never;

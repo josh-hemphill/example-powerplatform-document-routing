@@ -14,10 +14,16 @@ environment. The Code App gates UI from host identity + mapped roles;
 
 ## Hosted identity (Phase 9)
 
-On successful Power Apps `getContext()`, the app defaults to **`user` only** until
-Dataverse security roles are resolved. Host context does **not** include security
-roles; call `applyHostedSecurityRoles([...])` (or a future Dataverse role fetch)
-with the display names above. Mapping lives in `src/domain/security-roles.ts`.
+On successful Power Apps `getContext()`, the app defaults to **`user` only**, then
+calls **`GET /principal`** to load server-derived roles (`refreshHostedRoles`).
+Host context does **not** include security roles. Production `/principal` should
+return Dataverse security role display names (or mapped tokens); the mock resolves
+roles from a server-side email directory and **ignores** client role headers on
+that request.
+
+You can also call `applyHostedSecurityRoles([...])` with Dataverse display names
+when a connector surfaces them directly. Mapping lives in
+`src/domain/security-roles.ts`.
 
 Hosted builds never grant publisher/approver/admin by hardcoding. A host-context
 **timeout** fails identity (with retry) and does **not** install the local demo

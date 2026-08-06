@@ -47,11 +47,32 @@ tags:
   - name: Approvals
   - name: Publishing
   - name: Control
+  - name: Principal
 security:
   - PrincipalHeader: []
   - PrincipalHeader: []
     RolesHeader: []
 paths:
+  /principal:
+    get:
+      operationId: getPrincipal
+      tags: [Principal]
+      summary: Resolve caller principal and Document Routing roles
+      description: |
+        Returns the authenticated caller's email and effective Document Routing
+        roles. Production derives roles from Dataverse security roles assigned to
+        the caller. The local mock resolves roles from a server-side directory
+        keyed by actor email and **ignores** `X-Document-Routing-Roles` on this
+        request (roles are never client-trusted here).
+      responses:
+        '200':
+          description: Caller principal with roles
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Principal'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /documents:
     get:
       operationId: listDocuments
@@ -894,6 +915,24 @@ components:
           schema:
             $ref: '#/components/schemas/Error'
   schemas:
+    Principal:
+      type: object
+      required: [email, roles]
+      properties:
+        email:
+          type: string
+          format: email
+        roles:
+          type: array
+          description: Effective Document Routing role tokens for UI / mock gating
+          items:
+            type: string
+            enum: [user, author, approver, publisher, admin]
+        securityRoleNames:
+          type: array
+          description: Optional Dataverse security role display names
+          items:
+            type: string
     DocumentStatus:
       type: string
       enum:

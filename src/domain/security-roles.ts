@@ -86,3 +86,12 @@ export function resolveHostedRoles(
 	const mapped = mapDataverseSecurityRoles(roleNames);
 	return mapped.length > 0 ? mapped : defaultHostedRoles();
 }
+
+/**
+ * Maps app role tokens back to Dataverse display names (for principal responses).
+ */
+export function toDataverseSecurityRoleNames(
+	roles: readonly DocumentRoutingRole[],
+): string[] {
+	return roles.map((role) => DATAVERSE_SECURITY_ROLE_NAMES[role]);
+}

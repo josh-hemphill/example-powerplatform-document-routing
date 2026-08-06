@@ -4,8 +4,8 @@ import { type _JSONValue, defineQueryOptions, type UseMutationOptions } from '@p
 
 import { serializeQueryKeyValue } from '../client';
 import { client } from '../client.gen';
-import { claimApprovalStep, createApproverPool, createDocumentRequest, createDocumentType, createPublishDestination, deactivateDocumentType, deactivatePublishDestination, decideApprovalStep, deleteApproverPool, getControlSettings, getDocument, getDocumentByNumber, getDocumentTypeConfig, listApproverPools, listDocuments, listDocumentTypes, listFlowRuns, listLibraryDocuments, listPublishDestinations, type Options, processApprovalSla, publishDocumentPdf, releaseApprovalStep, submitForApproval, supersedeDocument, updateApproverPool, updateControlSettings, updateDocumentDraft, updateDocumentType, updatePublishDestination, withdrawAndRevise } from '../sdk.gen';
-import type { ClaimApprovalStepData, ClaimApprovalStepError, ClaimApprovalStepResponse, CreateApproverPoolData, CreateApproverPoolError, CreateApproverPoolResponse, CreateDocumentRequestData, CreateDocumentRequestError, CreateDocumentRequestResponse, CreateDocumentTypeData, CreateDocumentTypeError, CreateDocumentTypeResponse, CreatePublishDestinationData, CreatePublishDestinationError, CreatePublishDestinationResponse, DeactivateDocumentTypeData, DeactivateDocumentTypeError, DeactivateDocumentTypeResponse, DeactivatePublishDestinationData, DeactivatePublishDestinationError, DeactivatePublishDestinationResponse, DecideApprovalStepData, DecideApprovalStepError, DecideApprovalStepResponse, DeleteApproverPoolData, DeleteApproverPoolError, DeleteApproverPoolResponse, GetControlSettingsData, GetControlSettingsError, GetControlSettingsResponse, GetDocumentByNumberData, GetDocumentByNumberError, GetDocumentByNumberResponse, GetDocumentData, GetDocumentError, GetDocumentResponse, GetDocumentTypeConfigData, GetDocumentTypeConfigError, GetDocumentTypeConfigResponse, ListApproverPoolsData, ListApproverPoolsError, ListApproverPoolsResponse, ListDocumentsData, ListDocumentsError, ListDocumentsResponse, ListDocumentTypesData, ListDocumentTypesResponse, ListFlowRunsData, ListFlowRunsError, ListFlowRunsResponse, ListLibraryDocumentsData, ListLibraryDocumentsError, ListLibraryDocumentsResponse, ListPublishDestinationsData, ListPublishDestinationsResponse, ProcessApprovalSlaData, ProcessApprovalSlaError, ProcessApprovalSlaResponse, PublishDocumentPdfData, PublishDocumentPdfError, PublishDocumentPdfResponse, ReleaseApprovalStepData, ReleaseApprovalStepError, ReleaseApprovalStepResponse, SubmitForApprovalData, SubmitForApprovalError, SubmitForApprovalResponse, SupersedeDocumentData, SupersedeDocumentError, SupersedeDocumentResponse, UpdateApproverPoolData, UpdateApproverPoolError, UpdateApproverPoolResponse, UpdateControlSettingsData, UpdateControlSettingsError, UpdateControlSettingsResponse, UpdateDocumentDraftData, UpdateDocumentDraftError, UpdateDocumentDraftResponse, UpdateDocumentTypeData, UpdateDocumentTypeError, UpdateDocumentTypeResponse, UpdatePublishDestinationData, UpdatePublishDestinationError, UpdatePublishDestinationResponse, WithdrawAndReviseData, WithdrawAndReviseError, WithdrawAndReviseResponse } from '../types.gen';
+import { claimApprovalStep, createApproverPool, createDocumentRequest, createDocumentType, createPublishDestination, deactivateDocumentType, deactivatePublishDestination, decideApprovalStep, deleteApproverPool, getControlSettings, getDocument, getDocumentByNumber, getDocumentTypeConfig, getPrincipal, listApproverPools, listDocuments, listDocumentTypes, listFlowRuns, listLibraryDocuments, listPublishDestinations, type Options, processApprovalSla, publishDocumentPdf, releaseApprovalStep, submitForApproval, supersedeDocument, updateApproverPool, updateControlSettings, updateDocumentDraft, updateDocumentType, updatePublishDestination, withdrawAndRevise } from '../sdk.gen';
+import type { ClaimApprovalStepData, ClaimApprovalStepError, ClaimApprovalStepResponse, CreateApproverPoolData, CreateApproverPoolError, CreateApproverPoolResponse, CreateDocumentRequestData, CreateDocumentRequestError, CreateDocumentRequestResponse, CreateDocumentTypeData, CreateDocumentTypeError, CreateDocumentTypeResponse, CreatePublishDestinationData, CreatePublishDestinationError, CreatePublishDestinationResponse, DeactivateDocumentTypeData, DeactivateDocumentTypeError, DeactivateDocumentTypeResponse, DeactivatePublishDestinationData, DeactivatePublishDestinationError, DeactivatePublishDestinationResponse, DecideApprovalStepData, DecideApprovalStepError, DecideApprovalStepResponse, DeleteApproverPoolData, DeleteApproverPoolError, DeleteApproverPoolResponse, GetControlSettingsData, GetControlSettingsError, GetControlSettingsResponse, GetDocumentByNumberData, GetDocumentByNumberError, GetDocumentByNumberResponse, GetDocumentData, GetDocumentError, GetDocumentResponse, GetDocumentTypeConfigData, GetDocumentTypeConfigError, GetDocumentTypeConfigResponse, GetPrincipalData, GetPrincipalError, GetPrincipalResponse, ListApproverPoolsData, ListApproverPoolsError, ListApproverPoolsResponse, ListDocumentsData, ListDocumentsError, ListDocumentsResponse, ListDocumentTypesData, ListDocumentTypesResponse, ListFlowRunsData, ListFlowRunsError, ListFlowRunsResponse, ListLibraryDocumentsData, ListLibraryDocumentsError, ListLibraryDocumentsResponse, ListPublishDestinationsData, ListPublishDestinationsResponse, ProcessApprovalSlaData, ProcessApprovalSlaError, ProcessApprovalSlaResponse, PublishDocumentPdfData, PublishDocumentPdfError, PublishDocumentPdfResponse, ReleaseApprovalStepData, ReleaseApprovalStepError, ReleaseApprovalStepResponse, SubmitForApprovalData, SubmitForApprovalError, SubmitForApprovalResponse, SupersedeDocumentData, SupersedeDocumentError, SupersedeDocumentResponse, UpdateApproverPoolData, UpdateApproverPoolError, UpdateApproverPoolResponse, UpdateControlSettingsData, UpdateControlSettingsError, UpdateControlSettingsResponse, UpdateDocumentDraftData, UpdateDocumentDraftError, UpdateDocumentDraftResponse, UpdateDocumentTypeData, UpdateDocumentTypeError, UpdateDocumentTypeResponse, UpdatePublishDestinationData, UpdatePublishDestinationError, UpdatePublishDestinationResponse, WithdrawAndReviseData, WithdrawAndReviseError, WithdrawAndReviseResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'path'> & {
@@ -41,6 +41,30 @@ const createQueryKey = <TOptions extends Options>(id: string, options?: TOptions
     }
     return [params];
 };
+
+export const getPrincipalQueryKey = (options?: Options<GetPrincipalData>) => createQueryKey('getPrincipal', options, ['Principal']);
+
+/**
+ * Resolve caller principal and Document Routing roles
+ *
+ * Returns the authenticated caller's email and effective Document Routing
+ * roles. Production derives roles from Dataverse security roles assigned to
+ * the caller. The local mock resolves roles from a server-side directory
+ * keyed by actor email and **ignores** `X-Document-Routing-Roles` on this
+ * request (roles are never client-trusted here).
+ *
+ */
+export const getPrincipalQuery = defineQueryOptions<Options<GetPrincipalData>, GetPrincipalResponse, GetPrincipalError>((options?: Options<GetPrincipalData>) => ({
+    key: getPrincipalQueryKey(options),
+    query: async (context) => {
+        const { data } = await getPrincipal({
+            ...options,
+            ...context,
+            throwOnError: true
+        });
+        return data;
+    }
+}));
 
 export const listDocumentsQueryKey = (options?: Options<ListDocumentsData>) => createQueryKey('listDocuments', options, ['Documents']);
 

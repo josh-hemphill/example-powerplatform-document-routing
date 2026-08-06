@@ -9,6 +9,7 @@ import {
 } from '../api/form-rules.ts';
 import { appConfig } from '../config/app.config.ts';
 import { toApprovalStepInputs } from '../config/document-types.ts';
+import { resolvePrincipalRolesByEmail } from '../config/local-personas.ts';
 import {
 	canActorAccessDocument,
 	canActorMutateDraft,
@@ -18,6 +19,7 @@ import {
 	canActorProcessSla,
 	canActorPublishDocument,
 } from '../domain/document-authz.ts';
+import { toDataverseSecurityRoleNames } from '../domain/security-roles.ts';
 import {
 	PublishValidationError,
 	resolveTrustedPublishTarget,
@@ -185,6 +187,16 @@ export function documentRoutingMockPlugin(): Plugin {
 					const method = req.method ?? 'GET';
 					const actor = requireActor(req, res);
 					if (!actor) {
+						return;
+					}
+
+					if (method === 'GET' && path === '/api/principal') {
+						const roles = resolvePrincipalRolesByEmail(actor);
+						sendJson(res, 200, {
+							email: actor,
+							roles,
+							securityRoleNames: toDataverseSecurityRoleNames(roles),
+						});
 						return;
 					}
 

@@ -6,9 +6,14 @@ import {
 } from './identity.ts';
 
 const getContext = vi.fn();
+const fetchPrincipal = vi.fn();
 
 vi.mock('@microsoft/power-apps/app', () => ({
 	getContext: () => getContext(),
+}));
+
+vi.mock('@/api/fetch-principal', () => ({
+	fetchPrincipal: (...args: unknown[]) => fetchPrincipal(...args),
 }));
 
 describe('identity store', () => {
@@ -16,6 +21,8 @@ describe('identity store', () => {
 		setActivePinia(createPinia());
 		resetIdentityLoadStateForTests();
 		getContext.mockReset();
+		fetchPrincipal.mockReset();
+		fetchPrincipal.mockRejectedValue(new Error('principal unavailable'));
 		vi.useRealTimers();
 	});
 
@@ -23,7 +30,7 @@ describe('identity store', () => {
 		vi.useRealTimers();
 	});
 
-	it('defaults hosted principals to user-only roles', async() => {
+	it('defaults hosted principals to user-only when principal lookup fails', async() => {
 		getContext.mockResolvedValue({
 			user: {
 				objectId: 'oid-1',
@@ -40,6 +47,33 @@ describe('identity store', () => {
 		expect(store.email).toBe('pat@contoso.com');
 		expect(store.identity.roles).toEqual(['user']);
 		expect(store.hasRole('publisher')).toBe(false);
+		expect(store.hasRole('admin')).toBe(false);
+		expect(fetchPrincipal).toHaveBeenCalledWith('pat@contoso.com');
+	});
+
+	it('loads hosted roles from GET /principal after host context', async() => {
+		getContext.mockResolvedValue({
+			user: {
+				userPrincipalName: 'publisher@contoso.com',
+				fullName: 'Pat Publisher',
+			},
+			app: { environmentId: 'env-1' },
+		});
+		fetchPrincipal.mockResolvedValue({
+			email: 'publisher@contoso.com',
+			roles: ['user', 'publisher'],
+			securityRoleNames: [
+				'Document Routing User',
+				'Document Routing Publisher',
+			],
+		});
+
+		const store = useIdentityStore();
+		await store.ensureLoaded();
+
+		expect(store.status).toBe('hosted');
+		expect(store.identity.roles).toEqual(['user', 'publisher']);
+		expect(store.hasRole('publisher')).toBe(true);
 		expect(store.hasRole('admin')).toBe(false);
 	});
 
@@ -76,6 +110,7 @@ describe('identity store', () => {
 		expect(store.error).toMatch(/timed out/i);
 		expect(store.identity.email).toBeUndefined();
 		expect(store.identity.roles).toEqual([]);
+		expect(fetchPrincipal).not.toHaveBeenCalled();
 	});
 
 	it('retries after a failed load', async() => {
@@ -98,6 +133,7 @@ describe('identity store', () => {
 		expect(store.status).toBe('hosted');
 		expect(store.email).toBe('retry@contoso.com');
 		expect(store.identity.roles).toEqual(['user']);
+		expect(fetchPrincipal).toHaveBeenCalledWith('retry@contoso.com');
 	});
 
 	it('falls back to demo identity when getContext rejects in DEV', async() => {
@@ -109,5 +145,6 @@ describe('identity store', () => {
 		expect(store.status).toBe('standalone');
 		expect(store.hasRole('admin')).toBe(true);
 		expect(store.email).toBeTruthy();
+		expect(fetchPrincipal).not.toHaveBeenCalled();
 	});
 });

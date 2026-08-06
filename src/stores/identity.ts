@@ -1,16 +1,15 @@
-import type { DocumentRoutingRole } from '@/domain/security-roles';
 /**
  * App-level Power Apps / standalone identity.
  * Single in-flight host context load; never trust request-body actor emails.
  */
+import type { DocumentRoutingRole } from '@/domain/security-roles';
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
-import { appConfig } from '@/config/app.config';
-import {
+import { fetchPrincipal } from '@/api/fetch-principal';
+import { LOCAL_DEMO_PERSONAS } from '@/config/local-personas';
+import { resolveHostedRoles } from '@/domain/security-roles';
 
-	resolveHostedRoles,
-} from '@/domain/security-roles';
-
+export { LOCAL_DEMO_PERSONAS } from '@/config/local-personas';
 export type { DocumentRoutingRole } from '@/domain/security-roles';
 
 export type IdentityStatus = 'loading' | 'hosted' | 'standalone' | 'failed';
@@ -41,42 +40,6 @@ export function resetIdentityLoadStateForTests(): void {
 export function allowsDemoIdentityFallback(): boolean {
 	return Boolean(import.meta.env.DEV);
 }
-
-/**
- * Local-only personas for collaborative draft / approval demos (sets principal header).
- * Only the local developer persona includes Admin for gating demos.
- */
-export const LOCAL_DEMO_PERSONAS: Array<{
-	label: string;
-	email: string;
-	userName: string;
-	roles: DocumentRoutingRole[];
-}> = [
-	{
-		label: 'Local developer (Admin)',
-		email: appConfig.localDemoUser.email,
-		userName: appConfig.localDemoUser.userName,
-		roles: ['user', 'author', 'approver', 'publisher', 'admin'],
-	},
-	{
-		label: 'Jordan Legal (pool)',
-		email: 'jordan.legal@contoso.com',
-		userName: 'Jordan Legal',
-		roles: ['user', 'approver'],
-	},
-	{
-		label: 'Alex Requester',
-		email: 'alex.requester@contoso.com',
-		userName: 'Alex Requester',
-		roles: ['user'],
-	},
-	{
-		label: 'Casey Author',
-		email: 'casey.author@contoso.com',
-		userName: 'Casey Author',
-		roles: ['user', 'author'],
-	},
-];
 
 type HostContextResult
 	= | { kind: 'context'; context: {
@@ -146,6 +109,46 @@ export const useIdentityStore = defineStore('identity', () => {
 		await ensureLoaded();
 	}
 
+	/**
+	 * Applies Dataverse security role names to a hosted identity (UI gating).
+	 * No-op unless status is hosted.
+	 */
+	function applyHostedSecurityRoles(roleNames: readonly string[]): void {
+		if (status.value !== 'hosted') {
+			return;
+		}
+		identity.value = {
+			...identity.value,
+			roles: resolveHostedRoles(roleNames),
+		};
+	}
+
+	/**
+	 * Loads roles from GET /principal after host context (server-derived, not client headers).
+	 */
+	async function refreshHostedRoles(): Promise<void> {
+		const actorEmail = identity.value.email;
+		if (status.value !== 'hosted' || !actorEmail) {
+			return;
+		}
+		try {
+			const principal = await fetchPrincipal(actorEmail);
+			if (principal.securityRoleNames?.length) {
+				applyHostedSecurityRoles(principal.securityRoleNames);
+				return;
+			}
+			if (principal.roles?.length) {
+				identity.value = {
+					...identity.value,
+					roles: resolveHostedRoles(principal.roles),
+				};
+			}
+		}
+		catch {
+			// Keep least-privilege user-only defaults when principal lookup is unavailable.
+		}
+	}
+
 	async function loadContext(): Promise<void> {
 		status.value = 'loading';
 		error.value = null;
@@ -175,10 +178,11 @@ export const useIdentityStore = defineStore('identity', () => {
 				userName: hostContext.user?.fullName,
 				email: hostEmail,
 				environmentId: hostContext.app?.environmentId,
-				// Host context has no security roles; default to user until Dataverse roles load.
+				// Least privilege until GET /principal (or Dataverse) resolves roles.
 				roles: resolveHostedRoles(null),
 			};
 			status.value = 'hosted';
+			await refreshHostedRoles();
 		}
 		catch(loadError) {
 			error.value
@@ -218,20 +222,6 @@ export const useIdentityStore = defineStore('identity', () => {
 		applyStandaloneDemo(persona);
 	}
 
-	/**
-	 * Applies Dataverse security role names to a hosted identity (UI gating).
-	 * No-op unless status is hosted.
-	 */
-	function applyHostedSecurityRoles(roleNames: readonly string[]): void {
-		if (status.value !== 'hosted') {
-			return;
-		}
-		identity.value = {
-			...identity.value,
-			roles: resolveHostedRoles(roleNames),
-		};
-	}
-
 	function hasRole(role: DocumentRoutingRole): boolean {
 		return identity.value.roles.includes(role);
 	}
@@ -250,6 +240,7 @@ export const useIdentityStore = defineStore('identity', () => {
 		retryLoad,
 		switchLocalPersona,
 		applyHostedSecurityRoles,
+		refreshHostedRoles,
 		hasRole,
 	};
 });
