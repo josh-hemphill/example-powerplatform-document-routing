@@ -21,6 +21,7 @@ const DRAFT_EDITABLE_STATUSES = new Set(['requested', 'drafting']);
 
 /**
  * True when the actor may list/open the document (owner, collaborator, author, or active approver/pool).
+ * Published and superseded controlled documents are readable by any authenticated user (library).
  */
 export function canActorAccessDocument(
 	document: AccessibleDocument,
@@ -29,6 +30,9 @@ export function canActorAccessDocument(
 	const email = actorEmail.trim().toLowerCase();
 	if (!email) {
 		return false;
+	}
+	if (document.status === 'published' || document.status === 'superseded') {
+		return true;
 	}
 	if (document.requesterEmail.toLowerCase() === email) {
 		return true;

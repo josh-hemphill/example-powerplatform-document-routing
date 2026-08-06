@@ -29,6 +29,18 @@ export const router = createRouter({
 			meta: { title: 'Admin' },
 		},
 		{
+			path: '/library',
+			name: 'library',
+			component: async() => import('@/views/LibraryView.vue'),
+			meta: { title: 'Library' },
+		},
+		{
+			path: '/library/:documentNumber',
+			name: 'library-document',
+			component: async() => import('@/views/PublishedDocumentView.vue'),
+			meta: { title: 'Published document' },
+		},
+		{
 			path: '/:pathMatch(.*)*',
 			name: 'not-found',
 			component: async() => import('@/views/NotFoundView.vue'),

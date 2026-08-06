@@ -33,11 +33,16 @@ import {
 	findControlDocumentType,
 	getControlStore,
 	materializeApprovalSteps,
+	allocateNextDocumentNumber,
 	recordFlowRun,
 	toDocumentTypeDefinition,
 } from './control-store.ts';
 import { getDocumentStore } from './document-store.ts';
 import { resolveSlaClock } from './sla-clock.ts';
+import {
+	applySupersessionOnPublish,
+	supersedeDocument,
+} from './supersede-engine.ts';
 
 const ACTOR_HEADER = 'x-document-routing-actor';
 const ROLES_HEADER = 'x-document-routing-roles';
@@ -112,6 +117,11 @@ function toSummary(document: MockDocumentRecord) {
 		contentRevision: document.contentRevision,
 		submittedContentRevision: document.submittedContentRevision,
 		publishedContentRevision: document.publishedContentRevision,
+		documentNumber: document.documentNumber,
+		documentVersion: document.documentVersion,
+		supersedesDocumentId: document.supersedesDocumentId,
+		supersededByDocumentId: document.supersededByDocumentId,
+		publishedAt: document.publishedAt,
 	};
 }
 
@@ -187,6 +197,67 @@ export function documentRoutingMockPlugin(): Plugin {
 						matchRoute,
 					});
 					if (handledControl) {
+						return;
+					}
+
+					if (method === 'GET' && path === '/api/library') {
+						const documentType = url.searchParams.get('documentType');
+						const q = url.searchParams.get('q')?.toLowerCase();
+						const includeSuperseded
+							= url.searchParams.get('includeSuperseded') === 'true';
+						let items = [...getDocumentStore().values()]
+							.filter((document) => {
+								if (document.status === 'published') {
+									return Boolean(document.documentNumber);
+								}
+								if (includeSuperseded && document.status === 'superseded') {
+									return Boolean(document.documentNumber);
+								}
+								return false;
+							})
+							.map(toSummary);
+
+						if (documentType) {
+							items = items.filter((item) => item.documentType === documentType);
+						}
+						if (q) {
+							items = items.filter((item) => {
+								const full = getDocumentStore().get(item.id);
+								return (
+									item.title.toLowerCase().includes(q)
+									|| Boolean(item.documentNumber?.toLowerCase().includes(q))
+									|| item.documentType.toLowerCase().includes(q)
+									|| Boolean(full?.draftSummary?.toLowerCase().includes(q))
+								);
+							});
+						}
+
+						items.sort((a, b) =>
+							(b.publishedAt ?? b.updatedAt).localeCompare(a.publishedAt ?? a.updatedAt),
+						);
+						sendJson(res, 200, { items });
+						return;
+					}
+
+					const byNumberMatch = matchRoute(
+						path,
+						/^\/api\/documents\/by-number\/([^/]+)$/,
+					);
+					if (method === 'GET' && byNumberMatch) {
+						const documentNumber = decodeURIComponent(byNumberMatch[1]);
+						const match = [...getDocumentStore().values()].find(
+							(document) =>
+								document.documentNumber === documentNumber
+								&& document.status === 'published',
+						);
+						if (!match) {
+							sendJson(res, 404, {
+								message: 'No current published document for this number',
+								code: 'not_found',
+							});
+							return;
+						}
+						sendJson(res, 200, match);
 						return;
 					}
 
@@ -277,6 +348,11 @@ export function documentRoutingMockPlugin(): Plugin {
 							contentRevision: 0,
 							submittedContentRevision: null,
 							publishedContentRevision: null,
+							documentNumber: null,
+							documentVersion: null,
+							supersedesDocumentId: null,
+							supersededByDocumentId: null,
+							publishedAt: null,
 							approvalSteps: [],
 							history: [],
 							publishedPdfUrl: null,
@@ -312,6 +388,44 @@ export function documentRoutingMockPlugin(): Plugin {
 							return;
 						}
 						sendJson(res, 200, document);
+						return;
+					}
+
+					const supersedeMatch = matchRoute(
+						path,
+						/^\/api\/documents\/([^/]+)\/supersede$/,
+					);
+					if (method === 'POST' && supersedeMatch) {
+						const document = getDocumentStore().get(supersedeMatch[1]);
+						if (!document) {
+							sendJson(res, 404, { message: 'Document not found', code: 'not_found' });
+							return;
+						}
+						const body = await readJson<{ comment?: string }>(req);
+						const roles = readActorRoles(req);
+						try {
+							const successor = supersedeDocument(document, actor, {
+								isAdmin: roles.includes('admin'),
+								comment: body.comment,
+							});
+							sendJson(res, 201, successor);
+						}
+						catch(error) {
+							const code
+								= error instanceof Error && 'code' in error
+									? String((error as { code: string }).code)
+									: 'invalid_state';
+							const status
+								= code === 'forbidden'
+									? 403
+									: code === 'validation_error'
+										? 400
+										: 409;
+							sendJson(res, status, {
+								message: error instanceof Error ? error.message : 'Supersede failed',
+								code,
+							});
+						}
 						return;
 					}
 
@@ -799,18 +913,45 @@ export function documentRoutingMockPlugin(): Plugin {
 								folderPath: target.folderPath,
 								fileName: target.fileName,
 							});
+							const publishedAt = stamp();
+
+							if (document.supersedesDocumentId) {
+								const prior = getDocumentStore().get(document.supersedesDocumentId);
+								if (!prior || prior.status !== 'published') {
+									sendJson(res, 409, {
+										message: 'Superseded prior document is missing or not published',
+										code: 'invalid_state',
+									});
+									return;
+								}
+								applySupersessionOnPublish(document, prior);
+								pushHistory(
+									prior,
+									actor,
+									'superseded',
+									`Superseded by ${document.id}`,
+								);
+							}
+							else if (!document.documentNumber) {
+								document.documentNumber = allocateNextDocumentNumber(
+									document.documentType,
+								);
+								document.documentVersion = 1;
+							}
 
 							document.status = 'published';
 							document.publishedPdfUrl = sharePointUrl;
 							document.sharePointItemId = sharePointItemId;
 							document.publishedContentRevision = target.revision;
+							document.publishedAt = publishedAt;
 							document.requestedPublishSiteUrl = target.destination.siteUrl;
 							document.requestedLibraryName = target.destination.libraryName;
 							pushHistory(
 								document,
 								actor,
 								'published',
-								`Published PDF revision ${target.revision} to ${target.destination.name}`,
+								`Published ${document.documentNumber} v${document.documentVersion} `
+								+ `(PDF revision ${target.revision}) to ${target.destination.name}`,
 							);
 							recordFlowRun(
 								'Document Routing — Publish approved',

@@ -141,6 +141,11 @@ export function handleControlApiRequest(options: {
 				active: body.active ?? true,
 				policyVersion: body.policyVersion ?? 1,
 				defaultDestinationId: body.defaultDestinationId ?? null,
+				numberPrefix:
+					body.numberPrefix?.trim()
+					|| body.id.trim().slice(0, 3).toUpperCase(),
+				numberPattern: body.numberPattern?.trim() || '{prefix}-{yyyy}-{seq:5}',
+				nextSequence: Math.max(1, body.nextSequence ?? 1),
 				approvalChain: body.approvalChain,
 			};
 			getControlStore().documentTypes.push(created);
@@ -186,6 +191,12 @@ export function handleControlApiRequest(options: {
 						body.defaultDestinationId === undefined
 							? type.defaultDestinationId
 							: body.defaultDestinationId,
+					numberPrefix: body.numberPrefix ?? type.numberPrefix,
+					numberPattern: body.numberPattern ?? type.numberPattern,
+					nextSequence:
+						body.nextSequence === undefined
+							? type.nextSequence
+							: Math.max(1, body.nextSequence),
 					approvalChain: body.approvalChain ?? type.approvalChain,
 				});
 				sendJson(res, 200, type);

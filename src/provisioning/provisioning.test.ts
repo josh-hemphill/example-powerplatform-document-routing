@@ -188,6 +188,19 @@ describe('dataverse schema + provision plan', () => {
 		expect(document.columns.some((column) => column.schemaName === 'contentrevision')).toBe(
 			true,
 		);
+		expect(document.columns.some((column) => column.schemaName === 'documentnumber')).toBe(
+			true,
+		);
+		expect(document.columns.some((column) => column.schemaName === 'supersedesdocument')).toBe(
+			true,
+		);
+		const typeTable = schema.tables.find((table) => table.schemaName === 'documenttype');
+		expect(typeTable?.columns.some((column) => column.schemaName === 'numberprefix')).toBe(
+			true,
+		);
+		expect(typeTable?.columns.some((column) => column.schemaName === 'nextsequence')).toBe(
+			true,
+		);
 		expect(document.columns.some((column) => column.schemaName === 'publishdestination')).toBe(
 			true,
 		);

@@ -4,8 +4,8 @@ import { type _JSONValue, defineQueryOptions, type UseMutationOptions } from '@p
 
 import { serializeQueryKeyValue } from '../client';
 import { client } from '../client.gen';
-import { claimApprovalStep, createApproverPool, createDocumentRequest, createDocumentType, createPublishDestination, deactivateDocumentType, deactivatePublishDestination, decideApprovalStep, deleteApproverPool, getControlSettings, getDocument, getDocumentTypeConfig, listApproverPools, listDocuments, listDocumentTypes, listFlowRuns, listPublishDestinations, type Options, processApprovalSla, publishDocumentPdf, releaseApprovalStep, submitForApproval, updateApproverPool, updateControlSettings, updateDocumentDraft, updateDocumentType, updatePublishDestination, withdrawAndRevise } from '../sdk.gen';
-import type { ClaimApprovalStepData, ClaimApprovalStepError, ClaimApprovalStepResponse, CreateApproverPoolData, CreateApproverPoolError, CreateApproverPoolResponse, CreateDocumentRequestData, CreateDocumentRequestError, CreateDocumentRequestResponse, CreateDocumentTypeData, CreateDocumentTypeError, CreateDocumentTypeResponse, CreatePublishDestinationData, CreatePublishDestinationError, CreatePublishDestinationResponse, DeactivateDocumentTypeData, DeactivateDocumentTypeError, DeactivateDocumentTypeResponse, DeactivatePublishDestinationData, DeactivatePublishDestinationError, DeactivatePublishDestinationResponse, DecideApprovalStepData, DecideApprovalStepError, DecideApprovalStepResponse, DeleteApproverPoolData, DeleteApproverPoolError, DeleteApproverPoolResponse, GetControlSettingsData, GetControlSettingsError, GetControlSettingsResponse, GetDocumentData, GetDocumentError, GetDocumentResponse, GetDocumentTypeConfigData, GetDocumentTypeConfigError, GetDocumentTypeConfigResponse, ListApproverPoolsData, ListApproverPoolsError, ListApproverPoolsResponse, ListDocumentsData, ListDocumentsError, ListDocumentsResponse, ListDocumentTypesData, ListDocumentTypesResponse, ListFlowRunsData, ListFlowRunsError, ListFlowRunsResponse, ListPublishDestinationsData, ListPublishDestinationsResponse, ProcessApprovalSlaData, ProcessApprovalSlaError, ProcessApprovalSlaResponse, PublishDocumentPdfData, PublishDocumentPdfError, PublishDocumentPdfResponse, ReleaseApprovalStepData, ReleaseApprovalStepError, ReleaseApprovalStepResponse, SubmitForApprovalData, SubmitForApprovalError, SubmitForApprovalResponse, UpdateApproverPoolData, UpdateApproverPoolError, UpdateApproverPoolResponse, UpdateControlSettingsData, UpdateControlSettingsError, UpdateControlSettingsResponse, UpdateDocumentDraftData, UpdateDocumentDraftError, UpdateDocumentDraftResponse, UpdateDocumentTypeData, UpdateDocumentTypeError, UpdateDocumentTypeResponse, UpdatePublishDestinationData, UpdatePublishDestinationError, UpdatePublishDestinationResponse, WithdrawAndReviseData, WithdrawAndReviseError, WithdrawAndReviseResponse } from '../types.gen';
+import { claimApprovalStep, createApproverPool, createDocumentRequest, createDocumentType, createPublishDestination, deactivateDocumentType, deactivatePublishDestination, decideApprovalStep, deleteApproverPool, getControlSettings, getDocument, getDocumentByNumber, getDocumentTypeConfig, listApproverPools, listDocuments, listDocumentTypes, listFlowRuns, listLibraryDocuments, listPublishDestinations, type Options, processApprovalSla, publishDocumentPdf, releaseApprovalStep, submitForApproval, supersedeDocument, updateApproverPool, updateControlSettings, updateDocumentDraft, updateDocumentType, updatePublishDestination, withdrawAndRevise } from '../sdk.gen';
+import type { ClaimApprovalStepData, ClaimApprovalStepError, ClaimApprovalStepResponse, CreateApproverPoolData, CreateApproverPoolError, CreateApproverPoolResponse, CreateDocumentRequestData, CreateDocumentRequestError, CreateDocumentRequestResponse, CreateDocumentTypeData, CreateDocumentTypeError, CreateDocumentTypeResponse, CreatePublishDestinationData, CreatePublishDestinationError, CreatePublishDestinationResponse, DeactivateDocumentTypeData, DeactivateDocumentTypeError, DeactivateDocumentTypeResponse, DeactivatePublishDestinationData, DeactivatePublishDestinationError, DeactivatePublishDestinationResponse, DecideApprovalStepData, DecideApprovalStepError, DecideApprovalStepResponse, DeleteApproverPoolData, DeleteApproverPoolError, DeleteApproverPoolResponse, GetControlSettingsData, GetControlSettingsError, GetControlSettingsResponse, GetDocumentByNumberData, GetDocumentByNumberError, GetDocumentByNumberResponse, GetDocumentData, GetDocumentError, GetDocumentResponse, GetDocumentTypeConfigData, GetDocumentTypeConfigError, GetDocumentTypeConfigResponse, ListApproverPoolsData, ListApproverPoolsError, ListApproverPoolsResponse, ListDocumentsData, ListDocumentsError, ListDocumentsResponse, ListDocumentTypesData, ListDocumentTypesResponse, ListFlowRunsData, ListFlowRunsError, ListFlowRunsResponse, ListLibraryDocumentsData, ListLibraryDocumentsError, ListLibraryDocumentsResponse, ListPublishDestinationsData, ListPublishDestinationsResponse, ProcessApprovalSlaData, ProcessApprovalSlaError, ProcessApprovalSlaResponse, PublishDocumentPdfData, PublishDocumentPdfError, PublishDocumentPdfResponse, ReleaseApprovalStepData, ReleaseApprovalStepError, ReleaseApprovalStepResponse, SubmitForApprovalData, SubmitForApprovalError, SubmitForApprovalResponse, SupersedeDocumentData, SupersedeDocumentError, SupersedeDocumentResponse, UpdateApproverPoolData, UpdateApproverPoolError, UpdateApproverPoolResponse, UpdateControlSettingsData, UpdateControlSettingsError, UpdateControlSettingsResponse, UpdateDocumentDraftData, UpdateDocumentDraftError, UpdateDocumentDraftResponse, UpdateDocumentTypeData, UpdateDocumentTypeError, UpdateDocumentTypeResponse, UpdatePublishDestinationData, UpdatePublishDestinationError, UpdatePublishDestinationResponse, WithdrawAndReviseData, WithdrawAndReviseError, WithdrawAndReviseResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'path'> & {
@@ -128,7 +128,8 @@ export const submitForApprovalMutation = (options?: Partial<Options<SubmitForApp
  *
  * Clears approval steps and returns the case to `drafting` so authors can
  * revise content. Allowed from `in_review`, `rejected`, or `approved`
- * for the requester, author, or collaborators.
+ * for the requester, author, or collaborators. Not allowed from
+ * `published` or `superseded` (use supersede instead).
  *
  */
 export const withdrawAndReviseMutation = (options?: Partial<Options<WithdrawAndReviseData>>): UseMutationOptions<WithdrawAndReviseResponse, Options<WithdrawAndReviseData>, WithdrawAndReviseError> => ({
@@ -207,7 +208,9 @@ export const processApprovalSlaMutation = (options?: Partial<Options<ProcessAppr
  *
  * Starts trusted publish (mock or Cloud Flow). The client does **not** upload
  * PDF/HTML bytes. Requires Publisher (or Admin) role. Idempotent for the same
- * content revision.
+ * content revision. First publish allocates `documentNumber` + version 1.
+ * Publishing a superseding case marks the prior document `superseded` and
+ * keeps the same number with version + 1.
  *
  */
 export const publishDocumentPdfMutation = (options?: Partial<Options<PublishDocumentPdfData>>): UseMutationOptions<PublishDocumentPdfResponse, Options<PublishDocumentPdfData>, PublishDocumentPdfError> => ({
@@ -220,6 +223,59 @@ export const publishDocumentPdfMutation = (options?: Partial<Options<PublishDocu
         return data;
     }
 });
+
+/**
+ * Open a successor case that will supersede a published document
+ *
+ * Creates a new drafting case linked via `supersedesDocumentId`. Allowed when
+ * the source is `published` and no open successor already exists. Published
+ * content is never edited in place.
+ *
+ */
+export const supersedeDocumentMutation = (options?: Partial<Options<SupersedeDocumentData>>): UseMutationOptions<SupersedeDocumentResponse, Options<SupersedeDocumentData>, SupersedeDocumentError> => ({
+    mutation: async (vars) => {
+        const { data } = await supersedeDocument({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+export const listLibraryDocumentsQueryKey = (options?: Options<ListLibraryDocumentsData>) => createQueryKey('listLibraryDocuments', options, ['Documents']);
+
+/**
+ * List current controlled (published) documents
+ */
+export const listLibraryDocumentsQuery = defineQueryOptions<Options<ListLibraryDocumentsData>, ListLibraryDocumentsResponse, ListLibraryDocumentsError>((options?: Options<ListLibraryDocumentsData>) => ({
+    key: listLibraryDocumentsQueryKey(options),
+    query: async (context) => {
+        const { data } = await listLibraryDocuments({
+            ...options,
+            ...context,
+            throwOnError: true
+        });
+        return data;
+    }
+}));
+
+export const getDocumentByNumberQueryKey = (options: Options<GetDocumentByNumberData>) => createQueryKey('getDocumentByNumber', options, ['Documents']);
+
+/**
+ * Resolve the current published document by controlled number
+ */
+export const getDocumentByNumberQuery = defineQueryOptions<Options<GetDocumentByNumberData>, GetDocumentByNumberResponse, GetDocumentByNumberError>((options: Options<GetDocumentByNumberData>) => ({
+    key: getDocumentByNumberQueryKey(options),
+    query: async (context) => {
+        const { data } = await getDocumentByNumber({
+            ...options,
+            ...context,
+            throwOnError: true
+        });
+        return data;
+    }
+}));
 
 export const listDocumentTypesQueryKey = (options?: Options<ListDocumentTypesData>) => createQueryKey('listDocumentTypes', options, ['Control']);
 

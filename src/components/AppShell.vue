@@ -78,6 +78,14 @@ const hostChipLabel = computed(() => {
 				</template>
 			</div>
 			<v-btn
+				class="me-2"
+				variant="tonal"
+				prepend-icon="$bookOpenOutline"
+				@click="router.push({ name: 'library' })"
+			>
+				Library
+			</v-btn>
+			<v-btn
 				v-if="identityStore.hasRole('admin')"
 				class="me-2"
 				variant="tonal"
@@ -108,14 +116,24 @@ const hostChipLabel = computed(() => {
 							{{ appConfig.brand.tagline }}
 						</p>
 					</div>
-					<v-btn
-						v-if="route.name !== 'inbox'"
-						variant="text"
-						prepend-icon="$arrowLeft"
-						@click="router.push({ name: 'inbox' })"
-					>
-						Back to inbox
-					</v-btn>
+					<div class="d-flex flex-wrap ga-2">
+						<v-btn
+							v-if="route.name !== 'inbox'"
+							variant="text"
+							prepend-icon="$arrowLeft"
+							@click="router.push({ name: 'inbox' })"
+						>
+							Back to inbox
+						</v-btn>
+						<v-btn
+							v-if="route.name !== 'library' && route.name !== 'library-document'"
+							variant="text"
+							prepend-icon="$bookOpenOutline"
+							@click="router.push({ name: 'library' })"
+						>
+							Library
+						</v-btn>
+					</div>
 				</div>
 				<slot />
 			</v-container>

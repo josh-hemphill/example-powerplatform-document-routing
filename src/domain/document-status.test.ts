@@ -17,6 +17,11 @@ describe('document workflow stages', () => {
 		expect(getWorkflowStageIndex('rejected')).toBe(2);
 	});
 
+	it('maps superseded onto the published stage', () => {
+		expect(getWorkflowStageIndex('superseded')).toBe(4);
+		expect(DOCUMENT_STATUS_LABELS.superseded).toBe('Superseded');
+	});
+
 	it('exposes human-readable labels', () => {
 		expect(DOCUMENT_STATUS_LABELS.published).toBe('Published');
 	});

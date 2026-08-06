@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Document Routing API
-  version: 1.5.0
+  version: 1.6.0
   description: |
     Routes freeform document requests through drafting and a chain of approvals,
     then publishes an approved PDF to SharePoint. In Power Platform, this API is
@@ -26,6 +26,11 @@ info:
     an allowlisted `publishDestinationId`; the mock/Flow renders HTML→PDF under a
     service identity. Filenames include document id + content revision; republishing
     the same revision is idempotent.
+
+    **Controlled documents (Phase 8):** First publish allocates a human
+    `documentNumber` from the document type sequence. Published finals are
+    immutable; changes use `POST …/supersede` (new case). Prior becomes
+    `superseded` when the successor publishes (same number, version + 1).
 
     **Contract (Phase 6):** OpenAPI 3.1 null unions (`type: [T, 'null']`), shared
     `401`/`403`/`409` responses, and schema-aligned request validation (title length).
@@ -197,7 +202,8 @@ paths:
       description: |
         Clears approval steps and returns the case to `drafting` so authors can
         revise content. Allowed from `in_review`, `rejected`, or `approved`
-        for the requester, author, or collaborators.
+        for the requester, author, or collaborators. Not allowed from
+        `published` or `superseded` (use supersede instead).
       parameters:
         - $ref: '#/components/parameters/DocumentId'
       requestBody:
@@ -360,7 +366,9 @@ paths:
       description: |
         Starts trusted publish (mock or Cloud Flow). The client does **not** upload
         PDF/HTML bytes. Requires Publisher (or Admin) role. Idempotent for the same
-        content revision.
+        content revision. First publish allocates `documentNumber` + version 1.
+        Publishing a superseding case marks the prior document `superseded` and
+        keeps the same number with version + 1.
       parameters:
         - $ref: '#/components/parameters/DocumentId'
       requestBody:
@@ -386,6 +394,98 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+  /documents/{documentId}/supersede:
+    post:
+      operationId: supersedeDocument
+      tags: [Documents]
+      summary: Open a successor case that will supersede a published document
+      description: |
+        Creates a new drafting case linked via `supersedesDocumentId`. Allowed when
+        the source is `published` and no open successor already exists. Published
+        content is never edited in place.
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                comment:
+                  type: string
+      responses:
+        '201':
+          description: Successor document created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /library:
+    get:
+      operationId: listLibraryDocuments
+      tags: [Documents]
+      summary: List current controlled (published) documents
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Search number, title, or type
+        - name: documentType
+          in: query
+          schema:
+            type: string
+        - name: includeSuperseded
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Library list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DocumentSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /documents/by-number/{documentNumber}:
+    get:
+      operationId: getDocumentByNumber
+      tags: [Documents]
+      summary: Resolve the current published document by controlled number
+      parameters:
+        - name: documentNumber
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Current published document for this number
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /control/document-types:
     get:
       operationId: listDocumentTypes
@@ -795,6 +895,7 @@ components:
         - approved
         - rejected
         - published
+        - superseded
     ApprovalStepStatus:
       type: string
       enum:
@@ -1031,9 +1132,29 @@ components:
         submittedContentRevision:
           type: [integer, 'null']
           description: contentRevision frozen at submit-for-approval
+
         publishedContentRevision:
           type: [integer, 'null']
           description: contentRevision of the artifact currently published
+        documentNumber:
+          type: [string, 'null']
+          description: Human-facing controlled document number (assigned on first publish)
+        documentVersion:
+          type: [integer, 'null']
+          minimum: 1
+          description: Controlled version (1 on first publish; increments on superseding publish)
+        supersedesDocumentId:
+          type: [string, 'null']
+          format: uuid
+          description: Prior published document this case will replace
+        supersededByDocumentId:
+          type: [string, 'null']
+          format: uuid
+          description: Successor document that replaced this one
+        publishedAt:
+          type: [string, 'null']
+          format: date-time
+          description: When this controlled version was published
     ApprovalStep:
       type: object
       required:
@@ -1241,6 +1362,18 @@ components:
         defaultDestinationId:
           type: [string, 'null']
           format: uuid
+        numberPrefix:
+          type: string
+          description: Controlled document number prefix (e.g. POL)
+          default: DOC
+        numberPattern:
+          type: string
+          description: Pattern with {prefix}, {yyyy}, {seq:N}
+          default: '{prefix}-{yyyy}-{seq:5}'
+        nextSequence:
+          type: integer
+          minimum: 1
+          description: Next sequence value for number allocation (server-managed)
         approvalChain:
           type: array
           items:
@@ -1283,6 +1416,18 @@ components:
         defaultDestinationId:
           type: [string, 'null']
           format: uuid
+        numberPrefix:
+          type: string
+          description: Controlled document number prefix (e.g. POL)
+          default: DOC
+        numberPattern:
+          type: string
+          description: Pattern with {prefix}, {yyyy}, {seq:N}
+          default: '{prefix}-{yyyy}-{seq:5}'
+        nextSequence:
+          type: integer
+          minimum: 1
+          description: Next sequence value for number allocation (server-managed)
         approvalChain:
           type: array
           items:

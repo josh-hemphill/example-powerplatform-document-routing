@@ -13,7 +13,8 @@ export type MockDocumentStatus
 		| 'in_review'
 		| 'approved'
 		| 'rejected'
-		| 'published';
+		| 'published'
+		| 'superseded';
 
 export interface MockApprovalStep {
 	id: string;
@@ -67,6 +68,13 @@ export interface MockDocumentRecord {
 	submittedContentRevision: number | null;
 	/** Revision of the currently published artifact (idempotency key). */
 	publishedContentRevision: number | null;
+	/** Human-facing controlled number (assigned on first publish). */
+	documentNumber: string | null;
+	/** Controlled version (1 on first publish). */
+	documentVersion: number | null;
+	supersedesDocumentId: string | null;
+	supersededByDocumentId: string | null;
+	publishedAt: string | null;
 	approvalSteps: MockApprovalStep[];
 	history: Array<{
 		id: string;
@@ -113,6 +121,11 @@ export function createSeedDocuments(): MockDocumentRecord[] {
 		contentRevision: 0,
 		submittedContentRevision: null,
 		publishedContentRevision: null,
+		documentNumber: null,
+		documentVersion: null,
+		supersedesDocumentId: null,
+		supersededByDocumentId: null,
+		publishedAt: null,
 		approvalSteps: [],
 		history: [
 			{
@@ -161,6 +174,11 @@ Document the 36-month laptop refresh process for corporate devices.
 		contentRevision: 1,
 		submittedContentRevision: null,
 		publishedContentRevision: null,
+		documentNumber: null,
+		documentVersion: null,
+		supersedesDocumentId: null,
+		supersededByDocumentId: null,
+		publishedAt: null,
 		approvalSteps: [],
 		history: [
 			{
@@ -212,6 +230,11 @@ Meal caps for customer visits are $75 / person.
 		contentRevision: 2,
 		submittedContentRevision: 2,
 		publishedContentRevision: null,
+		documentNumber: null,
+		documentVersion: null,
+		supersedesDocumentId: null,
+		supersededByDocumentId: null,
+		publishedAt: null,
 		approvalSteps: [
 			{
 				id: randomUUID(),
@@ -297,6 +320,52 @@ Meal caps for customer visits are $75 / person.
 		requestedLibraryName: appConfig.sharePoint.libraryName,
 	};
 
+	const published: MockDocumentRecord = {
+		id: randomUUID(),
+		title: 'Remote Work Policy',
+		documentType: 'policy',
+		status: 'published',
+		requesterEmail: 'alex.requester@contoso.com',
+		collaboratorEmails: ['developer@example.com', 'casey.author@contoso.com', 'alex.requester@contoso.com'],
+		priority: 'normal',
+		currentApproverEmail: null,
+		currentStepStatus: null,
+		currentStepDueAt: null,
+		currentStepElevated: null,
+		currentPoolEmails: [],
+		createdAt,
+		updatedAt: createdAt,
+		freeformRequest: 'Publish a controlled remote work policy for Contoso employees.',
+		draftBodyMarkdown: `# Remote Work Policy
+
+Employees may work remotely up to three days per week with manager approval.
+`,
+		draftSummary: 'Remote work eligibility and expectations',
+		authorEmail: appConfig.localDemoUser.email,
+		contentRevision: 3,
+		submittedContentRevision: 3,
+		publishedContentRevision: 3,
+		documentNumber: 'POL-2026-00001',
+		documentVersion: 1,
+		supersedesDocumentId: null,
+		supersededByDocumentId: null,
+		publishedAt: createdAt,
+		approvalSteps: [],
+		history: [
+			{
+				id: randomUUID(),
+				at: createdAt,
+				actorEmail: appConfig.localDemoUser.email,
+				action: 'published',
+				message: 'Published POL-2026-00001 v1',
+			},
+		],
+		publishedPdfUrl: `${appConfig.sharePoint.siteUrl}/${encodeURIComponent(appConfig.sharePoint.libraryName)}/POL-2026-00001-v1.pdf`,
+		sharePointItemId: randomUUID(),
+		requestedPublishSiteUrl: appConfig.sharePoint.siteUrl,
+		requestedLibraryName: appConfig.sharePoint.libraryName,
+	};
+
 	syncCurrentApprovalFields(queuedPool);
-	return [requested, drafting, queuedPool];
+	return [requested, drafting, queuedPool, published];
 }

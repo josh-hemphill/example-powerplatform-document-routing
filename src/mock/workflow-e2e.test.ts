@@ -23,6 +23,7 @@ import {
 	findControlDocumentType,
 	getControlStore,
 	materializeApprovalSteps,
+	allocateNextDocumentNumber,
 	recordFlowRun,
 	resetControlStore,
 	toDocumentTypeDefinition,
@@ -31,6 +32,10 @@ import {
 	clearDocumentStore,
 	getDocumentStore,
 } from './document-store.ts';
+import {
+	applySupersessionOnPublish,
+	supersedeDocument,
+} from './supersede-engine.ts';
 
 const REQUESTER = 'alex.requester@contoso.com';
 const AUTHOR = 'casey.author@contoso.com';
@@ -70,6 +75,11 @@ function createRequest(actor: string): MockDocumentRecord {
 		contentRevision: 0,
 		submittedContentRevision: null,
 		publishedContentRevision: null,
+		documentNumber: null,
+		documentVersion: null,
+		supersedesDocumentId: null,
+		supersededByDocumentId: null,
+		publishedAt: null,
 		approvalSteps: [],
 		history: [],
 		publishedPdfUrl: null,
@@ -158,7 +168,10 @@ describe('mock workflow e2e', () => {
 
 		const itemId = randomUUID();
 		const publishedAt = stamp();
+		document.documentNumber = allocateNextDocumentNumber(document.documentType);
+		document.documentVersion = 1;
 		document.status = 'published';
+		document.publishedAt = publishedAt;
 		document.publishedContentRevision = target.revision;
 		document.sharePointItemId = itemId;
 		document.publishedPdfUrl = buildSharePointDocumentUrl({
@@ -171,9 +184,11 @@ describe('mock workflow e2e', () => {
 		recordFlowRun(
 			'Document Routing — Publish approved',
 			'succeeded',
-			`Published PDF revision ${target.revision}`,
+			`Published ${document.documentNumber} v${document.documentVersion}`,
 		);
 
+		expect(document.documentNumber).toMatch(/^POL-\d{4}-\d{5}$/);
+		expect(document.documentVersion).toBe(1);
 		expect(document.publishedPdfUrl).toContain(target.fileName);
 		expect(document.publishedContentRevision).toBe(1);
 		expect(
@@ -208,5 +223,84 @@ describe('mock workflow e2e', () => {
 		const health = getControlStore().flowRuns[0];
 		expect(health?.flowName).toMatch(/Publish/i);
 		expect(health?.status).toBe('succeeded');
+	});
+
+	it('publish A → supersede → publish B keeps number and bumps version', () => {
+		const document = createRequest(REQUESTER);
+		document.draftBodyMarkdown = '# Policy A';
+		document.draftSummary = 'A';
+		document.authorEmail = AUTHOR;
+		document.contentRevision = 1;
+		document.status = 'drafting';
+
+		const clock = new Date('2026-02-01T12:00:00.000Z');
+		const stepsInput = materializeApprovalSteps(document.documentType);
+		expect(stepsInput?.length).toBeGreaterThan(0);
+		document.approvalSteps = stepsInput!.map((step, index) =>
+			createStepFromInput(step, index + 1, clock, index === 0, 1),
+		);
+		document.submittedContentRevision = 1;
+		document.status = 'in_review';
+		syncCurrentApprovalFields(document);
+
+		for (let guard = 0; guard < 10; guard += 1) {
+			const active = document.approvalSteps.find(
+				(step) => step.status === 'queued' || step.status === 'pending',
+			);
+			if (!active) {
+				break;
+			}
+			if (active.status === 'queued') {
+				claimStep(active, active.pool[0]!.email, clock);
+			}
+			decideStep(document, active, active.approverEmail!, 'approve', clock);
+			syncCurrentApprovalFields(document);
+		}
+		expect(document.status).toBe('approved');
+
+		document.documentNumber = allocateNextDocumentNumber(document.documentType);
+		document.documentVersion = 1;
+		document.status = 'published';
+		document.publishedContentRevision = 1;
+		document.publishedAt = stamp();
+		const number = document.documentNumber;
+
+		const successor = supersedeDocument(document, REQUESTER);
+		expect(successor.supersedesDocumentId).toBe(document.id);
+		expect(document.status).toBe('published');
+
+		successor.draftBodyMarkdown = '# Policy B';
+		successor.contentRevision = 2;
+		successor.submittedContentRevision = 2;
+		const successorSteps = materializeApprovalSteps(successor.documentType);
+		successor.approvalSteps = successorSteps!.map((step, index) =>
+			createStepFromInput(step, index + 1, clock, index === 0, 2),
+		);
+		successor.status = 'in_review';
+		syncCurrentApprovalFields(successor);
+		for (let guard = 0; guard < 10; guard += 1) {
+			const active = successor.approvalSteps.find(
+				(step) => step.status === 'queued' || step.status === 'pending',
+			);
+			if (!active) {
+				break;
+			}
+			if (active.status === 'queued') {
+				claimStep(active, active.pool[0]!.email, clock);
+			}
+			decideStep(successor, active, active.approverEmail!, 'approve', clock);
+			syncCurrentApprovalFields(successor);
+		}
+		expect(successor.status).toBe('approved');
+
+		applySupersessionOnPublish(successor, document);
+		successor.status = 'published';
+		successor.publishedContentRevision = 2;
+		successor.publishedAt = stamp();
+
+		expect(document.status).toBe('superseded');
+		expect(document.supersededByDocumentId).toBe(successor.id);
+		expect(successor.documentNumber).toBe(number);
+		expect(successor.documentVersion).toBe(2);
 	});
 });

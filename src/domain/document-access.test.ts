@@ -43,4 +43,13 @@ describe('document access', () => {
 		expect(canActorEditDraft(doc, 'casey.author@contoso.com')).toBe(false);
 		expect(canActorAccessDocument(doc, 'casey.author@contoso.com')).toBe(true);
 	});
+
+	it('allows any authenticated user to read published and superseded library docs', () => {
+		expect(
+			canActorAccessDocument(baseDoc({ status: 'published' }), 'stranger@contoso.com'),
+		).toBe(true);
+		expect(
+			canActorAccessDocument(baseDoc({ status: 'superseded' }), 'stranger@contoso.com'),
+		).toBe(true);
+	});
 });
