@@ -209,6 +209,13 @@ function buildSeedSnapshot(): ControlStoreSnapshot {
 				at: now,
 				message: 'Notifications idle',
 			},
+			{
+				id: randomUUID(),
+				flowName: 'Document Routing — Publish approved',
+				status: 'failed',
+				at: now,
+				message: 'Demo failure: SharePoint library unreachable (seeded for Admin Flow health)',
+			},
 		],
 	};
 }

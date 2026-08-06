@@ -44,3 +44,16 @@ Production sweeps use the flow’s wall clock. Do **not** accept a client-suppli
 - Filename: `{title-slug}-{documentId8}-r{revision}.pdf`. Republishing the same
   revision is **idempotent** (returns the existing URL).
 - Stub: [`flows/publish-approved.json`](./flows/publish-approved.json).
+
+## Flow health rows (Admin)
+
+At the end of each SLA sweeper or publish run, write a health row so Admin →
+**Flow health** can show recent outcomes:
+
+1. Create (or append to) `dr_flowrun` — or patch a JSON blob on `dr_appsetting` if
+   you skip a dedicated table in early environments.
+2. Fields: `flowname`, `status` (`succeeded`/`failed`/`running`), `at`, `message`.
+3. Keep a short rolling window (mock keeps 20).
+
+The local mock seeds a failed publish row for demo and records runs via
+`recordFlowRun` in `src/mock/control-store.ts`. See [`SCHEMA.md`](../SCHEMA.md).

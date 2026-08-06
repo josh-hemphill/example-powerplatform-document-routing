@@ -22,5 +22,23 @@ export default defineConfig({
 	test: {
 		environment: 'jsdom',
 		globals: true,
+		coverage: {
+			provider: 'v8',
+			reporter: ['text', 'json-summary'],
+			include: [
+				'src/domain/**/*.ts',
+				'src/mock/approval-engine.ts',
+				'src/publishing/publish-engine.ts',
+				'src/provisioning/shell-quote.ts',
+				'src/provisioning/connection-config.ts',
+				'src/provisioning/schema-drift.ts',
+			],
+			thresholds: {
+				lines: 80,
+				functions: 80,
+				branches: 70,
+				statements: 80,
+			},
+		},
 	},
 });

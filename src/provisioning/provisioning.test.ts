@@ -360,4 +360,53 @@ describe('applyDataversePlan', () => {
 		expect(isDocumentedDuplicate(400, 'something went wrong')).toBe(false);
 		expect(isDocumentedDuplicate(404, 'Not Found')).toBe(false);
 	});
+
+	it('fails apply when an existing attribute has an incompatible type', async() => {
+		const profile = sampleProfile();
+		const plan = buildDataverseProvisionPlan(profile);
+		const attributeRequest = plan.requests.find(
+			(request) =>
+				request.kind === 'attribute'
+				&& String((request.body as { SchemaName?: string }).SchemaName ?? '')
+					.toLowerCase()
+					.includes('title'),
+		);
+		expect(attributeRequest).toBeTruthy();
+
+		const entityLogical = attributeRequest!.entityLogicalName!;
+		const result = await applyDataversePlan(
+			{
+				...plan,
+				requests: [
+					{
+						...plan.requests.find((request) => request.entityLogicalName === entityLogical && request.kind === 'entity')!,
+						skipIfExists: true,
+					},
+					attributeRequest!,
+				],
+			},
+			'token',
+			async(url) => {
+				if (String(url).includes('/Attributes(')) {
+					return new Response(
+						JSON.stringify({
+							LogicalName: 'dr_title',
+							AttributeType: 'Integer',
+						}),
+						{ status: 200, headers: { 'Content-Type': 'application/json' } },
+					);
+				}
+				if (String(url).includes('EntityDefinitions')) {
+					return new Response(
+						JSON.stringify({ LogicalName: entityLogical }),
+						{ status: 200, headers: { 'Content-Type': 'application/json' } },
+					);
+				}
+				return new Response('{}', { status: 204 });
+			},
+		);
+
+		expect(result.failed.length).toBeGreaterThan(0);
+		expect(result.failed.some((item) => /expects string|Integer/i.test(item.error))).toBe(true);
+	});
 });
