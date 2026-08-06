@@ -7,7 +7,7 @@ import { useRouter } from 'vue-router';
 import { listDocumentsQuery, listDocumentTypesQuery } from '@/client/@pinia/colada.gen';
 import DocumentStatusChip from '@/components/DocumentStatusChip.vue';
 import { usePowerAppsContext } from '@/composables/use-power-apps-context';
-import { getDocumentType } from '@/config/document-types';
+import { findDocumentType } from '@/config/document-types';
 import {
 	INBOX_PERSONAS,
 	matchesInboxPersona,
@@ -31,7 +31,8 @@ const typeSelectItems = computed(() =>
 
 function typeLabel(id: string): string {
 	return typesData.value?.items?.find((item) => item.id === id)?.label
-		?? getDocumentType(id).label;
+		?? findDocumentType(id)?.label
+		?? id;
 }
 
 const queryInput = computed(() => ({

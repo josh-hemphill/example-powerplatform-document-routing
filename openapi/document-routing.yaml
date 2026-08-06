@@ -36,7 +36,6 @@ tags:
   - name: Control
 security:
   - PrincipalHeader: []
-    RolesHeader: []
 paths:
   /documents:
     get:
@@ -676,8 +675,9 @@ components:
       in: header
       name: X-Document-Routing-Roles
       description: |
-        Local mock stand-in for Dataverse security roles (comma-separated).
-        Example: `user,author,admin`. Production derives roles from the token.
+        Optional local mock stand-in for Dataverse security roles (comma-separated).
+        Example: `user,author,admin`. Not required on every request — used by the
+        mock for Admin gating. Production derives roles from the token.
   parameters:
     DocumentId:
       name: documentId

@@ -43,3 +43,28 @@ describe('control store', () => {
 		expect(findControlDocumentType('policy')?.label).toBe('Policy');
 	});
 });
+
+describe('control chain validation', () => {
+	beforeEach(() => {
+		resetControlStore();
+	});
+
+	it('rejects missing, non-positive, and duplicate step orders', async() => {
+		const { validateControlChain } = await import('./control-api.ts');
+		const poolKey = getControlStore().approverPools[0]?.key;
+		expect(poolKey).toBeTruthy();
+
+		expect(
+			validateControlChain([
+				{ order: 0, assignmentMode: 'pool', role: 'Legal', poolKey },
+			]),
+		).toMatch(/order >= 1/);
+
+		expect(
+			validateControlChain([
+				{ order: 1, assignmentMode: 'pool', role: 'Legal', poolKey },
+				{ order: 1, assignmentMode: 'pool', role: 'Legal', poolKey },
+			]),
+		).toMatch(/Duplicate/);
+	});
+});

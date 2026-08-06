@@ -85,8 +85,9 @@ const activeStep = computed(
 );
 
 watch(
-	document,
-	(value) => {
+	[document, typesData],
+	() => {
+		const value = document.value;
 		if (!value) {
 			return;
 		}

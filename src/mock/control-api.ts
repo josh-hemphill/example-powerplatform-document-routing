@@ -34,7 +34,15 @@ function validateChain(chain: ControlChainStep[]): string | null {
 		return 'Approval chain cannot be empty';
 	}
 	const store = getControlStore();
+	const seenOrders = new Set<number>();
 	for (const step of chain) {
+		if (!Number.isInteger(step.order) || step.order < 1) {
+			return 'Each approval step requires an integer order >= 1';
+		}
+		if (seenOrders.has(step.order)) {
+			return `Duplicate approval step order: ${step.order}`;
+		}
+		seenOrders.add(step.order);
 		if (step.assignmentMode === 'named' && !step.assignee?.email) {
 			return `Named step ${step.order} requires an assignee`;
 		}
@@ -61,6 +69,9 @@ function validateChain(chain: ControlChainStep[]): string | null {
 	}
 	return null;
 }
+
+/** Exported for unit tests. */
+export { validateChain as validateControlChain };
 
 /**
  * Handles control API routes. Returns true when the request was fully handled.
