@@ -30,10 +30,10 @@ import {
 } from './approval-engine.ts';
 import { handleControlApiRequest } from './control-api.ts';
 import {
+	allocateNextDocumentNumber,
 	findControlDocumentType,
 	getControlStore,
 	materializeApprovalSteps,
-	allocateNextDocumentNumber,
 	recordFlowRun,
 	toDocumentTypeDefinition,
 } from './control-store.ts';

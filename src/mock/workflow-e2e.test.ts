@@ -20,10 +20,10 @@ import {
 	syncCurrentApprovalFields,
 } from './approval-engine.ts';
 import {
+	allocateNextDocumentNumber,
 	findControlDocumentType,
 	getControlStore,
 	materializeApprovalSteps,
-	allocateNextDocumentNumber,
 	recordFlowRun,
 	resetControlStore,
 	toDocumentTypeDefinition,
@@ -235,8 +235,10 @@ describe('mock workflow e2e', () => {
 
 		const clock = new Date('2026-02-01T12:00:00.000Z');
 		const stepsInput = materializeApprovalSteps(document.documentType);
-		expect(stepsInput?.length).toBeGreaterThan(0);
-		document.approvalSteps = stepsInput!.map((step, index) =>
+		if (!stepsInput?.length) {
+			throw new Error('expected approval steps for policy');
+		}
+		document.approvalSteps = stepsInput.map((step, index) =>
 			createStepFromInput(step, index + 1, clock, index === 0, 1),
 		);
 		document.submittedContentRevision = 1;
@@ -251,9 +253,13 @@ describe('mock workflow e2e', () => {
 				break;
 			}
 			if (active.status === 'queued') {
-				claimStep(active, active.pool[0]!.email, clock);
+				const claimer = active.pool[0]?.email;
+				expect(claimer).toBeTruthy();
+				claimStep(active, claimer, clock);
 			}
-			decideStep(document, active, active.approverEmail!, 'approve', clock);
+			const actor = active.approverEmail;
+			expect(actor).toBeTruthy();
+			decideStep(document, active, actor!, 'approve', clock);
 			syncCurrentApprovalFields(document);
 		}
 		expect(document.status).toBe('approved');
@@ -273,7 +279,10 @@ describe('mock workflow e2e', () => {
 		successor.contentRevision = 2;
 		successor.submittedContentRevision = 2;
 		const successorSteps = materializeApprovalSteps(successor.documentType);
-		successor.approvalSteps = successorSteps!.map((step, index) =>
+		if (!successorSteps?.length) {
+			throw new Error('expected approval steps for successor');
+		}
+		successor.approvalSteps = successorSteps.map((step, index) =>
 			createStepFromInput(step, index + 1, clock, index === 0, 2),
 		);
 		successor.status = 'in_review';
@@ -286,9 +295,13 @@ describe('mock workflow e2e', () => {
 				break;
 			}
 			if (active.status === 'queued') {
-				claimStep(active, active.pool[0]!.email, clock);
+				const claimer = active.pool[0]?.email;
+				expect(claimer).toBeTruthy();
+				claimStep(active, claimer, clock);
 			}
-			decideStep(successor, active, active.approverEmail!, 'approve', clock);
+			const actor = active.approverEmail;
+			expect(actor).toBeTruthy();
+			decideStep(successor, active, actor!, 'approve', clock);
 			syncCurrentApprovalFields(successor);
 		}
 		expect(successor.status).toBe('approved');
