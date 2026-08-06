@@ -85,7 +85,11 @@ export const appConfig: AppConfig = {
 	},
 	features: {
 		showSetupBanner: true,
-		allowApproverOverride: true,
+		/**
+		 * Seed default only — runtime mock/hosted value lives in control `appsetting`
+		 * / Admin Settings (`allowApproverOverride`, default off).
+		 */
+		allowApproverOverride: false,
 	},
 };
 

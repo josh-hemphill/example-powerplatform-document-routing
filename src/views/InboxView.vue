@@ -4,10 +4,10 @@ import type { DocumentStatus } from '@/domain/document-status';
 import { useQuery } from '@pinia/colada';
 import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { listDocumentsQuery } from '@/client/@pinia/colada.gen';
+import { listDocumentsQuery, listDocumentTypesQuery } from '@/client/@pinia/colada.gen';
 import DocumentStatusChip from '@/components/DocumentStatusChip.vue';
 import { usePowerAppsContext } from '@/composables/use-power-apps-context';
-import { documentTypeSelectItems, getDocumentType } from '@/config/document-types';
+import { findDocumentType } from '@/config/document-types';
 import {
 	INBOX_PERSONAS,
 	matchesInboxPersona,
@@ -20,6 +20,20 @@ const statusFilter = ref<DocumentStatus | null>(null);
 const typeFilter = ref<string | null>(null);
 const search = ref('');
 const persona = ref<InboxPersona>('all');
+
+const { data: typesData } = useQuery(() => listDocumentTypesQuery());
+const typeSelectItems = computed(() =>
+	(typesData.value?.items ?? []).map((item) => ({
+		title: item.label,
+		value: item.id,
+	})),
+);
+
+function typeLabel(id: string): string {
+	return typesData.value?.items?.find((item) => item.id === id)?.label
+		?? findDocumentType(id)?.label
+		?? id;
+}
 
 const queryInput = computed(() => ({
 	query: {
@@ -120,7 +134,7 @@ watch(
 			<v-col cols="12" md="2">
 				<v-select
 					v-model="typeFilter"
-					:items="[{ title: 'All types', value: null }, ...documentTypeSelectItems()]"
+					:items="[{ title: 'All types', value: null }, ...typeSelectItems]"
 					item-title="title"
 					item-value="value"
 					label="Type"
@@ -180,7 +194,7 @@ watch(
 							Waiting on {{ item.currentApproverEmail }}
 						</div>
 					</td>
-					<td>{{ getDocumentType(item.documentType).label }}</td>
+					<td>{{ typeLabel(item.documentType) }}</td>
 					<td>
 						<DocumentStatusChip :status="item.status" />
 					</td>

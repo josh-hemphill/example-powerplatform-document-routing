@@ -23,6 +23,9 @@ Dataverse user). Never accept `actorEmail` / spoofable identity in request bodie
 
 ## Local mock
 
-The Vite mock accepts `X-Document-Routing-Actor` (email/UPN) as a stand-in for the
-host principal. The SPA sets this header from the identity store. In DEV only, a
-persona switcher changes the store (and thus the header) — not per-form “Acting as”.
+The Vite mock accepts `X-Document-Routing-Actor` (email/UPN) and
+`X-Document-Routing-Roles` (comma-separated) as stand-ins for the host principal.
+The SPA sets these from the identity store. In DEV only, a persona switcher changes
+the store — **Local developer** includes `admin`; other personas do not.
+
+Admin UI: `#/admin` (nav only when `admin` role is present).

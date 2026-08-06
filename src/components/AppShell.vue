@@ -78,6 +78,15 @@ const hostChipLabel = computed(() => {
 				</template>
 			</div>
 			<v-btn
+				v-if="identityStore.hasRole('admin')"
+				class="me-2"
+				variant="tonal"
+				prepend-icon="$cogOutline"
+				@click="router.push({ name: 'admin' })"
+			>
+				Admin
+			</v-btn>
+			<v-btn
 				color="primary"
 				prepend-icon="$plus"
 				:disabled="!canAct"

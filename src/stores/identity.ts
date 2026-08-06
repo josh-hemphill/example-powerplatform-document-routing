@@ -37,27 +37,37 @@ export function allowsDemoIdentityFallback(): boolean {
 
 /**
  * Local-only personas for collaborative draft / approval demos (sets principal header).
+ * Only the local developer persona includes Admin for gating demos.
  */
-export const LOCAL_DEMO_PERSONAS: Array<{ label: string; email: string; userName: string }> = [
+export const LOCAL_DEMO_PERSONAS: Array<{
+	label: string;
+	email: string;
+	userName: string;
+	roles: DocumentRoutingRole[];
+}> = [
 	{
-		label: 'Local developer',
+		label: 'Local developer (Admin)',
 		email: appConfig.localDemoUser.email,
 		userName: appConfig.localDemoUser.userName,
+		roles: ['user', 'author', 'approver', 'publisher', 'admin'],
 	},
 	{
 		label: 'Jordan Legal (pool)',
 		email: 'jordan.legal@contoso.com',
 		userName: 'Jordan Legal',
+		roles: ['user', 'approver'],
 	},
 	{
 		label: 'Alex Requester',
 		email: 'alex.requester@contoso.com',
 		userName: 'Alex Requester',
+		roles: ['user'],
 	},
 	{
 		label: 'Casey Author',
 		email: 'casey.author@contoso.com',
 		userName: 'Casey Author',
+		roles: ['user', 'author'],
 	},
 ];
 
@@ -147,7 +157,7 @@ export const useIdentityStore = defineStore('identity', () => {
 		identity.value = {
 			userName: persona.userName,
 			email: persona.email,
-			roles: ['user', 'author', 'approver', 'publisher', 'admin'],
+			roles: [...persona.roles],
 		};
 		status.value = 'standalone';
 		error.value = null;

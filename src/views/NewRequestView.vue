@@ -1,23 +1,31 @@
 <script setup lang="ts">
-import { useMutation, useQueryCache } from '@pinia/colada';
-import { computed, reactive, ref } from 'vue';
+import { useMutation, useQuery, useQueryCache } from '@pinia/colada';
+import { computed, reactive, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import {
 	createDocumentRequestMutation,
 	listDocumentsQueryKey,
+	listDocumentTypesQuery,
 } from '@/client/@pinia/colada.gen';
 import { usePowerAppsContext } from '@/composables/use-power-apps-context';
 import { appConfig } from '@/config/app.config';
-import {
-	DEFAULT_DOCUMENT_TYPE_ID,
-	documentTypeSelectItems,
-	getDocumentType,
-} from '@/config/document-types';
+import { DEFAULT_DOCUMENT_TYPE_ID } from '@/config/document-types';
 
 const router = useRouter();
 const queryCache = useQueryCache();
 const { context, canAct, isLoading: identityLoading } = usePowerAppsContext();
 const formError = ref<string | null>(null);
+
+const { data: typesData } = useQuery(() => listDocumentTypesQuery());
+const typeItems = computed(() =>
+	(typesData.value?.items ?? [])
+		.filter((item) => item.active)
+		.map((item) => ({
+			title: item.label,
+			value: item.id,
+			subtitle: item.description,
+		})),
+);
 
 const form = reactive({
 	title: '',
@@ -28,7 +36,19 @@ const form = reactive({
 	requestedLibraryName: appConfig.sharePoint.libraryName,
 });
 
-const selectedType = computed(() => getDocumentType(form.documentType));
+watch(
+	typeItems,
+	(items) => {
+		if (!items.some((item) => item.value === form.documentType) && items[0]) {
+			form.documentType = items[0].value;
+		}
+	},
+	{ immediate: true },
+);
+
+const selectedType = computed(
+	() => typesData.value?.items?.find((item) => item.id === form.documentType) ?? null,
+);
 
 const { mutateAsync, isLoading } = useMutation({
 	...createDocumentRequestMutation(),
@@ -105,7 +125,7 @@ async function submit(): Promise<void> {
 				<v-col cols="12" md="6">
 					<v-select
 						v-model="form.documentType"
-						:items="documentTypeSelectItems()"
+						:items="typeItems"
 						item-title="title"
 						item-value="value"
 						label="Document type"
@@ -113,7 +133,7 @@ async function submit(): Promise<void> {
 				</v-col>
 				<v-col cols="12" md="6" class="d-flex align-center">
 					<p class="text-body-2 text-medium-emphasis mb-0">
-						{{ selectedType.description }}
+						{{ selectedType?.description }}
 					</p>
 				</v-col>
 				<v-col cols="12">
@@ -121,7 +141,7 @@ async function submit(): Promise<void> {
 						v-model="form.freeformRequest"
 						label="Freeform request"
 						rows="8"
-						:hint="selectedType.requestHint"
+						:hint="selectedType?.requestHint"
 						persistent-hint
 					/>
 				</v-col>

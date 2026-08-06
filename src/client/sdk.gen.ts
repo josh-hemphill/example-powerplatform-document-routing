@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { ClaimApprovalStepData, ClaimApprovalStepErrors, ClaimApprovalStepResponses, CreateDocumentRequestData, CreateDocumentRequestErrors, CreateDocumentRequestResponses, DecideApprovalStepData, DecideApprovalStepErrors, DecideApprovalStepResponses, GetDocumentData, GetDocumentErrors, GetDocumentResponses, ListDocumentsData, ListDocumentsResponses, ProcessApprovalSlaData, ProcessApprovalSlaErrors, ProcessApprovalSlaResponses, PublishDocumentPdfData, PublishDocumentPdfErrors, PublishDocumentPdfResponses, ReleaseApprovalStepData, ReleaseApprovalStepErrors, ReleaseApprovalStepResponses, SubmitForApprovalData, SubmitForApprovalErrors, SubmitForApprovalResponses, UpdateDocumentDraftData, UpdateDocumentDraftErrors, UpdateDocumentDraftResponses, WithdrawAndReviseData, WithdrawAndReviseErrors, WithdrawAndReviseResponses } from './types.gen';
+import type { ClaimApprovalStepData, ClaimApprovalStepErrors, ClaimApprovalStepResponses, CreateApproverPoolData, CreateApproverPoolErrors, CreateApproverPoolResponses, CreateDocumentRequestData, CreateDocumentRequestErrors, CreateDocumentRequestResponses, CreateDocumentTypeData, CreateDocumentTypeErrors, CreateDocumentTypeResponses, CreatePublishDestinationData, CreatePublishDestinationErrors, CreatePublishDestinationResponses, DeactivateDocumentTypeData, DeactivateDocumentTypeErrors, DeactivateDocumentTypeResponses, DeactivatePublishDestinationData, DeactivatePublishDestinationErrors, DeactivatePublishDestinationResponses, DecideApprovalStepData, DecideApprovalStepErrors, DecideApprovalStepResponses, DeleteApproverPoolData, DeleteApproverPoolErrors, DeleteApproverPoolResponses, GetControlSettingsData, GetControlSettingsErrors, GetControlSettingsResponses, GetDocumentData, GetDocumentErrors, GetDocumentResponses, GetDocumentTypeConfigData, GetDocumentTypeConfigErrors, GetDocumentTypeConfigResponses, ListApproverPoolsData, ListApproverPoolsErrors, ListApproverPoolsResponses, ListDocumentsData, ListDocumentsResponses, ListDocumentTypesData, ListDocumentTypesResponses, ListFlowRunsData, ListFlowRunsErrors, ListFlowRunsResponses, ListPublishDestinationsData, ListPublishDestinationsResponses, ProcessApprovalSlaData, ProcessApprovalSlaErrors, ProcessApprovalSlaResponses, PublishDocumentPdfData, PublishDocumentPdfErrors, PublishDocumentPdfResponses, ReleaseApprovalStepData, ReleaseApprovalStepErrors, ReleaseApprovalStepResponses, SubmitForApprovalData, SubmitForApprovalErrors, SubmitForApprovalResponses, UpdateApproverPoolData, UpdateApproverPoolErrors, UpdateApproverPoolResponses, UpdateControlSettingsData, UpdateControlSettingsErrors, UpdateControlSettingsResponses, UpdateDocumentDraftData, UpdateDocumentDraftErrors, UpdateDocumentDraftResponses, UpdateDocumentTypeData, UpdateDocumentTypeErrors, UpdateDocumentTypeResponses, UpdatePublishDestinationData, UpdatePublishDestinationErrors, UpdatePublishDestinationResponses, WithdrawAndReviseData, WithdrawAndReviseErrors, WithdrawAndReviseResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -165,4 +165,176 @@ export const publishDocumentPdf = <ThrowOnError extends boolean = false>(options
         'Content-Type': 'application/json',
         ...options.headers
     }
+});
+
+/**
+ * List document types (active for users; all for admins)
+ */
+export const listDocumentTypes = <ThrowOnError extends boolean = false>(options?: Options<ListDocumentTypesData, ThrowOnError>): RequestResult<ListDocumentTypesResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListDocumentTypesResponses, unknown, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }],
+    url: '/control/document-types',
+    ...options
+});
+
+/**
+ * Create a document type (Admin)
+ */
+export const createDocumentType = <ThrowOnError extends boolean = false>(options: Options<CreateDocumentTypeData, ThrowOnError>): RequestResult<CreateDocumentTypeResponses, CreateDocumentTypeErrors, ThrowOnError> => (options.client ?? client).post<CreateDocumentTypeResponses, CreateDocumentTypeErrors, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }],
+    url: '/control/document-types',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Deactivate a document type (Admin)
+ */
+export const deactivateDocumentType = <ThrowOnError extends boolean = false>(options: Options<DeactivateDocumentTypeData, ThrowOnError>): RequestResult<DeactivateDocumentTypeResponses, DeactivateDocumentTypeErrors, ThrowOnError> => (options.client ?? client).delete<DeactivateDocumentTypeResponses, DeactivateDocumentTypeErrors, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }],
+    url: '/control/document-types/{typeId}',
+    ...options
+});
+
+/**
+ * Get one document type
+ */
+export const getDocumentTypeConfig = <ThrowOnError extends boolean = false>(options: Options<GetDocumentTypeConfigData, ThrowOnError>): RequestResult<GetDocumentTypeConfigResponses, GetDocumentTypeConfigErrors, ThrowOnError> => (options.client ?? client).get<GetDocumentTypeConfigResponses, GetDocumentTypeConfigErrors, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }],
+    url: '/control/document-types/{typeId}',
+    ...options
+});
+
+/**
+ * Update a document type including approval chain (Admin)
+ */
+export const updateDocumentType = <ThrowOnError extends boolean = false>(options: Options<UpdateDocumentTypeData, ThrowOnError>): RequestResult<UpdateDocumentTypeResponses, UpdateDocumentTypeErrors, ThrowOnError> => (options.client ?? client).put<UpdateDocumentTypeResponses, UpdateDocumentTypeErrors, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }],
+    url: '/control/document-types/{typeId}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * List approver pools (Admin)
+ */
+export const listApproverPools = <ThrowOnError extends boolean = false>(options?: Options<ListApproverPoolsData, ThrowOnError>): RequestResult<ListApproverPoolsResponses, ListApproverPoolsErrors, ThrowOnError> => (options?.client ?? client).get<ListApproverPoolsResponses, ListApproverPoolsErrors, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }],
+    url: '/control/approver-pools',
+    ...options
+});
+
+/**
+ * Create an approver pool (Admin)
+ */
+export const createApproverPool = <ThrowOnError extends boolean = false>(options: Options<CreateApproverPoolData, ThrowOnError>): RequestResult<CreateApproverPoolResponses, CreateApproverPoolErrors, ThrowOnError> => (options.client ?? client).post<CreateApproverPoolResponses, CreateApproverPoolErrors, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }],
+    url: '/control/approver-pools',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Delete an unused approver pool (Admin)
+ */
+export const deleteApproverPool = <ThrowOnError extends boolean = false>(options: Options<DeleteApproverPoolData, ThrowOnError>): RequestResult<DeleteApproverPoolResponses, DeleteApproverPoolErrors, ThrowOnError> => (options.client ?? client).delete<DeleteApproverPoolResponses, DeleteApproverPoolErrors, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }],
+    url: '/control/approver-pools/{poolId}',
+    ...options
+});
+
+/**
+ * Update pool name/members (Admin)
+ */
+export const updateApproverPool = <ThrowOnError extends boolean = false>(options: Options<UpdateApproverPoolData, ThrowOnError>): RequestResult<UpdateApproverPoolResponses, UpdateApproverPoolErrors, ThrowOnError> => (options.client ?? client).put<UpdateApproverPoolResponses, UpdateApproverPoolErrors, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }],
+    url: '/control/approver-pools/{poolId}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * List allowlisted publish destinations
+ */
+export const listPublishDestinations = <ThrowOnError extends boolean = false>(options?: Options<ListPublishDestinationsData, ThrowOnError>): RequestResult<ListPublishDestinationsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListPublishDestinationsResponses, unknown, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }],
+    url: '/control/publish-destinations',
+    ...options
+});
+
+/**
+ * Create a publish destination (Admin)
+ */
+export const createPublishDestination = <ThrowOnError extends boolean = false>(options: Options<CreatePublishDestinationData, ThrowOnError>): RequestResult<CreatePublishDestinationResponses, CreatePublishDestinationErrors, ThrowOnError> => (options.client ?? client).post<CreatePublishDestinationResponses, CreatePublishDestinationErrors, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }],
+    url: '/control/publish-destinations',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Deactivate a publish destination (Admin)
+ */
+export const deactivatePublishDestination = <ThrowOnError extends boolean = false>(options: Options<DeactivatePublishDestinationData, ThrowOnError>): RequestResult<DeactivatePublishDestinationResponses, DeactivatePublishDestinationErrors, ThrowOnError> => (options.client ?? client).delete<DeactivatePublishDestinationResponses, DeactivatePublishDestinationErrors, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }],
+    url: '/control/publish-destinations/{destinationId}',
+    ...options
+});
+
+/**
+ * Update a publish destination (Admin)
+ */
+export const updatePublishDestination = <ThrowOnError extends boolean = false>(options: Options<UpdatePublishDestinationData, ThrowOnError>): RequestResult<UpdatePublishDestinationResponses, UpdatePublishDestinationErrors, ThrowOnError> => (options.client ?? client).put<UpdatePublishDestinationResponses, UpdatePublishDestinationErrors, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }],
+    url: '/control/publish-destinations/{destinationId}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Read feature flags / collaboration settings (Admin)
+ */
+export const getControlSettings = <ThrowOnError extends boolean = false>(options?: Options<GetControlSettingsData, ThrowOnError>): RequestResult<GetControlSettingsResponses, GetControlSettingsErrors, ThrowOnError> => (options?.client ?? client).get<GetControlSettingsResponses, GetControlSettingsErrors, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }],
+    url: '/control/settings',
+    ...options
+});
+
+/**
+ * Update feature flags (Admin)
+ */
+export const updateControlSettings = <ThrowOnError extends boolean = false>(options: Options<UpdateControlSettingsData, ThrowOnError>): RequestResult<UpdateControlSettingsResponses, UpdateControlSettingsErrors, ThrowOnError> => (options.client ?? client).put<UpdateControlSettingsResponses, UpdateControlSettingsErrors, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }],
+    url: '/control/settings',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Recent Flow health rows (Admin, read-only)
+ */
+export const listFlowRuns = <ThrowOnError extends boolean = false>(options?: Options<ListFlowRunsData, ThrowOnError>): RequestResult<ListFlowRunsResponses, ListFlowRunsErrors, ThrowOnError> => (options?.client ?? client).get<ListFlowRunsResponses, ListFlowRunsErrors, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }],
+    url: '/control/flow-runs',
+    ...options
 });
