@@ -7,10 +7,13 @@ import type { ApproverPerson } from '../domain/approval-queue.ts';
 import { randomUUID } from 'node:crypto';
 import { appConfig } from '../config/app.config.ts';
 import {
-
 	documentTypes as seedDocumentTypes,
 	toApprovalStepInputs,
 } from '../config/document-types.ts';
+import {
+	allocateDocumentNumber,
+	DEFAULT_NUMBER_PATTERN,
+} from '../domain/document-number.ts';
 
 export interface ControlApproverPool {
 	id: string;
@@ -41,6 +44,9 @@ export interface ControlDocumentType {
 	active: boolean;
 	policyVersion: number;
 	defaultDestinationId: string | null;
+	numberPrefix: string;
+	numberPattern: string;
+	nextSequence: number;
 	approvalChain: ControlChainStep[];
 }
 
@@ -170,6 +176,10 @@ function buildSeedSnapshot(): ControlStoreSnapshot {
 		active: true,
 		policyVersion: 1,
 		defaultDestinationId: destinationId,
+		numberPrefix: type.id.slice(0, 3).toUpperCase(),
+		numberPattern: DEFAULT_NUMBER_PATTERN,
+		// policy seeds a published POL-2026-00001 demo case
+		nextSequence: type.id === 'policy' ? 2 : 1,
 		approvalChain: type.approvalChain.map((step, index) =>
 			mapSeedChain(step, index + 1, pools),
 		),
@@ -309,6 +319,29 @@ export function materializeApprovalSteps(typeId: string) {
 		return null;
 	}
 	return toApprovalStepInputs(toDocumentTypeDefinition(type).approvalChain);
+}
+
+/**
+ * Allocates the next controlled document number for a type (mutates nextSequence).
+ */
+export function allocateNextDocumentNumber(
+	typeId: string,
+	clock: Date = new Date(),
+): string {
+	const type = findControlDocumentType(typeId);
+	if (!type) {
+		throw new Error(`Unknown document type: ${typeId}`);
+	}
+	const allocated = allocateDocumentNumber(
+		{
+			numberPrefix: type.numberPrefix || type.id.slice(0, 3).toUpperCase(),
+			numberPattern: type.numberPattern || DEFAULT_NUMBER_PATTERN,
+			nextSequence: type.nextSequence || 1,
+		},
+		clock,
+	);
+	type.nextSequence = allocated.nextSequence;
+	return allocated.documentNumber;
 }
 
 /**

@@ -352,7 +352,7 @@ Prefer Dataverse **business rules / column constraints** for simple field locks;
 
 ## Phase 8 — Controlled documents (numbers, reader, supersession)
 
-**Status:** Planned (after Phase 7).
+**Status:** Implemented.
 
 **Goal:** Treat a **published** artifact as an immutable controlled document: human-facing number, read-only presentation, and supersession via a **new** case — never in-place edit of a published final.
 
@@ -526,9 +526,7 @@ Ship as stacked PRs (one phase per PR unless a phase is tiny):
 
 ### Confirm at Phase 8 kickoff
 
-1. **Number format:** default `{prefix}-{yyyy}-{seq:5}` per type vs org-global single sequence.
-2. **Supersede actor:** same set as withdraw (requester/author/collaborator) vs Admin-only.
-3. **When prior becomes superseded:** on successor **publish** (recommended) vs when supersede is opened.
-4. **Library visibility:** all authenticated app users vs Publishers/Admins only for superseded history.
-
-Default recommendations if unblocked: **(1)** per-type sequence with type prefix, **(2)** same actors as withdraw plus Admin, **(3)** supersede prior on successor publish, **(4)** all authenticated users see current library; superseded readable via lineage links.
+1. **Number format:** default `{prefix}-{yyyy}-{seq:5}` per type vs org-global single sequence. **Locked:** per-type sequence with type prefix.
+2. **Supersede actor:** same set as withdraw (requester/author/collaborator) vs Admin-only. **Locked:** same actors as withdraw plus Admin.
+3. **When prior becomes superseded:** on successor **publish** (recommended) vs when supersede is opened. **Locked:** on successor publish.
+4. **Library visibility:** all authenticated app users vs Publishers/Admins only for superseded history. **Locked:** all authenticated users see current library; superseded via `includeSuperseded` / lineage.

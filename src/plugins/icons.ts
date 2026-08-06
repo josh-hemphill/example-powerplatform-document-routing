@@ -4,6 +4,7 @@
 import {
 	mdiAccountMultipleOutline,
 	mdiArrowLeft,
+	mdiBookOpenOutline,
 	mdiCheckCircle,
 	mdiClockOutline,
 	mdiCloseCircle,
@@ -25,6 +26,7 @@ export const appIconAliases = {
 	closeCircle: mdiCloseCircle,
 	minusCircle: mdiMinusCircle,
 	cogOutline: mdiCogOutline,
+	bookOpenOutline: mdiBookOpenOutline,
 } as const;
 
 export type AppIconAlias = keyof typeof appIconAliases;

@@ -73,6 +73,9 @@ const typeForm = reactive({
 	authorTeamEmails: '',
 	active: true,
 	defaultDestinationId: null as string | null,
+	numberPrefix: '',
+	numberPattern: '',
+	nextSequence: 1,
 	chainJson: '',
 });
 
@@ -184,6 +187,9 @@ function hydrateTypeForm(type: ControlDocumentType): void {
 	typeForm.authorTeamEmails = (type.authorTeamEmails ?? []).join(', ');
 	typeForm.active = type.active;
 	typeForm.defaultDestinationId = type.defaultDestinationId ?? null;
+	typeForm.numberPrefix = type.numberPrefix ?? type.id.slice(0, 3).toUpperCase();
+	typeForm.numberPattern = type.numberPattern ?? '{prefix}-{yyyy}-{seq:5}';
+	typeForm.nextSequence = type.nextSequence ?? 1;
 	typeForm.chainJson = JSON.stringify(type.approvalChain, null, 2);
 }
 
@@ -232,6 +238,13 @@ async function saveType(): Promise<void> {
 	if (!selectedTypeId.value) {
 		return;
 	}
+	const numberPrefix = typeForm.numberPrefix.trim();
+	const numberPattern = typeForm.numberPattern.trim() || '{prefix}-{yyyy}-{seq:5}';
+	const nextSequence = Number(typeForm.nextSequence);
+	if (!Number.isFinite(nextSequence) || !Number.isInteger(nextSequence) || nextSequence < 1) {
+		actionError.value = 'Next sequence must be an integer greater than or equal to 1.';
+		return;
+	}
 	try {
 		const approvalChain = JSON.parse(typeForm.chainJson) as ControlDocumentType['approvalChain'];
 		await saveTypeAsync({
@@ -249,6 +262,9 @@ async function saveType(): Promise<void> {
 					.filter(Boolean),
 				active: typeForm.active,
 				defaultDestinationId: typeForm.defaultDestinationId ?? undefined,
+				numberPrefix: numberPrefix || undefined,
+				numberPattern,
+				nextSequence,
 				approvalChain,
 			},
 		});
@@ -413,6 +429,25 @@ const poolSelectItems = computed(() =>
 							item-value="id"
 							label="Default publish destination"
 							clearable
+							class="mb-2"
+						/>
+						<v-text-field
+							v-model="typeForm.numberPrefix"
+							label="Number prefix"
+							class="mb-2"
+						/>
+						<v-text-field
+							v-model="typeForm.numberPattern"
+							label="Number pattern"
+							hint="{prefix}-{yyyy}-{seq:5}"
+							persistent-hint
+							class="mb-2"
+						/>
+						<v-text-field
+							v-model.number="typeForm.nextSequence"
+							label="Next sequence"
+							type="number"
+							min="1"
 							class="mb-2"
 						/>
 						<v-switch

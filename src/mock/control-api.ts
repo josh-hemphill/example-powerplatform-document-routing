@@ -13,6 +13,15 @@ import {
 
 type SendJson = (res: ServerResponse, status: number, body: unknown) => void;
 
+/** Coerces nextSequence to an integer >= 1; falls back when NaN/invalid. */
+function normalizeNextSequence(value: unknown, fallback: number): number {
+	const parsed = typeof value === 'number' ? value : Number(value);
+	if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed < 1) {
+		return Math.max(1, Math.trunc(fallback) || 1);
+	}
+	return parsed;
+}
+
 function poolKeyFromName(name: string): string {
 	return name
 		.trim()
@@ -141,6 +150,11 @@ export function handleControlApiRequest(options: {
 				active: body.active ?? true,
 				policyVersion: body.policyVersion ?? 1,
 				defaultDestinationId: body.defaultDestinationId ?? null,
+				numberPrefix:
+					body.numberPrefix?.trim()
+					|| body.id.trim().slice(0, 3).toUpperCase(),
+				numberPattern: body.numberPattern?.trim() || '{prefix}-{yyyy}-{seq:5}',
+				nextSequence: normalizeNextSequence(body.nextSequence, 1),
 				approvalChain: body.approvalChain,
 			};
 			getControlStore().documentTypes.push(created);
@@ -186,6 +200,12 @@ export function handleControlApiRequest(options: {
 						body.defaultDestinationId === undefined
 							? type.defaultDestinationId
 							: body.defaultDestinationId,
+					numberPrefix: body.numberPrefix?.trim() || type.numberPrefix,
+					numberPattern: body.numberPattern?.trim() || type.numberPattern,
+					nextSequence:
+						body.nextSequence === undefined
+							? type.nextSequence
+							: normalizeNextSequence(body.nextSequence, type.nextSequence),
 					approvalChain: body.approvalChain ?? type.approvalChain,
 				});
 				sendJson(res, 200, type);

@@ -125,6 +125,7 @@ watch(
 						{ title: 'Approved', value: 'approved' },
 						{ title: 'Rejected', value: 'rejected' },
 						{ title: 'Published', value: 'published' },
+						{ title: 'Superseded', value: 'superseded' },
 					]"
 					label="Status"
 					hide-details

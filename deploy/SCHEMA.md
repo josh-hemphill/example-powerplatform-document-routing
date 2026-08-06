@@ -91,3 +91,22 @@ Optional / soft table (or `appsetting`-backed log) for Admin **Flow health**:
 | `message`  | Short outcome for operators          |
 
 Hosted Flows should append a row (or update `appsetting`) at the end of SLA / publish runs. The Vite mock seeds success and failure samples and calls `recordFlowRun` on SLA changes and publish.
+
+## Controlled documents (Phase 8)
+
+Published finals are **immutable**. Changes open a new case via **supersede**; the prior
+becomes `superseded` when the successor publishes (same `documentnumber`,
+`documentversion` + 1).
+
+| Field / table                         | Purpose                                                                 |
+| ------------------------------------- | ----------------------------------------------------------------------- |
+| `document.documentnumber`             | Human id (e.g. `POL-2026-00042`), assigned on first publish             |
+| `document.documentversion`            | Controlled version (starts at 1)                                        |
+| `document.supersedesdocument`         | Lookup to prior published case                                          |
+| `document.supersededbydocument`       | Lookup set when successor publishes                                     |
+| `document.publishedat`                | Publish instant for this controlled version                             |
+| `documenttype.numberprefix` / pattern | Per-type format; default `{prefix}-{yyyy}-{seq:5}`                      |
+| `documenttype.nextsequence`           | Atomic sequence counter (mock in-memory; Dataverse needs transactional) |
+
+Library (`GET /library`) and reader (`GET /documents/by-number/{number}`) are visible to
+authenticated Document Routing users. Number allocation is server/Flow only.

@@ -10,11 +10,13 @@ import {
 	getDocumentQueryKey,
 	listDocumentsQueryKey,
 	listDocumentTypesQuery,
+	listLibraryDocumentsQueryKey,
 	listPublishDestinationsQuery,
 	processApprovalSlaMutation,
 	publishDocumentPdfMutation,
 	releaseApprovalStepMutation,
 	submitForApprovalMutation,
+	supersedeDocumentMutation,
 	updateDocumentDraftMutation,
 	withdrawAndReviseMutation,
 } from '@/client/@pinia/colada.gen';
@@ -169,10 +171,23 @@ export function useDocumentWorkspace(documentId: Ref<string>) {
 		},
 	});
 
+	const { mutateAsync: supersedeAsync, isLoading: isSuperseding } = useMutation({
+		...supersedeDocumentMutation(),
+		async onSettled() {
+			await Promise.all([
+				invalidateDocumentQueries(),
+				queryCache.invalidateQueries({ key: listLibraryDocumentsQueryKey() }),
+			]);
+		},
+	});
+
 	const { mutateAsync: publishPdfAsync, isLoading: isPublishingPdf } = useMutation({
 		...publishDocumentPdfMutation(),
 		async onSettled() {
-			await invalidateDocumentQueries();
+			await Promise.all([
+				invalidateDocumentQueries(),
+				queryCache.invalidateQueries({ key: listLibraryDocumentsQueryKey() }),
+			]);
 		},
 	});
 
@@ -283,6 +298,22 @@ export function useDocumentWorkspace(documentId: Ref<string>) {
 		}
 		catch(withdrawError) {
 			actionError.value = getApiErrorMessage(withdrawError, 'Failed to withdraw and revise');
+		}
+	}
+
+	async function onSupersede(): Promise<string | null> {
+		clearActionFeedback();
+		try {
+			const successor = await supersedeAsync({
+				path: { documentId: documentId.value },
+				body: {},
+			});
+			actionSuccess.value = 'Successor draft opened for supersession.';
+			return successor.id;
+		}
+		catch(supersedeError) {
+			actionError.value = getApiErrorMessage(supersedeError, 'Failed to supersede');
+			return null;
 		}
 	}
 
@@ -414,6 +445,30 @@ export function useDocumentWorkspace(documentId: Ref<string>) {
 		);
 	});
 
+	const canSupersede = computed(() => {
+		const doc = document.value;
+		const actor = (context.value.email || '').toLowerCase();
+		if (!canAct.value || !doc || doc.status !== 'published' || !actor) {
+			return false;
+		}
+		if (identity.hasRole('admin')) {
+			return true;
+		}
+		return (
+			doc.requesterEmail.toLowerCase() === actor
+			|| doc.authorEmail?.toLowerCase() === actor
+			|| (doc.collaboratorEmails ?? []).some((email) => email.toLowerCase() === actor)
+		);
+	});
+
+	const publishedLibraryPath = computed(() => {
+		const number = document.value?.documentNumber;
+		if (!number || (document.value?.status !== 'published' && document.value?.status !== 'superseded')) {
+			return null;
+		}
+		return { name: 'library-document' as const, params: { documentNumber: number } };
+	});
+
 	return {
 		document,
 		isPending,
@@ -435,6 +490,7 @@ export function useDocumentWorkspace(documentId: Ref<string>) {
 		isReleasing,
 		isProcessingSla,
 		isWithdrawing,
+		isSuperseding,
 		isPublishingPdf,
 		onSaveDraft,
 		onSubmitForApproval,
@@ -442,6 +498,7 @@ export function useDocumentWorkspace(documentId: Ref<string>) {
 		onRelease,
 		onProcessSla,
 		onWithdrawAndRevise,
+		onSupersede,
 		onDecision,
 		onPublish,
 		canDraft,
@@ -452,5 +509,7 @@ export function useDocumentWorkspace(documentId: Ref<string>) {
 		canPublish,
 		canProcessSla,
 		canWithdraw,
+		canSupersede,
+		publishedLibraryPath,
 	};
 }

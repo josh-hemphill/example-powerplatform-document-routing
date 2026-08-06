@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { ClaimApprovalStepData, ClaimApprovalStepErrors, ClaimApprovalStepResponses, CreateApproverPoolData, CreateApproverPoolErrors, CreateApproverPoolResponses, CreateDocumentRequestData, CreateDocumentRequestErrors, CreateDocumentRequestResponses, CreateDocumentTypeData, CreateDocumentTypeErrors, CreateDocumentTypeResponses, CreatePublishDestinationData, CreatePublishDestinationErrors, CreatePublishDestinationResponses, DeactivateDocumentTypeData, DeactivateDocumentTypeErrors, DeactivateDocumentTypeResponses, DeactivatePublishDestinationData, DeactivatePublishDestinationErrors, DeactivatePublishDestinationResponses, DecideApprovalStepData, DecideApprovalStepErrors, DecideApprovalStepResponses, DeleteApproverPoolData, DeleteApproverPoolErrors, DeleteApproverPoolResponses, GetControlSettingsData, GetControlSettingsErrors, GetControlSettingsResponses, GetDocumentData, GetDocumentErrors, GetDocumentResponses, GetDocumentTypeConfigData, GetDocumentTypeConfigErrors, GetDocumentTypeConfigResponses, ListApproverPoolsData, ListApproverPoolsErrors, ListApproverPoolsResponses, ListDocumentsData, ListDocumentsErrors, ListDocumentsResponses, ListDocumentTypesData, ListDocumentTypesResponses, ListFlowRunsData, ListFlowRunsErrors, ListFlowRunsResponses, ListPublishDestinationsData, ListPublishDestinationsResponses, ProcessApprovalSlaData, ProcessApprovalSlaErrors, ProcessApprovalSlaResponses, PublishDocumentPdfData, PublishDocumentPdfErrors, PublishDocumentPdfResponses, ReleaseApprovalStepData, ReleaseApprovalStepErrors, ReleaseApprovalStepResponses, SubmitForApprovalData, SubmitForApprovalErrors, SubmitForApprovalResponses, UpdateApproverPoolData, UpdateApproverPoolErrors, UpdateApproverPoolResponses, UpdateControlSettingsData, UpdateControlSettingsErrors, UpdateControlSettingsResponses, UpdateDocumentDraftData, UpdateDocumentDraftErrors, UpdateDocumentDraftResponses, UpdateDocumentTypeData, UpdateDocumentTypeErrors, UpdateDocumentTypeResponses, UpdatePublishDestinationData, UpdatePublishDestinationErrors, UpdatePublishDestinationResponses, WithdrawAndReviseData, WithdrawAndReviseErrors, WithdrawAndReviseResponses } from './types.gen';
+import type { ClaimApprovalStepData, ClaimApprovalStepErrors, ClaimApprovalStepResponses, CreateApproverPoolData, CreateApproverPoolErrors, CreateApproverPoolResponses, CreateDocumentRequestData, CreateDocumentRequestErrors, CreateDocumentRequestResponses, CreateDocumentTypeData, CreateDocumentTypeErrors, CreateDocumentTypeResponses, CreatePublishDestinationData, CreatePublishDestinationErrors, CreatePublishDestinationResponses, DeactivateDocumentTypeData, DeactivateDocumentTypeErrors, DeactivateDocumentTypeResponses, DeactivatePublishDestinationData, DeactivatePublishDestinationErrors, DeactivatePublishDestinationResponses, DecideApprovalStepData, DecideApprovalStepErrors, DecideApprovalStepResponses, DeleteApproverPoolData, DeleteApproverPoolErrors, DeleteApproverPoolResponses, GetControlSettingsData, GetControlSettingsErrors, GetControlSettingsResponses, GetDocumentByNumberData, GetDocumentByNumberErrors, GetDocumentByNumberResponses, GetDocumentData, GetDocumentErrors, GetDocumentResponses, GetDocumentTypeConfigData, GetDocumentTypeConfigErrors, GetDocumentTypeConfigResponses, ListApproverPoolsData, ListApproverPoolsErrors, ListApproverPoolsResponses, ListDocumentsData, ListDocumentsErrors, ListDocumentsResponses, ListDocumentTypesData, ListDocumentTypesResponses, ListFlowRunsData, ListFlowRunsErrors, ListFlowRunsResponses, ListLibraryDocumentsData, ListLibraryDocumentsErrors, ListLibraryDocumentsResponses, ListPublishDestinationsData, ListPublishDestinationsResponses, ProcessApprovalSlaData, ProcessApprovalSlaErrors, ProcessApprovalSlaResponses, PublishDocumentPdfData, PublishDocumentPdfErrors, PublishDocumentPdfResponses, ReleaseApprovalStepData, ReleaseApprovalStepErrors, ReleaseApprovalStepResponses, SubmitForApprovalData, SubmitForApprovalErrors, SubmitForApprovalResponses, SupersedeDocumentData, SupersedeDocumentErrors, SupersedeDocumentResponses, UpdateApproverPoolData, UpdateApproverPoolErrors, UpdateApproverPoolResponses, UpdateControlSettingsData, UpdateControlSettingsErrors, UpdateControlSettingsResponses, UpdateDocumentDraftData, UpdateDocumentDraftErrors, UpdateDocumentDraftResponses, UpdateDocumentTypeData, UpdateDocumentTypeErrors, UpdateDocumentTypeResponses, UpdatePublishDestinationData, UpdatePublishDestinationErrors, UpdatePublishDestinationResponses, WithdrawAndReviseData, WithdrawAndReviseErrors, WithdrawAndReviseResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -85,7 +85,8 @@ export const submitForApproval = <ThrowOnError extends boolean = false>(options:
  *
  * Clears approval steps and returns the case to `drafting` so authors can
  * revise content. Allowed from `in_review`, `rejected`, or `approved`
- * for the requester, author, or collaborators.
+ * for the requester, author, or collaborators. Not allowed from
+ * `published` or `superseded` (use supersede instead).
  *
  */
 export const withdrawAndRevise = <ThrowOnError extends boolean = false>(options: Options<WithdrawAndReviseData, ThrowOnError>): RequestResult<WithdrawAndReviseResponses, WithdrawAndReviseErrors, ThrowOnError> => (options.client ?? client).post<WithdrawAndReviseResponses, WithdrawAndReviseErrors, ThrowOnError>({
@@ -159,7 +160,9 @@ export const processApprovalSla = <ThrowOnError extends boolean = false>(options
  *
  * Starts trusted publish (mock or Cloud Flow). The client does **not** upload
  * PDF/HTML bytes. Requires Publisher (or Admin) role. Idempotent for the same
- * content revision.
+ * content revision. First publish allocates `documentNumber` + version 1.
+ * Publishing a superseding case marks the prior document `superseded` and
+ * keeps the same number with version + 1.
  *
  */
 export const publishDocumentPdf = <ThrowOnError extends boolean = false>(options: Options<PublishDocumentPdfData, ThrowOnError>): RequestResult<PublishDocumentPdfResponses, PublishDocumentPdfErrors, ThrowOnError> => (options.client ?? client).post<PublishDocumentPdfResponses, PublishDocumentPdfErrors, ThrowOnError>({
@@ -170,6 +173,42 @@ export const publishDocumentPdf = <ThrowOnError extends boolean = false>(options
         'Content-Type': 'application/json',
         ...options.headers
     }
+});
+
+/**
+ * Open a successor case that will supersede a published document
+ *
+ * Creates a new drafting case linked via `supersedesDocumentId`. Allowed when
+ * the source is `published` and no open successor already exists. Published
+ * content is never edited in place.
+ *
+ */
+export const supersedeDocument = <ThrowOnError extends boolean = false>(options: Options<SupersedeDocumentData, ThrowOnError>): RequestResult<SupersedeDocumentResponses, SupersedeDocumentErrors, ThrowOnError> => (options.client ?? client).post<SupersedeDocumentResponses, SupersedeDocumentErrors, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }, { name: 'X-Document-Routing-Roles', type: 'apiKey' }],
+    url: '/documents/{documentId}/supersede',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * List current controlled (published) documents
+ */
+export const listLibraryDocuments = <ThrowOnError extends boolean = false>(options?: Options<ListLibraryDocumentsData, ThrowOnError>): RequestResult<ListLibraryDocumentsResponses, ListLibraryDocumentsErrors, ThrowOnError> => (options?.client ?? client).get<ListLibraryDocumentsResponses, ListLibraryDocumentsErrors, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }, { name: 'X-Document-Routing-Roles', type: 'apiKey' }],
+    url: '/library',
+    ...options
+});
+
+/**
+ * Resolve the current published document by controlled number
+ */
+export const getDocumentByNumber = <ThrowOnError extends boolean = false>(options: Options<GetDocumentByNumberData, ThrowOnError>): RequestResult<GetDocumentByNumberResponses, GetDocumentByNumberErrors, ThrowOnError> => (options.client ?? client).get<GetDocumentByNumberResponses, GetDocumentByNumberErrors, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }, { name: 'X-Document-Routing-Roles', type: 'apiKey' }],
+    url: '/documents/by-number/{documentNumber}',
+    ...options
 });
 
 /**

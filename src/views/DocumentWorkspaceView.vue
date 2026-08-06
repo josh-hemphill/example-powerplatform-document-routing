@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { getApiErrorMessage } from '@/api/api-error';
 import ApprovalPanel from '@/components/workspace/ApprovalPanel.vue';
 import DraftPanel from '@/components/workspace/DraftPanel.vue';
@@ -11,6 +11,7 @@ import WorkspaceHeader from '@/components/workspace/WorkspaceHeader.vue';
 import { useDocumentWorkspace } from '@/composables/use-document-workspace';
 
 const route = useRoute();
+const router = useRouter();
 const documentId = computed(() => String(route.params.documentId));
 
 const {
@@ -39,6 +40,7 @@ const {
 	isReleasing,
 	isProcessingSla,
 	isWithdrawing,
+	isSuperseding,
 	isPublishingPdf,
 	onSaveDraft,
 	onSubmitForApproval,
@@ -46,6 +48,7 @@ const {
 	onRelease,
 	onProcessSla,
 	onWithdrawAndRevise,
+	onSupersede,
 	onDecision,
 	onPublish,
 	canDraft,
@@ -56,9 +59,18 @@ const {
 	canPublish,
 	canProcessSla,
 	canWithdraw,
+	canSupersede,
+	publishedLibraryPath,
 } = useDocumentWorkspace(documentId);
 
 const typeLabel = computed(() => documentType.value.label);
+
+async function handleSupersede(): Promise<void> {
+	const successorId = await onSupersede();
+	if (successorId) {
+		await router.push({ name: 'document', params: { documentId: successorId } });
+	}
+}
 </script>
 
 <template>
@@ -103,11 +115,55 @@ const typeLabel = computed(() => documentType.value.label);
 		<v-skeleton-loader v-if="isPending" type="article, actions" />
 
 		<template v-else-if="document">
+			<v-alert
+				v-if="document.supersedesDocumentId"
+				type="info"
+				variant="tonal"
+				class="mb-4"
+			>
+				This case supersedes a prior published document. The prior number stays current until you publish this revision.
+				<RouterLink
+					class="ms-1"
+					:to="{ name: 'document', params: { documentId: document.supersedesDocumentId } }"
+				>
+					Open prior case
+				</RouterLink>
+			</v-alert>
+
+			<v-alert
+				v-if="document.status === 'published' || document.status === 'superseded'"
+				type="info"
+				variant="tonal"
+				class="mb-4"
+			>
+				Published finals are immutable. Use supersede to open a new case — do not edit this content in place.
+				<RouterLink
+					v-if="publishedLibraryPath"
+					class="ms-1"
+					:to="publishedLibraryPath"
+				>
+					View published document
+				</RouterLink>
+			</v-alert>
+
 			<WorkspaceHeader
 				:document="document"
 				:type-label="typeLabel"
 				@refresh="() => refetch()"
 			/>
+
+			<div
+				v-if="canSupersede"
+				class="mb-4 d-flex flex-wrap ga-2"
+			>
+				<v-btn
+					color="primary"
+					:loading="isSuperseding"
+					@click="handleSupersede"
+				>
+					Supersede with new case
+				</v-btn>
+			</div>
 
 			<v-row>
 				<v-col cols="12" md="7">

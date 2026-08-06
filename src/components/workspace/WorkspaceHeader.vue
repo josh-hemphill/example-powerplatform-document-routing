@@ -21,6 +21,13 @@ const emit = defineEmits<{
 					{{ document.title }}
 				</div>
 				<div class="text-body-2 text-medium-emphasis">
+					<template v-if="document.documentNumber">
+						{{ document.documentNumber }}
+						<template v-if="document.documentVersion">
+							· v{{ document.documentVersion }}
+						</template>
+						·
+					</template>
 					{{ typeLabel }} · Requested by {{ document.requesterEmail }}
 				</div>
 			</div>

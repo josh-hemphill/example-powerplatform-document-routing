@@ -4,7 +4,7 @@ export type ClientOptions = {
     baseUrl: `${string}://${string}/api` | 'https://{environment}.crm.dynamics.com/api/document-routing' | (string & {});
 };
 
-export type DocumentStatus = 'requested' | 'drafting' | 'in_review' | 'approved' | 'rejected' | 'published';
+export type DocumentStatus = 'requested' | 'drafting' | 'in_review' | 'approved' | 'rejected' | 'published' | 'superseded';
 
 export type ApprovalStepStatus = 'waiting' | 'queued' | 'pending' | 'approved' | 'rejected' | 'skipped';
 
@@ -174,6 +174,26 @@ export type DocumentSummary = {
      * contentRevision of the artifact currently published
      */
     publishedContentRevision?: number | null;
+    /**
+     * Human-facing controlled document number (assigned on first publish)
+     */
+    documentNumber?: string | null;
+    /**
+     * Controlled version (1 on first publish; increments on superseding publish)
+     */
+    documentVersion?: number | null;
+    /**
+     * Prior published document this case will replace
+     */
+    supersedesDocumentId?: string | null;
+    /**
+     * Successor document that replaced this one
+     */
+    supersededByDocumentId?: string | null;
+    /**
+     * When this controlled version was published
+     */
+    publishedAt?: string | null;
 };
 
 export type ApprovalStep = {
@@ -270,6 +290,18 @@ export type ControlDocumentType = {
     active: boolean;
     policyVersion: number;
     defaultDestinationId?: string | null;
+    /**
+     * Controlled document number prefix (e.g. POL)
+     */
+    numberPrefix?: string;
+    /**
+     * Pattern with {prefix}, {yyyy}, {seq:N}
+     */
+    numberPattern?: string;
+    /**
+     * Next sequence value for number allocation (server-managed)
+     */
+    nextSequence?: number;
     approvalChain: Array<ControlChainStep>;
 };
 
@@ -284,6 +316,18 @@ export type ControlDocumentTypeWrite = {
     active: boolean;
     policyVersion?: number;
     defaultDestinationId?: string | null;
+    /**
+     * Controlled document number prefix (e.g. POL)
+     */
+    numberPrefix?: string;
+    /**
+     * Pattern with {prefix}, {yyyy}, {seq:N}
+     */
+    numberPattern?: string;
+    /**
+     * Next sequence value for number allocation (server-managed)
+     */
+    nextSequence?: number;
     approvalChain: Array<ControlChainStep>;
 };
 
@@ -771,6 +815,112 @@ export type PublishDocumentPdfResponses = {
 };
 
 export type PublishDocumentPdfResponse = PublishDocumentPdfResponses[keyof PublishDocumentPdfResponses];
+
+export type SupersedeDocumentData = {
+    body?: {
+        comment?: string;
+    };
+    path: {
+        documentId: string;
+    };
+    query?: never;
+    url: '/documents/{documentId}/supersede';
+};
+
+export type SupersedeDocumentErrors = {
+    /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
+    /**
+     * Caller is not allowed to perform this action
+     */
+    403: Error;
+    /**
+     * Resource not found
+     */
+    404: Error;
+    /**
+     * Invalid state transition
+     */
+    409: Error;
+};
+
+export type SupersedeDocumentError = SupersedeDocumentErrors[keyof SupersedeDocumentErrors];
+
+export type SupersedeDocumentResponses = {
+    /**
+     * Successor document created
+     */
+    201: Document;
+};
+
+export type SupersedeDocumentResponse = SupersedeDocumentResponses[keyof SupersedeDocumentResponses];
+
+export type ListLibraryDocumentsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Search number, title, or type
+         */
+        q?: string;
+        documentType?: string;
+        includeSuperseded?: boolean;
+    };
+    url: '/library';
+};
+
+export type ListLibraryDocumentsErrors = {
+    /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
+};
+
+export type ListLibraryDocumentsError = ListLibraryDocumentsErrors[keyof ListLibraryDocumentsErrors];
+
+export type ListLibraryDocumentsResponses = {
+    /**
+     * Library list
+     */
+    200: {
+        items: Array<DocumentSummary>;
+    };
+};
+
+export type ListLibraryDocumentsResponse = ListLibraryDocumentsResponses[keyof ListLibraryDocumentsResponses];
+
+export type GetDocumentByNumberData = {
+    body?: never;
+    path: {
+        documentNumber: string;
+    };
+    query?: never;
+    url: '/documents/by-number/{documentNumber}';
+};
+
+export type GetDocumentByNumberErrors = {
+    /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
+    /**
+     * Resource not found
+     */
+    404: Error;
+};
+
+export type GetDocumentByNumberError = GetDocumentByNumberErrors[keyof GetDocumentByNumberErrors];
+
+export type GetDocumentByNumberResponses = {
+    /**
+     * Current published document for this number
+     */
+    200: Document;
+};
+
+export type GetDocumentByNumberResponse = GetDocumentByNumberResponses[keyof GetDocumentByNumberResponses];
 
 export type ListDocumentTypesData = {
     body?: never;
