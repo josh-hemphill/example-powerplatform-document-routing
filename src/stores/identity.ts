@@ -1,3 +1,4 @@
+import type { DocumentRoutingRole } from '@/domain/security-roles';
 /**
  * App-level Power Apps / standalone identity.
  * Single in-flight host context load; never trust request-body actor emails.
@@ -6,7 +7,7 @@ import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import { appConfig } from '@/config/app.config';
 import {
-	type DocumentRoutingRole,
+
 	resolveHostedRoles,
 } from '@/domain/security-roles';
 
@@ -96,10 +97,7 @@ async function raceHostContext(): Promise<HostContextResult> {
 	return Promise.race([
 		getContext().then((context) => ({ kind: 'context' as const, context })),
 		new Promise<HostContextResult>((resolve) => {
-			window.setTimeout(
-				() => resolve({ kind: 'timeout' }),
-				HOST_CONTEXT_TIMEOUT_MS,
-			);
+			window.setTimeout(resolve, HOST_CONTEXT_TIMEOUT_MS, { kind: 'timeout' });
 		}),
 	]);
 }

@@ -40,9 +40,9 @@ Dataverse user). Never accept `actorEmail` / spoofable identity in request bodie
 
 The Vite mock accepts:
 
-| Header | Purpose |
-| ------ | ------- |
-| `X-Document-Routing-Actor` | Email/UPN stand-in for the caller |
+| Header                     | Purpose                                                                                                      |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `X-Document-Routing-Actor` | Email/UPN stand-in for the caller                                                                            |
 | `X-Document-Routing-Roles` | Comma-separated role tokens (`user`, `author`, `approver`, `publisher`, `admin`, optional `service` for SLA) |
 
 The SPA sets these from the identity store for **local play only**. Production

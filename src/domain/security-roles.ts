@@ -20,11 +20,11 @@ export const DATAVERSE_SECURITY_ROLE_NAMES = {
 } as const;
 
 const NORMALIZED_ROLE_ALIASES: Record<string, DocumentRoutingRole> = {
-	user: 'user',
-	author: 'author',
-	approver: 'approver',
-	publisher: 'publisher',
-	admin: 'admin',
+	'user': 'user',
+	'author': 'author',
+	'approver': 'approver',
+	'publisher': 'publisher',
+	'admin': 'admin',
 	'document routing user': 'user',
 	'document routing author': 'author',
 	'document routing approver': 'approver',

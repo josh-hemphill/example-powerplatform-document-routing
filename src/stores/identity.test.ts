@@ -65,7 +65,7 @@ describe('identity store', () => {
 
 	it('fails on host context timeout without installing demo identity', async() => {
 		vi.useFakeTimers();
-		getContext.mockImplementation(() => new Promise(() => {}));
+		getContext.mockImplementation(async() => new Promise(() => {}));
 
 		const store = useIdentityStore();
 		const pending = store.ensureLoaded();
@@ -80,7 +80,7 @@ describe('identity store', () => {
 
 	it('retries after a failed load', async() => {
 		vi.useFakeTimers();
-		getContext.mockImplementation(() => new Promise(() => {}));
+		getContext.mockImplementation(async() => new Promise(() => {}));
 
 		const store = useIdentityStore();
 		const first = store.ensureLoaded();
