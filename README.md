@@ -77,7 +77,8 @@ Customize `src/publishing/html-pdf-template.ts`. Run HTML→PDF (or Typst) **ser
 
 ```text
 SETUP.md                          Adopter checklist (start here)
-docs/remediation-roadmap.md       Phased hardening plan (Dataverse-first)
+docs/remediation-roadmap.md       Phased hardening plan (Dataverse-first, Phases 0–8)
+docs/post-phase-8-review-roadmap.md  Post-review Phases 9–13 (authz, UX polish)
 deploy/                           Dataverse + SharePoint provision scaffolding
 deploy/SCHEMA.md                  Control + case table model (collaboration / SLA)
 src/config/app.config.ts          Brand + SharePoint defaults (env-overridable)
