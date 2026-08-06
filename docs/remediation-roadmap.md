@@ -57,12 +57,13 @@ This is intentional scaffolding evolution for an example Code App — not a rewr
 | Unknown doc type → `policy` fallback                          | 1, 3    |
 | Filename collisions                                           | 5       |
 | `allowApproverOverride` docs drift                            | 4, 6    |
-| Query refetch clobbers edits / no concurrency                 | 6       |
+| Query refetch clobbers edits / no concurrency                 | 6, 7    |
 | Typed API errors discarded                                    | 6       |
 | Weak form validation / a11y / no CI/lint                      | 0, 6, 7 |
 | Full MDI webfont                                              | 0       |
 | Oversized workspace view / duplicated types                   | 6       |
 | Concurrent TOCTOU / no CAS                                    | 3, 7    |
+| No controlled document number / reader / supersession         | 8       |
 
 ---
 
@@ -309,21 +310,151 @@ Prefer Dataverse **business rules / column constraints** for simple field locks;
 
 ## Phase 7 — Hardening, tests, observability
 
-**Goal:** Close remaining review gaps and keep regressions out.
+**Status:** Planned (next after Phase 6).
+
+**Goal:** Lock the routing → approve → publish model against regressions before adding controlled-document product surface (Phase 8).
 
 ### Work
 
-1. Integration tests: full request → collaborative draft → submit → claim → SLA → decide → publish (mock).
-2. Concurrency tests where feasible (claim races, double decide); document Dataverse optimistic concurrency / row version strategy.
-3. Provisioning apply dry-run tests for schema drift detection.
-4. Optional axe checks on inbox/admin.
-5. Bundle budget check (icons already tree-shaken).
-6. Telemetry hooks for Flow failures surfaced in Admin (if Phase 4 stretch landed).
+1. **End-to-end mock integration test**
+   - One happy path: create → collaborative draft (second actor) → submit → claim → decide → (optional SLA elevate) → publish.
+   - Assert status transitions, `contentRevision` / `publishedContentRevision`, history actions, and idempotent republish.
+2. **Concurrency / CAS notes + tests**
+   - Document Dataverse row-version / `If-Match` (or equivalent) strategy in `deploy/SCHEMA.md`.
+   - Mock tests for claim race (second claimer → 409) and double decide (second decide → 409).
+   - UI: surface `409` clearly via existing `getApiErrorMessage` (no silent refetch clobber — already Phase 6).
+3. **Provisioning hardening tests**
+   - Dry-run / plan-diff coverage for schema drift (new columns refuse incompatible types).
+   - Keep quoting + connection-schema validation green under `pnpm check`.
+4. **Coverage thresholds**
+   - Vitest coverage for `src/domain/`, `src/mock/approval-engine.ts`, `src/publishing/publish-engine.ts`, provisioning quoting/validation.
+   - Wire into `pnpm check` / CI (fail under threshold).
+5. **A11y**
+   - Enable progressive Vue a11y rules where cheap; add optional axe smoke on inbox + admin (+ published reader once Phase 8 lands).
+6. **Bundle budget**
+   - CI check that production CSS/JS stay under a documented gzip budget (icons already tree-shaken).
+7. **Flow health observability**
+   - Ensure Admin Flow health panel has enough mock/seed failure rows to demo; document how hosted Flow writes `flowrun` rows.
+   - No new telemetry vendor — stick to Dataverse/`flowrun` + Admin UI.
+
+### Explicitly out of scope here
+
+- Document numbers, library/reader UX, supersession (Phase 8).
+- Dataverse C# plugins (still deferred).
 
 ### Exit criteria
 
-- `pnpm check` includes coverage threshold for `domain/`, `mock/approval-engine`, provisioning quoting/validation.
-- Review backlog items either fixed or explicitly deferred in this doc’s “Deferred” section.
+- `pnpm check` enforces coverage thresholds for the packages above.
+- Claim/decide race behaviors tested; concurrency strategy documented.
+- Review backlog items either fixed or moved to Deferred / Phase 8 with rationale.
+
+---
+
+## Phase 8 — Controlled documents (numbers, reader, supersession)
+
+**Status:** Planned (after Phase 7).
+
+**Goal:** Treat a **published** artifact as an immutable controlled document: human-facing number, read-only presentation, and supersession via a **new** case — never in-place edit of a published final.
+
+### Product rules (locked for this phase)
+
+| Rule | Choice |
+| ---- | ------ |
+| Immutability | `published` content and metadata that define the controlled artifact are read-only. No draft PUT, no withdraw-and-revise from `published`. |
+| Change path | **Supersede** creates a new document case linked to the prior published record; old record becomes `superseded`. |
+| Numbering | Assign a **document number** at first successful publish (not at request). Format is per document type. |
+| Presentation | Dedicated read-only **published document** page (and a library list). Workspace remains the routing/authoring surface. |
+| SharePoint | PDF remains the file-of-record in the allowlisted library; the app is the registry + reader chrome, not a second source of truth for bytes. |
+
+### State machine extension
+
+```text
+requested ⇄ drafting  →  in_review  →  approved  →  published  →  superseded
+                ↑            │              │
+                └─ revise ←──┴──────────────┘   (withdraw: not from published)
+                             └→ rejected → (optional revise)
+
+supersede(published A) → new case B (requested/drafting)
+  B.supersedes = A
+  A stays published until B publishes, then A → superseded (A.supersededBy = B)
+```
+
+**Timing of A → superseded:** Prefer **on B’s successful publish** (A remains the current controlled doc until the replacement is live). Reject a second concurrent supersede while B is still open (or allow only one open successor).
+
+### Schema / control model
+
+**Document (case) fields**
+
+| Field | Purpose |
+| ----- | ------- |
+| `documentNumber` | Human id, e.g. `POL-2026-00042` (null until first publish) |
+| `documentVersion` | Controlled version integer starting at `1` on first publish; successor publishes get `prior + 1` |
+| `supersedesDocumentId` | Lookup/UUID of the document this case replaces (set on supersede create) |
+| `supersededByDocumentId` | Set on the prior doc when successor publishes |
+| `publishedAt` | First (or this version’s) publish instant |
+| `status` | Add `superseded` to `DocumentStatus` |
+
+**Document type / settings**
+
+| Field | Purpose |
+| ----- | ------- |
+| `numberPrefix` | e.g. `POL`, `SOP` |
+| `numberPattern` | Template, default `{prefix}-{yyyy}-{seq:5}` |
+| `nextSequence` **or** separate `documentnumbersequence` table | Atomic sequence per type (Dataverse); mock uses in-memory counter |
+
+**Filename:** Keep revision-safe PDF names; optionally include `documentNumber` + `documentVersion` once assigned (`{number}-v{version}.pdf` or keep id+contentRevision for storage uniqueness and show number in UI).
+
+### API / Flow
+
+1. **Publish (extend Phase 5)**
+   - If first publish: allocate number + `documentVersion = 1`.
+   - If republish same `contentRevision`: still idempotent (no new number/version).
+   - If this case `supersedes` another and publish succeeds: mark prior `superseded`, set `supersededByDocumentId`, copy forward number, bump `documentVersion`.
+2. **`POST /documents/{id}/supersede`**
+   - Allowed when status is `published` and no open successor exists.
+   - Creates new case: copies type, title suggestion (“… (revision)”), freeform seed, collaboration shares; sets `supersedesDocumentId`; status `drafting` or `requested`.
+   - Does **not** copy approval steps (new chain materializes on submit from current control tables).
+3. **`GET /library` (or filter on list)**
+   - List current controlled docs (`published` only by default; optional include `superseded`).
+   - Search by number, title, type.
+4. **`GET /documents/by-number/{documentNumber}`**
+   - Resolves the **current** published version (not superseded), or 404.
+
+### App UX
+
+1. **Library** — `#/library` (nav for authenticated users): table of current published docs (number, title, type, version, published date).
+2. **Published reader** — `#/library/:documentNumber` or `#/documents/:id/published`:
+   - Brand/number/version, status chip, link to PDF, supersession trail (prior/next), metadata.
+   - No draft editors; CTA **Supersede** (author/admin policy) when status is `published`.
+3. **Workspace**
+   - If `published`: hide draft save; show link “View published document”; show supersede instead of withdraw.
+   - If case is a successor in progress: banner “Superseding {number} v{n}”.
+4. **Admin**
+   - Document type: edit `numberPrefix` / pattern; show next sequence (read-only or adjust with audit caution).
+
+### Permissions
+
+- Library/reader: any Document Routing User who can read published org docs (tighten later with Dataverse table perms).
+- Supersede: requester/author/collaborator on the published doc, or Admin (mirror withdraw actor set unless product says Admin-only).
+- Number allocation: server/Flow only — never client-supplied `documentNumber`.
+
+### Mock alignment
+
+- Sequence allocator in control store; publish assigns number; supersede endpoint + status transition tests.
+- Integration: publish A → supersede → draft/submit/approve/publish B → A `superseded`, B has same number and version+1.
+
+### Exit criteria
+
+- Published content cannot be edited or withdrawn in place.
+- First publish assigns a stable document number; superseding publish keeps the number and increments version.
+- Library + reader pages show current finals; superseded docs remain reachable read-only with clear lineage.
+- OpenAPI + mock + schema doc describe the new fields and statuses.
+
+### Out of scope (later / deferred)
+
+- Full records-management retention labels, legal hold, external public anonymous reader.
+- Branching multiple simultaneous drafts of the same number (one open successor only).
+- Auto-migrate historical published cases without numbers (optional backfill script if needed).
 
 ---
 
@@ -344,10 +475,12 @@ Phase 5 (Publish Flow)           ←── real SharePoint PDFs
     ↓
 Phase 6 (app/contract polish)
     ↓
-Phase 7 (hardening)
+Phase 7 (hardening)              ←── lock routing model
+    ↓
+Phase 8 (controlled documents)   ←── numbers, reader, supersede
 ```
 
-Phases 0 and 1 can proceed in parallel after the schema sketch is agreed. Phase 4 can start UI shell against mock control APIs as soon as Phase 1 table shapes exist.
+Phases 0 and 1 can proceed in parallel after the schema sketch is agreed. Phase 4 can start UI shell against mock control APIs as soon as Phase 1 table shapes exist. Phase 8 depends on Phase 5 publish semantics and benefits from Phase 7 coverage so supersession does not regress claim/publish races.
 
 ---
 
@@ -361,29 +494,41 @@ Ship as stacked PRs (one phase per PR unless a phase is tiny):
 | 1a  | Dataverse control schema + SLA/revision fields            |
 | 1b  | Provisioning validation, quoting, lookup/idempotency      |
 | 2   | Identity store, strip actor spoofing, draft sharing rules |
-| 3a  | Approval engine + mock tests (SLA/elevation/decisions)    |
+| 3a  | Workflow engine + mock tests (SLA/elevation/decisions)    |
 | 3b  | Flow stubs + deploy docs                                  |
 | 4   | Admin page + SETUP rewrite                                |
 | 5   | Publish orchestration via Flow                            |
 | 6   | Workspace split, OpenAPI 3.1, a11y/errors                 |
-| 7   | Coverage thresholds + concurrency notes                   |
+| 7   | Coverage thresholds, concurrency notes, e2e mock path     |
+| 8a  | Schema + number allocation + supersede API/mock           |
+| 8b  | Library + published reader UI + Admin number settings     |
 
 ---
 
 ## Deferred / non-goals (unless pulled in)
 
-- Full Dataverse plugin (C#) development — prefer Flow + security roles for this example unless a plugin becomes necessary for atomic transitions.
+- Full Dataverse plugin (C#) development — prefer Flow + security roles for this example unless a plugin becomes necessary for atomic transitions (number allocation / supersede publish may force a plugin or tightly transactional Flow if Dataverse alone races).
 - Replacing Vue/Vuetify or abandoning the local mock.
 - Multi-tenant SaaS billing / cross-environment promotion tooling beyond provision scripts.
 - Turning on Vue a11y ESLint rules at error level in Phase 0 (enable progressively in Phase 6–7; `redirect-newtab-ext` currently sets `vue.a11y: false`).
+- Records retention / legal hold / anonymous public portal (called out under Phase 8 out of scope).
 
 ---
 
-## Open choices to confirm at Phase 1 kickoff
+## Open choices
 
-1. **Collaboration model:** access-team share on create vs org-owned documents with role read/write on drafting statuses.
-2. **Named-step elevation:** convert to pool queue vs reassign to a single escalation owner.
-3. **Publish trigger:** button → Flow vs status change listener only.
-4. **Approver identity store:** email strings vs Dataverse systemuser lookups (prefer systemuser when Code App connector allows).
+### Confirmed from earlier phases
 
-Default recommendations if unblocked: **(1)** user-owned + share with type’s author team, **(2)** convert overdue named step to elevated pool queue, **(3)** explicit Publish button for publishers (Flow on demand) plus guard on status, **(4)** systemuser lookups with email denormalized for inbox filters.
+1. **Collaboration model:** user-owned + share with type’s author team.
+2. **Named-step elevation:** convert overdue named step to elevated pool queue.
+3. **Publish trigger:** explicit Publish button for publishers (Flow on demand) plus status guard.
+4. **Approver identity store:** systemuser lookups with email denormalized for inbox filters (mock still email-first).
+
+### Confirm at Phase 8 kickoff
+
+1. **Number format:** default `{prefix}-{yyyy}-{seq:5}` per type vs org-global single sequence.
+2. **Supersede actor:** same set as withdraw (requester/author/collaborator) vs Admin-only.
+3. **When prior becomes superseded:** on successor **publish** (recommended) vs when supersede is opened.
+4. **Library visibility:** all authenticated app users vs Publishers/Admins only for superseded history.
+
+Default recommendations if unblocked: **(1)** per-type sequence with type prefix, **(2)** same actors as withdraw plus Admin, **(3)** supersede prior on successor publish, **(4)** all authenticated users see current library; superseded readable via lineage links.
