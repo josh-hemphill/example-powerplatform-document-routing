@@ -431,7 +431,7 @@ export function documentRoutingMockPlugin(): Plugin {
 							document,
 							actor,
 							'withdrawn_for_revise',
-							body.comment ?? 'Withdrawn for revise; approval steps cleared',
+							body.comment ?? 'Withdrawn for revision; approval steps cleared',
 						);
 						sendJson(res, 200, document);
 						return;
