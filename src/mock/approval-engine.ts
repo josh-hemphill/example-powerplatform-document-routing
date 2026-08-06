@@ -62,7 +62,9 @@ export function createStepFromInput(
 	submittedRevision: number,
 ): MockApprovalStep {
 	const slaHours = input.slaHours ?? null;
-
+	if (slaHours !== null && slaHours <= 0) {
+		throw engineError('slaHours must be greater than 0', 'validation_error');
+	}
 	if (input.assignmentMode === 'named') {
 		if (!input.assignee) {
 			throw engineError('Named approval steps require an assignee', 'validation_error');
