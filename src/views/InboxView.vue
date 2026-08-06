@@ -1,9 +1,10 @@
 <script setup lang="ts">
+import type { DocumentStatus } from '@/client/types.gen';
 import type { InboxPersona } from '@/config/inbox-personas';
-import type { DocumentStatus } from '@/domain/document-status';
 import { useQuery } from '@pinia/colada';
 import { computed, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { RouterLink } from 'vue-router';
+import { getApiErrorMessage } from '@/api/api-error';
 import { listDocumentsQuery, listDocumentTypesQuery } from '@/client/@pinia/colada.gen';
 import DocumentStatusChip from '@/components/DocumentStatusChip.vue';
 import { usePowerAppsContext } from '@/composables/use-power-apps-context';
@@ -11,10 +12,8 @@ import { findDocumentType } from '@/config/document-types';
 import {
 	INBOX_PERSONAS,
 	matchesInboxPersona,
-
 } from '@/config/inbox-personas';
 
-const router = useRouter();
 const { context } = usePowerAppsContext();
 const statusFilter = ref<DocumentStatus | null>(null);
 const typeFilter = ref<string | null>(null);
@@ -154,7 +153,7 @@ watch(
 			variant="tonal"
 			class="mb-4"
 		>
-			{{ error instanceof Error ? error.message : 'Failed to load documents' }}
+			{{ getApiErrorMessage(error, 'Failed to load documents') }}
 		</v-alert>
 
 		<v-skeleton-loader v-if="isPending" type="table" />
@@ -162,37 +161,51 @@ watch(
 		<v-table v-else hover>
 			<thead>
 				<tr>
-					<th>Title</th>
-					<th>Type</th>
-					<th>Status</th>
-					<th>Requester</th>
-					<th>Updated</th>
+					<th scope="col">
+						Title
+					</th>
+					<th scope="col">
+						Type
+					</th>
+					<th scope="col">
+						Status
+					</th>
+					<th scope="col">
+						Requester
+					</th>
+					<th scope="col">
+						Updated
+					</th>
 				</tr>
 			</thead>
 			<tbody>
 				<tr
 					v-for="item in items"
 					:key="item.id"
-					style="cursor: pointer"
-					@click="router.push({ name: 'document', params: { documentId: item.id } })"
+					class="inbox-row"
 				>
 					<td>
-						<div class="font-weight-medium">
-							{{ item.title }}
-						</div>
-						<div v-if="item.currentStepStatus === 'queued'" class="text-caption text-medium-emphasis">
-							Pool queue
-							<span v-if="item.currentStepDueAt">
-								· due {{ new Date(item.currentStepDueAt).toLocaleString() }}
-							</span>
-							<span v-if="item.currentStepElevated"> · elevated</span>
-						</div>
-						<div
-							v-else-if="item.currentApproverEmail"
-							class="text-caption text-medium-emphasis"
+						<RouterLink
+							class="inbox-row__link"
+							:to="{ name: 'document', params: { documentId: item.id } }"
 						>
-							Waiting on {{ item.currentApproverEmail }}
-						</div>
+							<span class="font-weight-medium">
+								{{ item.title }}
+							</span>
+							<span v-if="item.currentStepStatus === 'queued'" class="text-caption text-medium-emphasis d-block">
+								Pool queue
+								<span v-if="item.currentStepDueAt">
+									· due {{ new Date(item.currentStepDueAt).toLocaleString() }}
+								</span>
+								<span v-if="item.currentStepElevated"> · elevated</span>
+							</span>
+							<span
+								v-else-if="item.currentApproverEmail"
+								class="text-caption text-medium-emphasis d-block"
+							>
+								Waiting on {{ item.currentApproverEmail }}
+							</span>
+						</RouterLink>
 					</td>
 					<td>{{ typeLabel(item.documentType) }}</td>
 					<td>
@@ -210,3 +223,20 @@ watch(
 		</v-table>
 	</div>
 </template>
+
+<style scoped>
+.inbox-row:hover {
+	background: rgba(var(--v-theme-on-surface), 0.04);
+}
+
+.inbox-row__link {
+	display: block;
+	color: inherit;
+	text-decoration: none;
+	outline-offset: 2px;
+}
+
+.inbox-row__link:focus-visible {
+	outline: 2px solid rgb(var(--v-theme-primary));
+}
+</style>

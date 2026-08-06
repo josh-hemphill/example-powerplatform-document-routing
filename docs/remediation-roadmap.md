@@ -284,6 +284,8 @@ Prefer Dataverse **business rules / column constraints** for simple field locks;
 
 ## Phase 6 — App & contract cleanup
 
+**Status:** Implemented (workspace split, dirty form state, OpenAPI 3.1 null unions, typed errors, inbox a11y, catch-all route, production `/api` fail-loud).
+
 **Goal:** Thin, correct Vue app over the new model; contract matches runtime.
 
 ### Work

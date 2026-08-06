@@ -28,5 +28,11 @@ export const router = createRouter({
 			component: async() => import('@/views/AdminView.vue'),
 			meta: { title: 'Admin' },
 		},
+		{
+			path: '/:pathMatch(.*)*',
+			name: 'not-found',
+			component: async() => import('@/views/NotFoundView.vue'),
+			meta: { title: 'Not found' },
+		},
 	],
 });

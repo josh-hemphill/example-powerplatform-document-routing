@@ -1,18 +1,12 @@
-export type ApprovalAssignmentMode = 'named' | 'pool';
+import type {
+	ApprovalAssignmentMode,
+	ApprovalStepStatus,
+	Approver,
+} from '../client/types.gen.ts';
 
-export type ApprovalStepStatus
-	= | 'waiting'
-		| 'queued'
-		| 'pending'
-		| 'approved'
-		| 'rejected'
-		| 'skipped';
+export type { ApprovalAssignmentMode, ApprovalStepStatus };
 
-export interface ApproverPerson {
-	email: string;
-	displayName: string;
-	role?: string;
-}
+export type ApproverPerson = Approver;
 
 /**
  * Adds hours to an ISO timestamp (or now).
