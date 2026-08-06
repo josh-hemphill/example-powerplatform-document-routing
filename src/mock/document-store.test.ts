@@ -1,10 +1,10 @@
+import type { MockDocumentRecord } from './seed-documents.ts';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
 	clearDocumentStore,
 	getDocumentStore,
 	resetDocumentStore,
 } from './document-store.ts';
-import type { MockDocumentRecord } from './seed-documents.ts';
 
 function stubDocument(id: string): MockDocumentRecord {
 	return {
