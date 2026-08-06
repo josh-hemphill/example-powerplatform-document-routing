@@ -57,6 +57,8 @@ SharePoint remains the **PDF binary** target. Lists are not used as the workflow
 
 Security role sketch: [`SECURITY_ROLES.md`](./SECURITY_ROLES.md).
 
+Power Automate stubs (SLA, notify, publish, submit guard): [`flows/`](./flows/).
+
 ## Auth for `provision:apply`
 
 Requires **Node.js 22+** (`engines.node`) for `node --experimental-strip-types`.

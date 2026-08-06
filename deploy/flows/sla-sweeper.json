@@ -1,0 +1,57 @@
+{
+	"$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+	"metadata": {
+		"flowName": "Document Routing — SLA sweeper",
+		"description": "Recurring sweep of overdue active approval steps. Elevates named steps to elevated pool queues and writes history.",
+		"trigger": "Recurrence",
+		"tables": ["dr_approvalstep", "dr_document", "dr_historyevent"]
+	},
+	"definition": {
+		"triggers": {
+			"Recurrence": {
+				"type": "Recurrence",
+				"recurrence": {
+					"frequency": "Minute",
+					"interval": 15
+				}
+			}
+		},
+		"actions": {
+			"List_overdue_active_steps": {
+				"type": "OpenApiConnection",
+				"description": "Filter dr_approvalstep where status in (queued, pending) and activatedueat <= utcNow()",
+				"inputs": {
+					"host": { "connectionName": "shared_commondataserviceforapps" },
+					"method": "get",
+					"path": "/api/data/v9.2/dr_approvalsteps",
+					"queries": {
+						"$filter": "Microsoft.Dynamics.CRM.In(PropertyName='dr_status',PropertyValues=['queued','pending']) and dr_activatedueat le @{utcNow()}"
+					}
+				}
+			},
+			"For_each_overdue_step": {
+				"type": "Foreach",
+				"foreach": "@body('List_overdue_active_steps')?['value']",
+				"actions": {
+					"Apply_elevation_semantics": {
+						"type": "Compose",
+						"description": "If not elevated and elevation pool exists: merge members, set assignmentmode=pool, status=queued, elevated=true, refresh activatedueat. Else if claimed pool: return to queued without moving activatedueat."
+					},
+					"Patch_step": {
+						"type": "OpenApiConnection",
+						"description": "PATCH dr_approvalstep with elevated fields / status / activatedueat as needed"
+					},
+					"Create_history_event": {
+						"type": "OpenApiConnection",
+						"description": "POST dr_historyevent action=sla_elevated under service identity"
+					},
+					"Sync_document_current_fields": {
+						"type": "OpenApiConnection",
+						"description": "PATCH parent dr_document currentapprover / currentsteplue / currentpoolemails"
+					}
+				}
+			}
+		},
+		"outputs": {}
+	}
+}

@@ -10,6 +10,20 @@ import {
 
 const nowIso = (clock?: Date): string => (clock ?? new Date()).toISOString();
 
+export interface EngineError extends Error {
+	code: 'invalid_state' | 'forbidden' | 'validation_error';
+}
+
+/**
+ * Throws an engine error with a stable API code.
+ */
+export function engineError(
+	message: string,
+	code: EngineError['code'],
+): EngineError {
+	return Object.assign(new Error(message), { code });
+}
+
 /**
  * Syncs summary-facing current-* fields from the active approval step.
  */
@@ -27,6 +41,12 @@ export function syncCurrentApprovalFields(document: MockDocumentRecord): void {
 			: [];
 }
 
+function setActivateDeadline(step: MockApprovalStep, clock: Date): void {
+	const due = step.slaHours ? addHoursIso(step.slaHours, clock) : null;
+	step.activateDueAt = due;
+	step.dueAt = due;
+}
+
 export function createStepFromInput(
 	input: {
 		assignmentMode: 'named' | 'pool';
@@ -39,14 +59,17 @@ export function createStepFromInput(
 	order: number,
 	clock: Date,
 	isActive: boolean,
+	submittedRevision: number,
 ): MockApprovalStep {
 	const slaHours = input.slaHours ?? null;
-
+	if (slaHours !== null && slaHours <= 0) {
+		throw engineError('slaHours must be greater than 0', 'validation_error');
+	}
 	if (input.assignmentMode === 'named') {
 		if (!input.assignee) {
-			throw new Error('Named approval steps require an assignee');
+			throw engineError('Named approval steps require an assignee', 'validation_error');
 		}
-		return {
+		const step: MockApprovalStep = {
 			id: randomUUID(),
 			order,
 			assignmentMode: 'named',
@@ -57,20 +80,27 @@ export function createStepFromInput(
 			pool: [input.assignee],
 			elevationPool: input.elevationPool ?? [],
 			slaHours,
-			dueAt: isActive && slaHours ? addHoursIso(slaHours, clock) : null,
+			activateDueAt: null,
+			dueAt: null,
 			claimedAt: null,
 			elevated: false,
 			elevatedAt: null,
 			comment: null,
 			decidedAt: null,
+			approvedRevision: null,
+			submittedRevision,
 		};
+		if (isActive) {
+			setActivateDeadline(step, clock);
+		}
+		return step;
 	}
 
 	if (!input.pool?.length) {
-		throw new Error('Pool approval steps require at least one pool member');
+		throw engineError('Pool approval steps require at least one pool member', 'validation_error');
 	}
 
-	return {
+	const step: MockApprovalStep = {
 		id: randomUUID(),
 		order,
 		assignmentMode: 'pool',
@@ -81,17 +111,24 @@ export function createStepFromInput(
 		pool: input.pool,
 		elevationPool: input.elevationPool ?? [],
 		slaHours,
-		dueAt: isActive && slaHours ? addHoursIso(slaHours, clock) : null,
+		activateDueAt: null,
+		dueAt: null,
 		claimedAt: null,
 		elevated: false,
 		elevatedAt: null,
 		comment: null,
 		decidedAt: null,
+		approvedRevision: null,
+		submittedRevision,
 	};
+	if (isActive) {
+		setActivateDeadline(step, clock);
+	}
+	return step;
 }
 
 /**
- * Activates the next waiting step after an approval.
+ * Activates the next waiting step after an approval (sets immutable activateDueAt).
  */
 export function activateStep(step: MockApprovalStep, clock: Date): void {
 	if (step.assignmentMode === 'pool') {
@@ -103,23 +140,22 @@ export function activateStep(step: MockApprovalStep, clock: Date): void {
 	else {
 		step.status = 'pending';
 	}
-	step.dueAt = step.slaHours ? addHoursIso(step.slaHours, clock) : null;
+	setActivateDeadline(step, clock);
 }
 
+/**
+ * Claims a queued pool step without extending the SLA deadline.
+ */
 export function claimStep(
 	step: MockApprovalStep,
 	actorEmail: string,
 	clock: Date,
 ): void {
 	if (step.assignmentMode !== 'pool' || step.status !== 'queued') {
-		throw Object.assign(new Error('Only queued pool steps can be claimed'), {
-			code: 'invalid_state',
-		});
+		throw engineError('Only queued pool steps can be claimed', 'invalid_state');
 	}
 	if (!isEmailInPool(step.pool, actorEmail)) {
-		throw Object.assign(new Error('Actor is not in the eligible pool'), {
-			code: 'forbidden',
-		});
+		throw engineError('Actor is not in the eligible pool', 'forbidden');
 	}
 	const member = step.pool.find(
 		(item) => item.email.toLowerCase() === actorEmail.toLowerCase(),
@@ -128,19 +164,18 @@ export function claimStep(
 	step.approverEmail = member.email;
 	step.approverDisplayName = member.displayName;
 	step.claimedAt = nowIso(clock);
-	step.dueAt = step.slaHours ? addHoursIso(step.slaHours, clock) : step.dueAt;
+	// Preserve activateDueAt / dueAt — claim must not extend absolute SLA.
 }
 
+/**
+ * Releases a claimed pool step back to the queue without moving the SLA deadline.
+ */
 export function releaseStep(step: MockApprovalStep, actorEmail: string): void {
 	if (step.assignmentMode !== 'pool' || step.status !== 'pending') {
-		throw Object.assign(new Error('Only claimed pool steps can be released'), {
-			code: 'invalid_state',
-		});
+		throw engineError('Only claimed pool steps can be released', 'invalid_state');
 	}
 	if (step.approverEmail?.toLowerCase() !== actorEmail.toLowerCase()) {
-		throw Object.assign(new Error('Only the claimer can release this step'), {
-			code: 'forbidden',
-		});
+		throw engineError('Only the claimer can release this step', 'forbidden');
 	}
 	step.status = 'queued';
 	step.approverEmail = null;
@@ -149,7 +184,9 @@ export function releaseStep(step: MockApprovalStep, actorEmail: string): void {
 }
 
 /**
- * Elevates overdue active steps: expands pool, returns to queue, refreshes SLA.
+ * Elevates overdue active steps.
+ * Named overdue steps convert to an elevated pool queue (chosen Phase 3 semantics).
+ * Claim/release-style requeue never extends activateDueAt; elevation starts a new window once.
  */
 export function processStepSla(
 	step: MockApprovalStep,
@@ -158,30 +195,128 @@ export function processStepSla(
 	if (step.status !== 'queued' && step.status !== 'pending') {
 		return { changed: false, message: null };
 	}
-	if (!isSlaOverdue(step.dueAt, clock)) {
+
+	const deadline = step.activateDueAt ?? step.dueAt;
+	if (!isSlaOverdue(deadline, clock)) {
 		return { changed: false, message: null };
 	}
 
 	const hadElevationMembers = (step.elevationPool?.length ?? 0) > 0;
+	const roleLabel = step.role ?? 'step';
+
+	// First elevation: merge elevation pool; named → elevated pool queue.
 	if (!step.elevated && hadElevationMembers) {
 		step.pool = mergeApproverPools(step.pool, step.elevationPool);
 		step.elevated = true;
 		step.elevatedAt = nowIso(clock);
-	}
 
-	if (step.assignmentMode === 'pool') {
+		if (step.assignmentMode === 'named') {
+			step.assignmentMode = 'pool';
+		}
+
 		step.status = 'queued';
 		step.approverEmail = null;
 		step.approverDisplayName = null;
 		step.claimedAt = null;
+		// New activation window for the elevated queue only.
+		setActivateDeadline(step, clock);
+
+		return {
+			changed: true,
+			message: `SLA breached; converted to elevated pool queue (${roleLabel} ${step.order})`,
+		};
 	}
 
-	step.dueAt = step.slaHours ? addHoursIso(step.slaHours, clock) : null;
+	// Overdue claimed pool step: return to queue without moving the deadline.
+	if (step.assignmentMode === 'pool' && step.status === 'pending') {
+		step.status = 'queued';
+		step.approverEmail = null;
+		step.approverDisplayName = null;
+		step.claimedAt = null;
+		return {
+			changed: true,
+			message: `SLA breached; returned to pool without extending deadline (${roleLabel} ${step.order})`,
+		};
+	}
 
-	return {
-		changed: true,
-		message: step.elevated
-			? `SLA breached; pool elevated and timer reset (${step.role ?? 'step'} ${step.order})`
-			: `SLA breached; timer reset (${step.role ?? 'step'} ${step.order})`,
-	};
+	// Already elevated / no elevation pool, and already queued: no mutation.
+	return { changed: false, message: null };
+}
+
+const ALLOWED_DECISIONS = new Set(['approve', 'reject']);
+
+/**
+ * Records an approve/reject decision for the active pending assignee.
+ */
+export function decideStep(
+	document: MockDocumentRecord,
+	step: MockApprovalStep,
+	actorEmail: string,
+	decision: string,
+	clock: Date,
+	comment?: string,
+): void {
+	if (!ALLOWED_DECISIONS.has(decision)) {
+		throw engineError('decision must be approve or reject', 'validation_error');
+	}
+	if (document.status !== 'in_review') {
+		throw engineError('Document is not awaiting approval', 'invalid_state');
+	}
+	if (step.status !== 'pending') {
+		throw engineError('Only a claimed/named pending step can be decided', 'invalid_state');
+	}
+	if (step.approverEmail?.toLowerCase() !== actorEmail.toLowerCase()) {
+		throw engineError('Only the assigned/claimed approver can decide this step', 'forbidden');
+	}
+
+	step.comment = comment ?? null;
+	step.decidedAt = nowIso(clock);
+
+	if (decision === 'reject') {
+		step.status = 'rejected';
+		document.status = 'rejected';
+		syncCurrentApprovalFields(document);
+		return;
+	}
+
+	step.status = 'approved';
+	step.approvedRevision = step.submittedRevision;
+	const next = document.approvalSteps.find((item) => item.order === step.order + 1);
+	if (next) {
+		activateStep(next, clock);
+	}
+	else {
+		document.status = 'approved';
+	}
+	syncCurrentApprovalFields(document);
+}
+
+/**
+ * Withdraws an in-flight or rejected/approved review back to drafting and clears steps.
+ */
+export function withdrawAndRevise(
+	document: MockDocumentRecord,
+	actorEmail: string,
+): void {
+	const status = document.status;
+	if (status !== 'in_review' && status !== 'rejected' && status !== 'approved') {
+		throw engineError(
+			'Only in_review, rejected, or approved documents can be withdrawn for revise',
+			'invalid_state',
+		);
+	}
+
+	const email = actorEmail.trim().toLowerCase();
+	const canWithdraw
+		= document.requesterEmail.toLowerCase() === email
+			|| document.authorEmail?.toLowerCase() === email
+			|| document.collaboratorEmails.some((item) => item.toLowerCase() === email);
+	if (!canWithdraw) {
+		throw engineError('Only requester, author, or collaborators can withdraw and revise', 'forbidden');
+	}
+
+	document.approvalSteps = [];
+	document.status = 'drafting';
+	document.submittedContentRevision = null;
+	syncCurrentApprovalFields(document);
 }

@@ -1,0 +1,46 @@
+{
+	"$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+	"metadata": {
+		"flowName": "Document Routing — Publish approved",
+		"description": "Publishes an approved revision to allowlisted SharePoint. Phase 5 completes HTML→PDF binary steps; this stub defines the trigger contract.",
+		"trigger": "When dr_document status becomes approved OR manual Publish command",
+		"tables": ["dr_document", "dr_publishdestination", "dr_historyevent"]
+	},
+	"definition": {
+		"triggers": {
+			"When_document_approved": {
+				"type": "OpenApiConnectionWebhook",
+				"inputs": {
+					"host": { "connectionName": "shared_commondataserviceforapps" },
+					"parameters": {
+						"entityName": "dr_documents",
+						"filterExpression": "dr_status eq 'approved'"
+					}
+				}
+			}
+		},
+		"actions": {
+			"Resolve_publish_destination": {
+				"type": "Compose",
+				"description": "Load dr_publishdestination lookup; reject free-form site URLs not on allowlist"
+			},
+			"Render_html_and_pdf": {
+				"type": "Compose",
+				"description": "Phase 5: render approved revision markdown/HTML to PDF under service identity"
+			},
+			"Upload_to_SharePoint": {
+				"type": "OpenApiConnection",
+				"description": "Create file in allowlisted library; filename includes document id + contentrevision"
+			},
+			"Patch_document_publish_fields": {
+				"type": "OpenApiConnection",
+				"description": "Set publishedpdfurl, sharepointitemid, status=published; idempotent on same revision"
+			},
+			"Create_history_event": {
+				"type": "OpenApiConnection",
+				"description": "POST history action=published"
+			}
+		},
+		"outputs": {}
+	}
+}

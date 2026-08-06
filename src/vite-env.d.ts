@@ -1,6 +1,10 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
+	readonly DEV: boolean;
+	readonly MODE: string;
+	readonly PROD: boolean;
+	readonly SSR: boolean;
 	readonly VITE_DOCUMENT_API_BASE_URL?: string;
 	/** SharePoint site URL — any HTTPS host (vanity / custom domains supported). */
 	readonly VITE_SHAREPOINT_SITE_URL?: string;

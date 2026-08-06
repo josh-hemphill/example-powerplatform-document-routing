@@ -181,6 +181,8 @@ Keep existing `document`, `approvalstep`, `historyevent`. Add control tables:
 
 ## Phase 3 — Workflow engine (Dataverse + Power Automate)
 
+**Status:** Implemented (approval engine semantics, mock alignment, Flow stubs under `deploy/flows/`).
+
 **Goal:** Correct state machine, SLA, claim/release, elevation — enforced outside the SPA.
 
 ### State machine

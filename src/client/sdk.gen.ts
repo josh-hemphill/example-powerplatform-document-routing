@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { ClaimApprovalStepData, ClaimApprovalStepErrors, ClaimApprovalStepResponses, CreateDocumentRequestData, CreateDocumentRequestResponses, DecideApprovalStepData, DecideApprovalStepErrors, DecideApprovalStepResponses, GetDocumentData, GetDocumentErrors, GetDocumentResponses, ListDocumentsData, ListDocumentsResponses, ProcessApprovalSlaData, ProcessApprovalSlaErrors, ProcessApprovalSlaResponses, PublishDocumentPdfData, PublishDocumentPdfErrors, PublishDocumentPdfResponses, ReleaseApprovalStepData, ReleaseApprovalStepErrors, ReleaseApprovalStepResponses, SubmitForApprovalData, SubmitForApprovalErrors, SubmitForApprovalResponses, UpdateDocumentDraftData, UpdateDocumentDraftErrors, UpdateDocumentDraftResponses } from './types.gen';
+import type { ClaimApprovalStepData, ClaimApprovalStepErrors, ClaimApprovalStepResponses, CreateDocumentRequestData, CreateDocumentRequestErrors, CreateDocumentRequestResponses, DecideApprovalStepData, DecideApprovalStepErrors, DecideApprovalStepResponses, GetDocumentData, GetDocumentErrors, GetDocumentResponses, ListDocumentsData, ListDocumentsResponses, ProcessApprovalSlaData, ProcessApprovalSlaErrors, ProcessApprovalSlaResponses, PublishDocumentPdfData, PublishDocumentPdfErrors, PublishDocumentPdfResponses, ReleaseApprovalStepData, ReleaseApprovalStepErrors, ReleaseApprovalStepResponses, SubmitForApprovalData, SubmitForApprovalErrors, SubmitForApprovalResponses, UpdateDocumentDraftData, UpdateDocumentDraftErrors, UpdateDocumentDraftResponses, WithdrawAndReviseData, WithdrawAndReviseErrors, WithdrawAndReviseResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -30,7 +30,7 @@ export const listDocuments = <ThrowOnError extends boolean = false>(options?: Op
 /**
  * Submit a freeform document request
  */
-export const createDocumentRequest = <ThrowOnError extends boolean = false>(options: Options<CreateDocumentRequestData, ThrowOnError>): RequestResult<CreateDocumentRequestResponses, unknown, ThrowOnError> => (options.client ?? client).post<CreateDocumentRequestResponses, unknown, ThrowOnError>({
+export const createDocumentRequest = <ThrowOnError extends boolean = false>(options: Options<CreateDocumentRequestData, ThrowOnError>): RequestResult<CreateDocumentRequestResponses, CreateDocumentRequestErrors, ThrowOnError> => (options.client ?? client).post<CreateDocumentRequestResponses, CreateDocumentRequestErrors, ThrowOnError>({
     security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }],
     url: '/documents',
     ...options,
@@ -64,10 +64,33 @@ export const updateDocumentDraft = <ThrowOnError extends boolean = false>(option
 
 /**
  * Move a draft into the approval chain
+ *
+ * Materializes steps from the document type’s control chain unless
+ * `allowApproverOverride` is enabled and `steps` are supplied.
+ * Rejects empty chains and unknown document types.
+ *
  */
 export const submitForApproval = <ThrowOnError extends boolean = false>(options: Options<SubmitForApprovalData, ThrowOnError>): RequestResult<SubmitForApprovalResponses, SubmitForApprovalErrors, ThrowOnError> => (options.client ?? client).post<SubmitForApprovalResponses, SubmitForApprovalErrors, ThrowOnError>({
     security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }],
     url: '/documents/{documentId}/submit-for-approval',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Withdraw review and return to drafting
+ *
+ * Clears approval steps and returns the case to `drafting` so authors can
+ * revise content. Allowed from `in_review`, `rejected`, or `approved`
+ * for the requester, author, or collaborators.
+ *
+ */
+export const withdrawAndRevise = <ThrowOnError extends boolean = false>(options: Options<WithdrawAndReviseData, ThrowOnError>): RequestResult<WithdrawAndReviseResponses, WithdrawAndReviseErrors, ThrowOnError> => (options.client ?? client).post<WithdrawAndReviseResponses, WithdrawAndReviseErrors, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }],
+    url: '/documents/{documentId}/withdraw-and-revise',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -116,6 +139,10 @@ export const releaseApprovalStep = <ThrowOnError extends boolean = false>(option
 
 /**
  * Process SLA timeouts and elevate overdue steps (scheduler / flow entrypoint)
+ *
+ * Production callers are Cloud Flows under a service identity; they omit `now`.
+ * The local mock accepts `now` only when running in development (`import.meta.env.DEV`).
+ *
  */
 export const processApprovalSla = <ThrowOnError extends boolean = false>(options: Options<ProcessApprovalSlaData, ThrowOnError>): RequestResult<ProcessApprovalSlaResponses, ProcessApprovalSlaErrors, ThrowOnError> => (options.client ?? client).post<ProcessApprovalSlaResponses, ProcessApprovalSlaErrors, ThrowOnError>({
     security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }],

@@ -204,12 +204,25 @@ Who and what this policy covers.
 export const DEFAULT_DOCUMENT_TYPE_ID = documentTypes[0].id;
 
 /**
- * Looks up a document type by id, falling back to the default type.
+ * Looks up a document type by id; returns undefined when unknown.
+ */
+export function findDocumentType(
+	id: string | null | undefined,
+): DocumentTypeDefinition | undefined {
+	if (!id) {
+		return undefined;
+	}
+	return documentTypes.find((type) => type.id === id);
+}
+
+/**
+ * Looks up a document type by id, falling back to the default type for display only.
+ * Prefer `findDocumentType` for create/submit validation.
  */
 export function getDocumentType(
 	id: string | null | undefined,
 ): DocumentTypeDefinition {
-	return documentTypes.find((type) => type.id === id) ?? documentTypes[0];
+	return findDocumentType(id) ?? documentTypes[0];
 }
 
 /**

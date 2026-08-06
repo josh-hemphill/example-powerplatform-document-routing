@@ -10,7 +10,7 @@ Documents (`dr_document`) are **user-owned**. On create (or type select), the ca
 so peers can open and co-edit `requested` / `drafting` content before submit.
 
 After submit-for-approval, content is frozen at `contentrevision` unless a
-withdraw/revise transition invalidates approval steps (Phase 3).
+withdraw/revise transition invalidates approval steps.
 
 ## SLA model
 
@@ -19,6 +19,10 @@ withdraw/revise transition invalidates approval steps (Phase 3).
 | `approvalstep.activatedueat`      | Immutable deadline set when the step activates                             |
 | `approvalstep.dueat`              | Denormalized mirror for inbox filters — **do not extend on claim/release** |
 | `approvalstep.elevationsemantics` | Default: `convert_to_elevated_pool` (named overdue → elevated pool queue)  |
+
+Named elevation (locked): convert overdue named steps to an elevated **pool**
+queue, merge elevation members, start a new activate window once. See
+[`flows/README.md`](./flows/README.md).
 
 ## Control tables (org-owned)
 

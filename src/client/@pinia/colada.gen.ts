@@ -4,8 +4,8 @@ import { type _JSONValue, defineQueryOptions, type UseMutationOptions } from '@p
 
 import { serializeQueryKeyValue } from '../client';
 import { client } from '../client.gen';
-import { claimApprovalStep, createDocumentRequest, decideApprovalStep, getDocument, listDocuments, type Options, processApprovalSla, publishDocumentPdf, releaseApprovalStep, submitForApproval, updateDocumentDraft } from '../sdk.gen';
-import type { ClaimApprovalStepData, ClaimApprovalStepError, ClaimApprovalStepResponse, CreateDocumentRequestData, CreateDocumentRequestResponse, DecideApprovalStepData, DecideApprovalStepError, DecideApprovalStepResponse, GetDocumentData, GetDocumentError, GetDocumentResponse, ListDocumentsData, ListDocumentsResponse, ProcessApprovalSlaData, ProcessApprovalSlaError, ProcessApprovalSlaResponse, PublishDocumentPdfData, PublishDocumentPdfError, PublishDocumentPdfResponse, ReleaseApprovalStepData, ReleaseApprovalStepError, ReleaseApprovalStepResponse, SubmitForApprovalData, SubmitForApprovalError, SubmitForApprovalResponse, UpdateDocumentDraftData, UpdateDocumentDraftError, UpdateDocumentDraftResponse } from '../types.gen';
+import { claimApprovalStep, createDocumentRequest, decideApprovalStep, getDocument, listDocuments, type Options, processApprovalSla, publishDocumentPdf, releaseApprovalStep, submitForApproval, updateDocumentDraft, withdrawAndRevise } from '../sdk.gen';
+import type { ClaimApprovalStepData, ClaimApprovalStepError, ClaimApprovalStepResponse, CreateDocumentRequestData, CreateDocumentRequestError, CreateDocumentRequestResponse, DecideApprovalStepData, DecideApprovalStepError, DecideApprovalStepResponse, GetDocumentData, GetDocumentError, GetDocumentResponse, ListDocumentsData, ListDocumentsResponse, ProcessApprovalSlaData, ProcessApprovalSlaError, ProcessApprovalSlaResponse, PublishDocumentPdfData, PublishDocumentPdfError, PublishDocumentPdfResponse, ReleaseApprovalStepData, ReleaseApprovalStepError, ReleaseApprovalStepResponse, SubmitForApprovalData, SubmitForApprovalError, SubmitForApprovalResponse, UpdateDocumentDraftData, UpdateDocumentDraftError, UpdateDocumentDraftResponse, WithdrawAndReviseData, WithdrawAndReviseError, WithdrawAndReviseResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'path'> & {
@@ -62,7 +62,7 @@ export const listDocumentsQuery = defineQueryOptions<Options<ListDocumentsData>,
 /**
  * Submit a freeform document request
  */
-export const createDocumentRequestMutation = (options?: Partial<Options<CreateDocumentRequestData>>): UseMutationOptions<CreateDocumentRequestResponse, Options<CreateDocumentRequestData>, Error> => ({
+export const createDocumentRequestMutation = (options?: Partial<Options<CreateDocumentRequestData>>): UseMutationOptions<CreateDocumentRequestResponse, Options<CreateDocumentRequestData>, CreateDocumentRequestError> => ({
     mutation: async (vars) => {
         const { data } = await createDocumentRequest({
             ...options,
@@ -106,10 +106,34 @@ export const updateDocumentDraftMutation = (options?: Partial<Options<UpdateDocu
 
 /**
  * Move a draft into the approval chain
+ *
+ * Materializes steps from the document type’s control chain unless
+ * `allowApproverOverride` is enabled and `steps` are supplied.
+ * Rejects empty chains and unknown document types.
+ *
  */
 export const submitForApprovalMutation = (options?: Partial<Options<SubmitForApprovalData>>): UseMutationOptions<SubmitForApprovalResponse, Options<SubmitForApprovalData>, SubmitForApprovalError> => ({
     mutation: async (vars) => {
         const { data } = await submitForApproval({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+/**
+ * Withdraw review and return to drafting
+ *
+ * Clears approval steps and returns the case to `drafting` so authors can
+ * revise content. Allowed from `in_review`, `rejected`, or `approved`
+ * for the requester, author, or collaborators.
+ *
+ */
+export const withdrawAndReviseMutation = (options?: Partial<Options<WithdrawAndReviseData>>): UseMutationOptions<WithdrawAndReviseResponse, Options<WithdrawAndReviseData>, WithdrawAndReviseError> => ({
+    mutation: async (vars) => {
+        const { data } = await withdrawAndRevise({
             ...options,
             ...vars,
             throwOnError: true
@@ -162,6 +186,10 @@ export const releaseApprovalStepMutation = (options?: Partial<Options<ReleaseApp
 
 /**
  * Process SLA timeouts and elevate overdue steps (scheduler / flow entrypoint)
+ *
+ * Production callers are Cloud Flows under a service identity; they omit `now`.
+ * The local mock accepts `now` only when running in development (`import.meta.env.DEV`).
+ *
  */
 export const processApprovalSlaMutation = (options?: Partial<Options<ProcessApprovalSlaData>>): UseMutationOptions<ProcessApprovalSlaResponse, Options<ProcessApprovalSlaData>, ProcessApprovalSlaError> => ({
     mutation: async (vars) => {

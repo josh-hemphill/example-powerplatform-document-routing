@@ -22,16 +22,32 @@ export function addHoursIso(hours: number, from: Date = new Date()): string {
 }
 
 /**
+ * Parses an ISO/date string; returns null when missing or invalid (never NaN).
+ */
+export function parseInstant(value: string | null | undefined): Date | null {
+	if (!value?.trim()) {
+		return null;
+	}
+	const ms = Date.parse(value);
+	if (Number.isNaN(ms)) {
+		return null;
+	}
+	return new Date(ms);
+}
+
+/**
  * True when dueAt is in the past relative to `now`.
+ * Invalid or missing timestamps are treated as not overdue (fail closed).
  */
 export function isSlaOverdue(
 	dueAt: string | null | undefined,
 	now: Date = new Date(),
 ): boolean {
-	if (!dueAt) {
+	const due = parseInstant(dueAt);
+	if (!due || Number.isNaN(now.getTime())) {
 		return false;
 	}
-	return new Date(dueAt).getTime() <= now.getTime();
+	return due.getTime() <= now.getTime();
 }
 
 /**

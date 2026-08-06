@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Document Routing API
-  version: 1.1.0
+  version: 1.2.0
   description: |
     Routes freeform document requests through drafting and a chain of approvals,
     then publishes an approved PDF to SharePoint. In Power Platform, this API is
@@ -11,6 +11,12 @@ info:
     security context in production. The local Vite mock accepts
     `X-Document-Routing-Actor` as a stand-in. Request bodies must not carry
     spoofable `actorEmail` / requester identity.
+
+    **Workflow (Phase 3):** Submit materializes approval steps from document-type
+    control data (client step override only when `allowApproverOverride` is on).
+    Claim/release preserve `activateDueAt`. SLA elevation converts overdue named
+    steps to an elevated pool queue. Production SLA sweeps run via Cloud Flow;
+    the mock accepts a DEV-only `now` clock override.
 servers:
   - url: /api
     description: Local Vite mock (development)
@@ -76,6 +82,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Document'
+        '400':
+          $ref: '#/components/responses/BadRequest'
   /documents/{documentId}:
     get:
       operationId: getDocument
@@ -90,6 +98,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Document'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
   /documents/{documentId}/draft:
@@ -112,6 +122,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Document'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
@@ -121,6 +133,10 @@ paths:
       operationId: submitForApproval
       tags: [Approvals]
       summary: Move a draft into the approval chain
+      description: |
+        Materializes steps from the document type’s control chain unless
+        `allowApproverOverride` is enabled and `steps` are supplied.
+        Rejects empty chains and unknown document types.
       parameters:
         - $ref: '#/components/parameters/DocumentId'
       requestBody:
@@ -136,6 +152,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Document'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /documents/{documentId}/withdraw-and-revise:
+    post:
+      operationId: withdrawAndRevise
+      tags: [Approvals]
+      summary: Withdraw review and return to drafting
+      description: |
+        Clears approval steps and returns the case to `drafting` so authors can
+        revise content. Allowed from `in_review`, `rejected`, or `approved`
+        for the requester, author, or collaborators.
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApprovalActorRequest'
+      responses:
+        '200':
+          description: Document returned to drafting
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
@@ -166,6 +216,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Document'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
@@ -196,6 +250,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Document'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
@@ -226,6 +282,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Document'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
@@ -235,6 +293,9 @@ paths:
       operationId: processApprovalSla
       tags: [Approvals]
       summary: Process SLA timeouts and elevate overdue steps (scheduler / flow entrypoint)
+      description: |
+        Production callers are Cloud Flows under a service identity; they omit `now`.
+        The local mock accepts `now` only when running in development (`import.meta.env.DEV`).
       parameters:
         - $ref: '#/components/parameters/DocumentId'
       requestBody:
@@ -250,6 +311,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Document'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
   /documents/{documentId}/publish:
@@ -301,6 +364,18 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
+    BadRequest:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Caller is not allowed to perform this action
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
     Conflict:
       description: Invalid state transition
       content:
@@ -331,13 +406,15 @@ components:
       enum: [named, pool]
     SubmitForApprovalRequest:
       type: object
-      required: [steps]
       properties:
         steps:
           type: array
           minItems: 1
           items:
             $ref: '#/components/schemas/ApprovalStepInput'
+          description: |
+            Optional when the server materializes the chain from document-type
+            control data. Required only when `allowApproverOverride` is enabled.
         comment:
           type: string
     ApprovalStepInput:
@@ -362,14 +439,14 @@ components:
         slaHours:
           type: number
           exclusiveMinimum: 0
-          description: Hours until SLA timeout from activation/claim
+          description: Hours until SLA timeout from step activation (not reset on claim)
         assignee:
           $ref: '#/components/schemas/Approver'
         elevationPool:
           type: array
           items:
             $ref: '#/components/schemas/Approver'
-          description: Extra members merged into the pool after SLA timeout
+          description: Extra members merged into the pool after SLA timeout (named → elevated pool)
     PoolApprovalStepInput:
       type: object
       required: [assignmentMode, pool]
@@ -383,7 +460,7 @@ components:
         slaHours:
           type: number
           exclusiveMinimum: 0
-          description: Hours until SLA timeout from queue activation/claim
+          description: Hours until SLA timeout from queue activation (not reset on claim)
         pool:
           type: array
           minItems: 1
@@ -429,7 +506,9 @@ components:
         now:
           type: string
           format: date-time
-          description: Override clock for tests/local demos; production schedulers omit this
+          description: |
+            DEV/test clock override only. Production Cloud Flows omit this.
+            Invalid timestamps are rejected; non-DEV mocks ignore the field.
     PublishRequest:
       type: object
       required: [sharePointSiteUrl, libraryName]
@@ -545,6 +624,14 @@ components:
         updatedAt:
           type: string
           format: date-time
+        contentRevision:
+          type: integer
+          minimum: 0
+          description: Incremented on each draft save
+        submittedContentRevision:
+          type: integer
+          nullable: true
+          description: contentRevision frozen at submit-for-approval
     ApprovalStep:
       type: object
       required:
@@ -586,10 +673,16 @@ components:
         slaHours:
           type: number
           nullable: true
+        activateDueAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Immutable SLA deadline set when the step activates
         dueAt:
           type: string
           format: date-time
           nullable: true
+          description: Denormalized mirror of activateDueAt for inbox filters
         claimedAt:
           type: string
           format: date-time
@@ -607,6 +700,14 @@ components:
           type: string
           format: date-time
           nullable: true
+        submittedRevision:
+          type: integer
+          nullable: true
+          description: Document contentRevision at submit
+        approvedRevision:
+          type: integer
+          nullable: true
+          description: contentRevision recorded when this step approved
     Document:
       allOf:
         - $ref: '#/components/schemas/DocumentSummary'
@@ -615,6 +716,7 @@ components:
             - freeformRequest
             - approvalSteps
             - history
+            - contentRevision
           properties:
             freeformRequest:
               type: string
@@ -627,6 +729,12 @@ components:
             authorEmail:
               type: string
               format: email
+              nullable: true
+            contentRevision:
+              type: integer
+              minimum: 0
+            submittedContentRevision:
+              type: integer
               nullable: true
             approvalSteps:
               type: array
