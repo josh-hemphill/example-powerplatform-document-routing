@@ -41,6 +41,11 @@ const tab = ref('types');
 const actionError = ref<string | null>(null);
 const actionSuccess = ref<string | null>(null);
 
+/** When set, the next selection watcher run for this id skips hydrate (cancel discard). */
+const revertTypeToId = ref<string | null>(null);
+const revertPoolToId = ref<string | null>(null);
+const revertDestinationToId = ref<string | null>(null);
+
 watch(
 	isAdmin,
 	(value) => {
@@ -112,9 +117,6 @@ const typeBaseline = ref('');
 const poolBaseline = ref('');
 const destinationBaseline = ref('');
 const settingsBaseline = ref('');
-const suppressTypeHydrate = ref(false);
-const suppressPoolHydrate = ref(false);
-const suppressDestinationHydrate = ref(false);
 
 function snapshotType(): string {
 	return JSON.stringify({
@@ -194,7 +196,8 @@ watch(
 watch(
 	[selectedTypeId, types],
 	async([nextId], [previousId]) => {
-		if (suppressTypeHydrate.value) {
+		if (nextId && revertTypeToId.value === nextId) {
+			revertTypeToId.value = null;
 			return;
 		}
 		if (
@@ -209,9 +212,8 @@ watch(
 				color: 'warning',
 			});
 			if (!ok) {
-				suppressTypeHydrate.value = true;
+				revertTypeToId.value = previousId;
 				selectedTypeId.value = previousId;
-				suppressTypeHydrate.value = false;
 				return;
 			}
 		}
@@ -226,7 +228,8 @@ watch(
 watch(
 	[selectedPoolId, pools],
 	async([nextId], [previousId]) => {
-		if (suppressPoolHydrate.value) {
+		if (nextId && revertPoolToId.value === nextId) {
+			revertPoolToId.value = null;
 			return;
 		}
 		if (
@@ -241,9 +244,8 @@ watch(
 				color: 'warning',
 			});
 			if (!ok) {
-				suppressPoolHydrate.value = true;
+				revertPoolToId.value = previousId;
 				selectedPoolId.value = previousId;
-				suppressPoolHydrate.value = false;
 				return;
 			}
 		}
@@ -258,7 +260,8 @@ watch(
 watch(
 	[selectedDestinationId, destinations],
 	async([nextId], [previousId]) => {
-		if (suppressDestinationHydrate.value) {
+		if (nextId && revertDestinationToId.value === nextId) {
+			revertDestinationToId.value = null;
 			return;
 		}
 		if (
@@ -273,9 +276,8 @@ watch(
 				color: 'warning',
 			});
 			if (!ok) {
-				suppressDestinationHydrate.value = true;
+				revertDestinationToId.value = previousId;
 				selectedDestinationId.value = previousId;
-				suppressDestinationHydrate.value = false;
 				return;
 			}
 		}

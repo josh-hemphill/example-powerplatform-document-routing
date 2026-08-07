@@ -3,6 +3,23 @@
  */
 import type { Approver, ControlChainStep } from '@/client/types.gen';
 
+let nextEditorRowKey = 1;
+const editorRowKeys = new WeakMap<object, number>();
+
+/**
+ * Stable Vue key for a row object identity (survives reorder when refs are kept).
+ */
+export function editorRowKey(row: object): number {
+	const existing = editorRowKeys.get(row);
+	if (existing != null) {
+		return existing;
+	}
+	const key = nextEditorRowKey;
+	nextEditorRowKey += 1;
+	editorRowKeys.set(row, key);
+	return key;
+}
+
 /**
  * Creates a blank named approval step at the given order.
  */
@@ -17,13 +34,13 @@ export function createEmptyChainStep(order: number): ControlChainStep {
 }
 
 /**
- * Reassigns contiguous 1..n order after insert/remove/reorder.
+ * Reassigns contiguous 1..n order in place so object identity (and Vue keys) stay stable.
  */
 export function normalizeChainOrders(steps: ControlChainStep[]): ControlChainStep[] {
-	return steps.map((step, index) => ({
-		...step,
-		order: index + 1,
-	}));
+	for (let index = 0; index < steps.length; index += 1) {
+		steps[index].order = index + 1;
+	}
+	return steps;
 }
 
 /**

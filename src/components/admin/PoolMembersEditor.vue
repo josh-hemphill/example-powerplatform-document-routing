@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Approver } from '@/client/types.gen';
 import { ref } from 'vue';
-import { createEmptyMember, parseMembersJson } from '@/domain/control-editors';
+import { createEmptyMember, editorRowKey, parseMembersJson } from '@/domain/control-editors';
 
 const members = defineModel<Approver[]>({ required: true });
 
@@ -66,7 +66,7 @@ function applyJson(): void {
 
 		<div
 			v-for="(member, index) in members"
-			:key="`member-${index}`"
+			:key="editorRowKey(member)"
 			class="d-flex flex-wrap align-start ga-2 mb-2"
 		>
 			<v-text-field

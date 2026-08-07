@@ -3,7 +3,7 @@ import type { DocumentStatus } from '@/client/types.gen';
 import type { InboxPersona } from '@/config/inbox-personas';
 import { useQuery } from '@pinia/colada';
 import { computed, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { RouterLink } from 'vue-router';
 import { getApiErrorMessage } from '@/api/api-error';
 import { listDocumentsQuery, listDocumentTypesQuery } from '@/client/@pinia/colada.gen';
 import DocumentStatusChip from '@/components/DocumentStatusChip.vue';
@@ -16,7 +16,6 @@ import {
 } from '@/config/inbox-personas';
 import { DOCUMENT_STATUS_LABELS } from '@/domain/document-status';
 
-const router = useRouter();
 const { context } = usePowerAppsContext();
 const statusFilter = ref<DocumentStatus | null>(null);
 const typeFilter = ref<string | null>(null);
@@ -86,17 +85,6 @@ watch(
 	},
 	{ immediate: true },
 );
-
-function openDocument(documentId: string): void {
-	void router.push({ name: 'document', params: { documentId } });
-}
-
-function onRowKeydown(event: KeyboardEvent, documentId: string): void {
-	if (event.key === 'Enter' || event.key === ' ') {
-		event.preventDefault();
-		openDocument(documentId);
-	}
-}
 </script>
 
 <template>
@@ -187,15 +175,15 @@ function onRowKeydown(event: KeyboardEvent, documentId: string): void {
 					:key="item.id"
 					class="mb-3 pa-3 inbox-card"
 					variant="outlined"
-					role="link"
-					tabindex="0"
-					:aria-label="`Open ${item.title}`"
-					@click="openDocument(item.id)"
-					@keydown="onRowKeydown($event, item.id)"
 				>
-					<div class="font-weight-medium mb-1">
-						{{ item.title }}
-					</div>
+					<RouterLink
+						class="inbox-stretched-link"
+						:to="{ name: 'document', params: { documentId: item.id } }"
+					>
+						<span class="font-weight-medium d-block mb-1">
+							{{ item.title }}
+						</span>
+					</RouterLink>
 					<div class="d-flex flex-wrap align-center ga-2 mb-2">
 						<DocumentStatusChip :status="item.status" />
 						<span class="text-caption text-medium-emphasis">
@@ -231,7 +219,6 @@ function onRowKeydown(event: KeyboardEvent, documentId: string): void {
 				</p>
 			</div>
 
-			<!-- Desktop table with horizontal scroll + sticky title -->
 			<div class="d-none d-md-block table-scroll">
 				<v-table>
 					<thead>
@@ -261,32 +248,32 @@ function onRowKeydown(event: KeyboardEvent, documentId: string): void {
 							v-for="item in items"
 							:key="item.id"
 							class="inbox-row"
-							role="link"
-							tabindex="0"
-							:aria-label="`Open ${item.title}`"
-							@click="openDocument(item.id)"
-							@keydown="onRowKeydown($event, item.id)"
 						>
 							<td class="table-scroll__sticky">
-								<span class="font-weight-medium">
-									{{ item.title }}
-								</span>
-								<span
-									v-if="item.currentStepStatus === 'queued'"
-									class="text-caption text-medium-emphasis d-block"
+								<RouterLink
+									class="inbox-stretched-link"
+									:to="{ name: 'document', params: { documentId: item.id } }"
 								>
-									Pool queue
-									<span v-if="item.currentStepDueAt">
-										· due {{ new Date(item.currentStepDueAt).toLocaleString() }}
+									<span class="font-weight-medium">
+										{{ item.title }}
 									</span>
-									<span v-if="item.currentStepElevated"> · elevated</span>
-								</span>
-								<span
-									v-else-if="item.currentApproverEmail"
-									class="text-caption text-medium-emphasis d-block"
-								>
-									Waiting on {{ item.currentApproverEmail }}
-								</span>
+									<span
+										v-if="item.currentStepStatus === 'queued'"
+										class="text-caption text-medium-emphasis d-block"
+									>
+										Pool queue
+										<span v-if="item.currentStepDueAt">
+											· due {{ new Date(item.currentStepDueAt).toLocaleString() }}
+										</span>
+										<span v-if="item.currentStepElevated"> · elevated</span>
+									</span>
+									<span
+										v-else-if="item.currentApproverEmail"
+										class="text-caption text-medium-emphasis d-block"
+									>
+										Waiting on {{ item.currentApproverEmail }}
+									</span>
+								</RouterLink>
 							</td>
 							<td>{{ typeLabel(item.documentType) }}</td>
 							<td>
@@ -308,8 +295,9 @@ function onRowKeydown(event: KeyboardEvent, documentId: string): void {
 </template>
 
 <style scoped>
-.inbox-row {
-	cursor: pointer;
+.inbox-row,
+.inbox-card {
+	position: relative;
 }
 
 .inbox-row:hover,
@@ -317,14 +305,26 @@ function onRowKeydown(event: KeyboardEvent, documentId: string): void {
 	background: rgba(var(--v-theme-on-surface), 0.04);
 }
 
-.inbox-row:focus-visible,
-.inbox-card:focus-visible {
-	outline: 2px solid rgb(var(--v-theme-primary));
-	outline-offset: -2px;
+.inbox-stretched-link {
+	color: inherit;
+	text-decoration: none;
+	outline-offset: 2px;
 }
 
-.inbox-card {
-	cursor: pointer;
+.inbox-stretched-link::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	z-index: 2;
+}
+
+.inbox-stretched-link:focus-visible {
+	outline: none;
+}
+
+.inbox-stretched-link:focus-visible::after {
+	outline: 2px solid rgb(var(--v-theme-primary));
+	outline-offset: -2px;
 }
 
 .table-scroll {

@@ -3,6 +3,7 @@ import type { ControlChainStep } from '@/client/types.gen';
 import { ref } from 'vue';
 import {
 	createEmptyChainStep,
+	editorRowKey,
 	moveChainStep,
 	normalizeChainOrders,
 	parseChainJson,
@@ -97,7 +98,7 @@ function applyJson(): void {
 
 		<div
 			v-for="(step, index) in steps"
-			:key="`step-${index}`"
+			:key="editorRowKey(step)"
 			class="mb-4 pa-3"
 			style="border: 1px solid rgba(var(--v-theme-on-surface), 0.12); border-radius: 8px"
 		>

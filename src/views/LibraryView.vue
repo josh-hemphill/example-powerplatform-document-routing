@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useQuery } from '@pinia/colada';
 import { computed, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { RouterLink } from 'vue-router';
 import { getApiErrorMessage } from '@/api/api-error';
 import {
 	listDocumentTypesQuery,
@@ -9,7 +9,6 @@ import {
 } from '@/client/@pinia/colada.gen';
 import DocumentStatusChip from '@/components/DocumentStatusChip.vue';
 
-const router = useRouter();
 const search = ref('');
 const typeFilter = ref<string | null>(null);
 const includeSuperseded = ref(false);
@@ -50,30 +49,6 @@ const items = computed(() => data.value?.items ?? []);
 
 function isOpenable(item: { documentNumber?: string | null; status: string }): boolean {
 	return Boolean(item.documentNumber && item.status === 'published');
-}
-
-function openLibraryDocument(documentNumber: string): void {
-	void router.push({ name: 'library-document', params: { documentNumber } });
-}
-
-function onRowKeydown(
-	event: KeyboardEvent,
-	item: { documentNumber?: string | null; status: string },
-): void {
-	if (!isOpenable(item) || !item.documentNumber) {
-		return;
-	}
-	if (event.key === 'Enter' || event.key === ' ') {
-		event.preventDefault();
-		openLibraryDocument(item.documentNumber);
-	}
-}
-
-function onRowClick(item: { documentNumber?: string | null; status: string }): void {
-	if (!isOpenable(item) || !item.documentNumber) {
-		return;
-	}
-	openLibraryDocument(item.documentNumber);
 }
 </script>
 
@@ -146,13 +121,21 @@ function onRowClick(item: { documentNumber?: string | null; status: string }): v
 					class="mb-3 pa-3"
 					:class="{ 'library-card--clickable': isOpenable(item) }"
 					variant="outlined"
-					:role="isOpenable(item) ? 'link' : undefined"
-					:tabindex="isOpenable(item) ? 0 : undefined"
-					:aria-label="isOpenable(item) ? `Open ${item.documentNumber}` : undefined"
-					@click="onRowClick(item)"
-					@keydown="onRowKeydown($event, item)"
 				>
-					<div class="font-weight-medium mb-1">
+					<template v-if="isOpenable(item) && item.documentNumber">
+						<RouterLink
+							class="library-stretched-link"
+							:to="{ name: 'library-document', params: { documentNumber: item.documentNumber } }"
+						>
+							<span class="font-weight-medium d-block mb-1">
+								{{ item.documentNumber }}
+							</span>
+						</RouterLink>
+					</template>
+					<div
+						v-else
+						class="font-weight-medium mb-1"
+					>
 						{{ item.documentNumber ?? '—' }}
 					</div>
 					<div class="text-body-2 mb-2">
@@ -209,14 +192,18 @@ function onRowClick(item: { documentNumber?: string | null; status: string }): v
 							v-for="item in items"
 							:key="item.id"
 							:class="{ 'library-row--clickable': isOpenable(item) }"
-							:role="isOpenable(item) ? 'link' : undefined"
-							:tabindex="isOpenable(item) ? 0 : undefined"
-							:aria-label="isOpenable(item) ? `Open ${item.documentNumber}` : undefined"
-							@click="onRowClick(item)"
-							@keydown="onRowKeydown($event, item)"
 						>
 							<td class="table-scroll__sticky font-weight-medium">
-								{{ item.documentNumber ?? '—' }}
+								<RouterLink
+									v-if="isOpenable(item) && item.documentNumber"
+									class="library-stretched-link"
+									:to="{ name: 'library-document', params: { documentNumber: item.documentNumber } }"
+								>
+									{{ item.documentNumber }}
+								</RouterLink>
+								<template v-else>
+									{{ item.documentNumber ?? '—' }}
+								</template>
 							</td>
 							<td>{{ item.title }}</td>
 							<td>{{ typeLabel(item.documentType) }}</td>
@@ -243,7 +230,7 @@ function onRowClick(item: { documentNumber?: string | null; status: string }): v
 <style scoped>
 .library-row--clickable,
 .library-card--clickable {
-	cursor: pointer;
+	position: relative;
 }
 
 .library-row--clickable:hover,
@@ -251,8 +238,25 @@ function onRowClick(item: { documentNumber?: string | null; status: string }): v
 	background: rgba(var(--v-theme-on-surface), 0.04);
 }
 
-.library-row--clickable:focus-visible,
-.library-card--clickable:focus-visible {
+.library-stretched-link {
+	color: inherit;
+	font-weight: 600;
+	text-decoration: none;
+	outline-offset: 2px;
+}
+
+.library-stretched-link::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	z-index: 2;
+}
+
+.library-stretched-link:focus-visible {
+	outline: none;
+}
+
+.library-stretched-link:focus-visible::after {
 	outline: 2px solid rgb(var(--v-theme-primary));
 	outline-offset: -2px;
 }

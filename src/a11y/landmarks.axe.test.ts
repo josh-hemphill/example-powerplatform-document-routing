@@ -49,8 +49,10 @@ describe('a11y smoke landmarks', () => {
 						</tr>
 					</thead>
 					<tbody>
-						<tr role="link" tabindex="0" aria-label="Open Sample policy">
-							<td>Sample policy</td>
+						<tr>
+							<td>
+								<a href="#/documents/1">Sample policy</a>
+							</td>
 							<td>In review</td>
 						</tr>
 					</tbody>
@@ -77,8 +79,10 @@ describe('a11y smoke landmarks', () => {
 						</tr>
 					</thead>
 					<tbody>
-						<tr role="link" tabindex="0" aria-label="Open POL-2026-00001">
-							<td>POL-2026-00001</td>
+						<tr>
+							<td>
+								<a href="#/library/POL-2026-00001">POL-2026-00001</a>
+							</td>
 							<td>Travel policy</td>
 						</tr>
 					</tbody>
