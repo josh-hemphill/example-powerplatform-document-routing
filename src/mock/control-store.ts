@@ -167,6 +167,8 @@ function mapSeedChain(
 function buildSeedSnapshot(): ControlStoreSnapshot {
 	const pools = new Map<string, ControlApproverPool>();
 	const destinationId = randomUUID();
+	/** Seeded published policy case uses this year in `POL-2026-00001`. */
+	const seedPolicyNumberYear = 2026;
 	const types: ControlDocumentType[] = seedDocumentTypes.map((type) => ({
 		id: type.id,
 		label: type.label,
@@ -180,9 +182,9 @@ function buildSeedSnapshot(): ControlStoreSnapshot {
 		defaultDestinationId: destinationId,
 		numberPrefix: type.id.slice(0, 3).toUpperCase(),
 		numberPattern: DEFAULT_NUMBER_PATTERN,
-		// policy seeds a published POL-2026-00001 demo case
+		// policy seeds a published POL-2026-00001 demo case — keep sequenceYear aligned
 		nextSequence: type.id === 'policy' ? 2 : 1,
-		sequenceYear: new Date().getUTCFullYear(),
+		sequenceYear: type.id === 'policy' ? seedPolicyNumberYear : new Date().getUTCFullYear(),
 		approvalChain: type.approvalChain.map((step, index) =>
 			mapSeedChain(step, index + 1, pools),
 		),

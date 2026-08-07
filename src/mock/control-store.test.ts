@@ -42,6 +42,12 @@ describe('control store', () => {
 		expect(findControlDocumentType('missing')).toBeUndefined();
 		expect(findControlDocumentType('policy')?.label).toBe('Policy');
 	});
+
+	it('seeds policy sequenceYear to match POL-2026 demo numbering', () => {
+		const policy = findControlDocumentType('policy');
+		expect(policy?.nextSequence).toBe(2);
+		expect(policy?.sequenceYear).toBe(2026);
+	});
 });
 
 describe('control chain validation', () => {

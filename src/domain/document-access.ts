@@ -33,7 +33,9 @@ const ACCESSIBLE_STEP_STATUSES = new Set([
 /**
  * True when the actor may list/open the document (owner, collaborator, author, or active approver/pool).
  * Published and superseded controlled documents are readable by any authenticated user (library).
- * After reject, unused future (`waiting`) approvers do not retain access.
+ * Step-based access is limited to activated/completed steps (`queued` / `pending` / decided) —
+ * future `waiting` steps never grant access (including while earlier steps are still in review,
+ * and after reject so unused future approvers do not retain draft visibility).
  */
 export function canActorAccessDocument(
 	document: AccessibleDocument,

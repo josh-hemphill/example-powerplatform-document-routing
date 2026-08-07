@@ -620,10 +620,18 @@ export function documentRoutingMockPlugin(): Plugin {
 						const roles = readActorRoles(req);
 						const isAdmin = roles.includes('admin');
 						if (body.steps && body.steps.length > 0) {
-							if (!allowOverride || !isAdmin) {
+							if (!allowOverride) {
 								sendJson(res, 403, {
 									message:
-										'Chain override requires Admin when allowApproverOverride is enabled',
+										'Client approval-chain override is disabled; submit uses control tables',
+									code: 'forbidden',
+								});
+								return;
+							}
+							if (!isAdmin) {
+								sendJson(res, 403, {
+									message:
+										'Chain override requires the Admin role when allowApproverOverride is enabled',
 									code: 'forbidden',
 								});
 								return;
