@@ -47,6 +47,8 @@ export interface ControlDocumentType {
 	numberPrefix: string;
 	numberPattern: string;
 	nextSequence: number;
+	/** Calendar year for `nextSequence`; allocation resets when the year advances. */
+	sequenceYear: number;
 	approvalChain: ControlChainStep[];
 }
 
@@ -165,6 +167,8 @@ function mapSeedChain(
 function buildSeedSnapshot(): ControlStoreSnapshot {
 	const pools = new Map<string, ControlApproverPool>();
 	const destinationId = randomUUID();
+	/** Seeded published policy case uses this year in `POL-2026-00001`. */
+	const seedPolicyNumberYear = 2026;
 	const types: ControlDocumentType[] = seedDocumentTypes.map((type) => ({
 		id: type.id,
 		label: type.label,
@@ -178,8 +182,9 @@ function buildSeedSnapshot(): ControlStoreSnapshot {
 		defaultDestinationId: destinationId,
 		numberPrefix: type.id.slice(0, 3).toUpperCase(),
 		numberPattern: DEFAULT_NUMBER_PATTERN,
-		// policy seeds a published POL-2026-00001 demo case
+		// policy seeds a published POL-2026-00001 demo case — keep sequenceYear aligned
 		nextSequence: type.id === 'policy' ? 2 : 1,
+		sequenceYear: type.id === 'policy' ? seedPolicyNumberYear : new Date().getUTCFullYear(),
 		approvalChain: type.approvalChain.map((step, index) =>
 			mapSeedChain(step, index + 1, pools),
 		),
@@ -265,38 +270,40 @@ export function toDocumentTypeDefinition(
 	const pools = new Map(
 		getControlStore().approverPools.map((pool) => [pool.key, pool] as const),
 	);
-	const approvalChain: ApprovalStepTemplate[] = type.approvalChain.map((step) => {
-		if (step.assignmentMode === 'named') {
-			if (!step.assignee) {
-				throw new Error(`Named step ${step.order} is missing assignee`);
+	const approvalChain: ApprovalStepTemplate[] = [...type.approvalChain]
+		.sort((a, b) => a.order - b.order)
+		.map((step) => {
+			if (step.assignmentMode === 'named') {
+				if (!step.assignee) {
+					throw new Error(`Named step ${step.order} is missing assignee`);
+				}
+				const elevation = step.elevationPoolKey
+					? pools.get(step.elevationPoolKey)?.members
+					: undefined;
+				return {
+					mode: 'named' as const,
+					displayName: step.assignee.displayName,
+					email: step.assignee.email,
+					role: step.role,
+					slaHours: step.slaHours,
+					elevationPool: elevation,
+				};
+			}
+			const pool = step.poolKey ? pools.get(step.poolKey) : undefined;
+			if (!pool?.members.length) {
+				throw new Error(`Pool step ${step.order} references empty/missing pool`);
 			}
 			const elevation = step.elevationPoolKey
 				? pools.get(step.elevationPoolKey)?.members
 				: undefined;
 			return {
-				mode: 'named' as const,
-				displayName: step.assignee.displayName,
-				email: step.assignee.email,
-				role: step.role,
-				slaHours: step.slaHours,
+				mode: 'pool' as const,
+				poolRole: step.role,
+				slaHours: step.slaHours ?? 8,
+				pool: pool.members,
 				elevationPool: elevation,
 			};
-		}
-		const pool = step.poolKey ? pools.get(step.poolKey) : undefined;
-		if (!pool?.members.length) {
-			throw new Error(`Pool step ${step.order} references empty/missing pool`);
-		}
-		const elevation = step.elevationPoolKey
-			? pools.get(step.elevationPoolKey)?.members
-			: undefined;
-		return {
-			mode: 'pool' as const,
-			poolRole: step.role,
-			slaHours: step.slaHours ?? 8,
-			pool: pool.members,
-			elevationPool: elevation,
-		};
-	});
+		});
 
 	return {
 		id: type.id,
@@ -322,7 +329,7 @@ export function materializeApprovalSteps(typeId: string) {
 }
 
 /**
- * Allocates the next controlled document number for a type (mutates nextSequence).
+ * Allocates the next controlled document number for a type (mutates nextSequence / sequenceYear).
  */
 export function allocateNextDocumentNumber(
 	typeId: string,
@@ -337,10 +344,12 @@ export function allocateNextDocumentNumber(
 			numberPrefix: type.numberPrefix || type.id.slice(0, 3).toUpperCase(),
 			numberPattern: type.numberPattern || DEFAULT_NUMBER_PATTERN,
 			nextSequence: type.nextSequence || 1,
+			sequenceYear: type.sequenceYear,
 		},
 		clock,
 	);
 	type.nextSequence = allocated.nextSequence;
+	type.sequenceYear = allocated.sequenceYear;
 	return allocated.documentNumber;
 }
 

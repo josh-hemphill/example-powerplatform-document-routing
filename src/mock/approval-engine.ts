@@ -188,6 +188,14 @@ export function releaseStep(step: MockApprovalStep, actorEmail: string): void {
  * Named overdue steps convert to an elevated pool queue (chosen Phase 3 semantics).
  * Claim/release-style requeue never extends activateDueAt; elevation starts a new window once.
  */
+/**
+ * Elevates or requeues an overdue active step.
+ *
+ * Named steps without an elevation pool: intentional no-op when overdue (no
+ * silent reassignment). Configure `elevationPool` / `elevationPoolKey` to escalate.
+ * Claimed pool steps without elevation members are returned to the queue without
+ * extending `activateDueAt`.
+ */
 export function processStepSla(
 	step: MockApprovalStep,
 	clock: Date,

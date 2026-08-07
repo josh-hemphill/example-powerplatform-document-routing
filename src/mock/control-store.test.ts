@@ -42,6 +42,12 @@ describe('control store', () => {
 		expect(findControlDocumentType('missing')).toBeUndefined();
 		expect(findControlDocumentType('policy')?.label).toBe('Policy');
 	});
+
+	it('seeds policy sequenceYear to match POL-2026 demo numbering', () => {
+		const policy = findControlDocumentType('policy');
+		expect(policy?.nextSequence).toBe(2);
+		expect(policy?.sequenceYear).toBe(2026);
+	});
 });
 
 describe('control chain validation', () => {
@@ -66,5 +72,35 @@ describe('control chain validation', () => {
 				{ order: 1, assignmentMode: 'pool', role: 'Legal', poolKey },
 			]),
 		).toMatch(/Duplicate/);
+	});
+
+	it('rejects gapped step orders and materializes sorted by order', async() => {
+		const { validateControlChain } = await import('./control-api.ts');
+		const poolKey = getControlStore().approverPools[0]?.key;
+		expect(poolKey).toBeTruthy();
+		expect(
+			validateControlChain([
+				{ order: 1, assignmentMode: 'pool', role: 'Legal', poolKey },
+				{ order: 3, assignmentMode: 'pool', role: 'Legal', poolKey },
+			]),
+		).toMatch(/contiguous/);
+
+		const type = findControlDocumentType('policy');
+		expect(type).toBeTruthy();
+		type!.approvalChain = [
+			{ order: 2, assignmentMode: 'pool', role: 'Second', poolKey },
+			{ order: 1, assignmentMode: 'pool', role: 'First', poolKey },
+		];
+		const steps = materializeApprovalSteps('policy');
+		expect(steps?.[0]?.assignmentMode).toBe('pool');
+		expect(type!.approvalChain.map((step) => step.order)).toEqual([2, 1]);
+		const { toDocumentTypeDefinition } = await import('./control-store.ts');
+		const def = toDocumentTypeDefinition(type!);
+		expect(def.approvalChain[0]?.mode).toBe('pool');
+		expect(
+			def.approvalChain[0] && 'poolRole' in def.approvalChain[0]
+				? def.approvalChain[0].poolRole
+				: undefined,
+		).toBe('First');
 	});
 });

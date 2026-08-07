@@ -126,6 +126,7 @@ watch(
 						{ title: 'Rejected', value: 'rejected' },
 						{ title: 'Published', value: 'published' },
 						{ title: 'Superseded', value: 'superseded' },
+						{ title: 'Abandoned', value: 'abandoned' },
 					]"
 					label="Status"
 					hide-details

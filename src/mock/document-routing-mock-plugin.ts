@@ -5,9 +5,9 @@ import { randomUUID } from 'node:crypto';
 import {
 	validateBodyMarkdown,
 	validateFreeformRequest,
+	validateSummary,
 	validateTitle,
 } from '../api/form-rules.ts';
-import { appConfig } from '../config/app.config.ts';
 import { toApprovalStepInputs } from '../config/document-types.ts';
 import { resolvePrincipalRolesByEmail } from '../config/local-personas.ts';
 import {
@@ -46,6 +46,7 @@ import {
 import { getDocumentStore } from './document-store.ts';
 import { resolveSlaClock } from './sla-clock.ts';
 import {
+	abandonSupersedeSuccessor,
 	applySupersessionOnPublish,
 	supersedeDocument,
 } from './supersede-engine.ts';
@@ -373,10 +374,10 @@ export function documentRoutingMockPlugin(): Plugin {
 							history: [],
 							publishedPdfUrl: null,
 							sharePointItemId: null,
-							requestedPublishSiteUrl:
-                body.requestedPublishSiteUrl ?? appConfig.sharePoint.siteUrl,
-							requestedLibraryName:
-                body.requestedLibraryName ?? appConfig.sharePoint.libraryName,
+							// Free-form SharePoint URLs from the client are ignored;
+							// trusted publish uses allowlisted destinations only.
+							requestedPublishSiteUrl: null,
+							requestedLibraryName: null,
 						};
 						pushHistory(
 							document,
@@ -445,6 +446,44 @@ export function documentRoutingMockPlugin(): Plugin {
 						return;
 					}
 
+					const abandonMatch = matchRoute(
+						path,
+						/^\/api\/documents\/([^/]+)\/abandon-supersede$/,
+					);
+					if (method === 'POST' && abandonMatch) {
+						const document = getDocumentStore().get(abandonMatch[1]);
+						if (!document) {
+							sendJson(res, 404, { message: 'Document not found', code: 'not_found' });
+							return;
+						}
+						const body = await readJson<{ comment?: string }>(req);
+						const roles = readActorRoles(req);
+						try {
+							const abandoned = abandonSupersedeSuccessor(document, actor, {
+								isAdmin: roles.includes('admin'),
+								comment: body.comment,
+							});
+							sendJson(res, 200, abandoned);
+						}
+						catch(error) {
+							const code
+								= error instanceof Error && 'code' in error
+									? String((error as { code: string }).code)
+									: 'invalid_state';
+							const status
+								= code === 'forbidden'
+									? 403
+									: code === 'validation_error'
+										? 400
+										: 409;
+							sendJson(res, status, {
+								message: error instanceof Error ? error.message : 'Abandon failed',
+								code,
+							});
+						}
+						return;
+					}
+
 					const draftMatch = matchRoute(path, /^\/api\/documents\/([^/]+)\/draft$/);
 					if (method === 'PUT' && draftMatch) {
 						const document = getDocumentStore().get(draftMatch[1]);
@@ -472,7 +511,28 @@ export function documentRoutingMockPlugin(): Plugin {
 							title: string;
 							bodyMarkdown: string;
 							summary?: string;
+							expectedContentRevision: number;
 						}>(req);
+
+						if (
+							typeof body.expectedContentRevision !== 'number'
+							|| !Number.isInteger(body.expectedContentRevision)
+						) {
+							sendJson(res, 400, {
+								message: 'expectedContentRevision is required (integer)',
+								code: 'validation_error',
+							});
+							return;
+						}
+						if (body.expectedContentRevision !== document.contentRevision) {
+							sendJson(res, 409, {
+								message:
+									'Draft was updated by someone else; reload and retry',
+								code: 'revision_conflict',
+								currentRevision: document.contentRevision,
+							});
+							return;
+						}
 
 						const titleError = validateTitle(body.title);
 						if (titleError) {
@@ -484,10 +544,15 @@ export function documentRoutingMockPlugin(): Plugin {
 							sendJson(res, 400, { message: bodyError, code: 'validation_error' });
 							return;
 						}
+						const summaryError = validateSummary(body.summary);
+						if (summaryError) {
+							sendJson(res, 400, { message: summaryError, code: 'validation_error' });
+							return;
+						}
 
 						document.title = body.title;
-						document.draftBodyMarkdown = body.bodyMarkdown;
-						document.draftSummary = body.summary ?? null;
+						document.draftBodyMarkdown = body.bodyMarkdown.trim();
+						document.draftSummary = body.summary?.trim() ? body.summary.trim() : null;
 						document.authorEmail = document.authorEmail ?? actor;
 						document.status = 'drafting';
 						document.contentRevision += 1;
@@ -552,9 +617,29 @@ export function documentRoutingMockPlugin(): Plugin {
 						}>(req);
 
 						const allowOverride = getControlStore().settings.allowApproverOverride;
+						const roles = readActorRoles(req);
+						const isAdmin = roles.includes('admin');
+						if (body.steps && body.steps.length > 0) {
+							if (!allowOverride) {
+								sendJson(res, 403, {
+									message:
+										'Client approval-chain override is disabled; submit uses control tables',
+									code: 'forbidden',
+								});
+								return;
+							}
+							if (!isAdmin) {
+								sendJson(res, 403, {
+									message:
+										'Chain override requires the Admin role when allowApproverOverride is enabled',
+									code: 'forbidden',
+								});
+								return;
+							}
+						}
 						const materialized = materializeApprovalSteps(typeRow.id);
 						const stepsInput
-							= allowOverride && body.steps && body.steps.length > 0
+							= allowOverride && isAdmin && body.steps && body.steps.length > 0
 								? body.steps
 								: materialized ?? toApprovalStepInputs(
 									toDocumentTypeDefinition(typeRow).approvalChain,
@@ -924,7 +1009,7 @@ export function documentRoutingMockPlugin(): Plugin {
 									pdfFileName: target.fileName,
 									sharePointUrl: document.publishedPdfUrl,
 									sharePointItemId: document.sharePointItemId,
-									publishedAt: document.updatedAt,
+									publishedAt: document.publishedAt,
 									idempotent: true,
 								});
 								return;
@@ -1012,7 +1097,7 @@ export function documentRoutingMockPlugin(): Plugin {
 								pdfFileName: target.fileName,
 								sharePointUrl,
 								sharePointItemId,
-								publishedAt: stamp(),
+								publishedAt,
 								idempotent: false,
 							});
 						}

@@ -41,14 +41,18 @@ const {
 	isProcessingSla,
 	isWithdrawing,
 	isSuperseding,
+	isAbandoningSupersede,
 	isPublishingPdf,
+	hasDraftRevisionConflict,
 	onSaveDraft,
+	onReloadDraftAfterConflict,
 	onSubmitForApproval,
 	onClaim,
 	onRelease,
 	onProcessSla,
 	onWithdrawAndRevise,
 	onSupersede,
+	onAbandonSupersede,
 	onDecision,
 	onPublish,
 	canDraft,
@@ -60,6 +64,7 @@ const {
 	canProcessSla,
 	canWithdraw,
 	canSupersede,
+	canAbandonSupersede,
 	publishedLibraryPath,
 } = useDocumentWorkspace(documentId);
 
@@ -153,15 +158,25 @@ async function handleSupersede(): Promise<void> {
 			/>
 
 			<div
-				v-if="canSupersede"
+				v-if="canSupersede || canAbandonSupersede"
 				class="mb-4 d-flex flex-wrap ga-2"
 			>
 				<v-btn
+					v-if="canSupersede"
 					color="primary"
 					:loading="isSuperseding"
 					@click="handleSupersede"
 				>
 					Supersede with new case
+				</v-btn>
+				<v-btn
+					v-if="canAbandonSupersede"
+					variant="tonal"
+					color="warning"
+					:loading="isAbandoningSupersede"
+					@click="onAbandonSupersede"
+				>
+					Abandon supersede successor
 				</v-btn>
 			</div>
 
@@ -178,8 +193,10 @@ async function handleSupersede(): Promise<void> {
 						:can-draft="Boolean(canDraft)"
 						:is-saving="isSavingDraft"
 						:is-dirty="isDraftDirty"
+						:has-revision-conflict="hasDraftRevisionConflict"
 						@save="onSaveDraft"
 						@discard="() => hydrateFromDocument(true)"
+						@reload="onReloadDraftAfterConflict"
 					/>
 
 					<ApprovalPanel

@@ -79,6 +79,19 @@ describe('supersede engine', () => {
 		expect(() => supersedeDocument(prior, ACTOR)).toThrow(/open successor/i);
 	});
 
+	it('allows a new supersede after abandoning the open successor', async() => {
+		const { abandonSupersedeSuccessor } = await import('./supersede-engine.ts');
+		const prior = publishedDoc();
+		const successor = supersedeDocument(prior, ACTOR);
+		expect(successor.contentRevision).toBe(0);
+		abandonSupersedeSuccessor(successor, ACTOR);
+		expect(successor.status).toBe('abandoned');
+		expect(findOpenSuccessor(prior.id)).toBeUndefined();
+		const next = supersedeDocument(prior, ACTOR);
+		expect(next.id).not.toBe(successor.id);
+		expect(next.status).toBe('drafting');
+	});
+
 	it('rejects supersede when not published', () => {
 		const prior = publishedDoc();
 		prior.status = 'approved';

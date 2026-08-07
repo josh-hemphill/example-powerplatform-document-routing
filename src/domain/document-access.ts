@@ -11,6 +11,8 @@ export interface AccessibleDocument {
 	currentApproverEmail?: string | null;
 	currentPoolEmails: string[];
 	approvalSteps: Array<{
+		/** When set, only activated/completed steps grant access (not future `waiting`). */
+		status?: string | null;
 		approverEmail?: string | null;
 		pool: Array<{ email: string }>;
 		elevationPool?: Array<{ email: string }> | null;
@@ -19,9 +21,21 @@ export interface AccessibleDocument {
 
 const DRAFT_EDITABLE_STATUSES = new Set(['requested', 'drafting']);
 
+/** Steps that have been activated or decided — future `waiting` steps do not grant access. */
+const ACCESSIBLE_STEP_STATUSES = new Set([
+	'queued',
+	'pending',
+	'approved',
+	'rejected',
+	'skipped',
+]);
+
 /**
  * True when the actor may list/open the document (owner, collaborator, author, or active approver/pool).
  * Published and superseded controlled documents are readable by any authenticated user (library).
+ * Step-based access is limited to activated/completed steps (`queued` / `pending` / decided) —
+ * future `waiting` steps never grant access (including while earlier steps are still in review,
+ * and after reject so unused future approvers do not retain draft visibility).
  */
 export function canActorAccessDocument(
 	document: AccessibleDocument,
@@ -50,6 +64,9 @@ export function canActorAccessDocument(
 		return true;
 	}
 	return document.approvalSteps.some((step) => {
+		if (step.status != null && !ACCESSIBLE_STEP_STATUSES.has(step.status)) {
+			return false;
+		}
 		if (step.approverEmail?.toLowerCase() === email) {
 			return true;
 		}

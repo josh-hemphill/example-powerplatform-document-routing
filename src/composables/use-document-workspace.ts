@@ -2,8 +2,9 @@ import type { Ref } from 'vue';
 import type { PublishRequest } from '@/client/types.gen';
 import { useMutation, useQuery, useQueryCache } from '@pinia/colada';
 import { computed, ref } from 'vue';
-import { getApiErrorMessage } from '@/api/api-error';
+import { getApiErrorCode, getApiErrorMessage } from '@/api/api-error';
 import {
+	abandonSupersedeMutation,
 	claimApprovalStepMutation,
 	decideApprovalStepMutation,
 	getDocumentQuery,
@@ -24,6 +25,7 @@ import { useDocumentFormState } from '@/composables/use-document-form-state';
 import { usePowerAppsContext } from '@/composables/use-power-apps-context';
 import { getDocumentType } from '@/config/document-types';
 import { isEmailInPool } from '@/domain/approval-queue';
+import { canActorEditDraft, canActorMutateDraft } from '@/domain/document-access';
 import { publishApprovedDocument } from '@/publishing/publish-document';
 import { buildRevisionPdfFileName } from '@/publishing/publish-engine';
 import { useIdentityStore } from '@/stores/identity';
@@ -37,6 +39,7 @@ export function useDocumentWorkspace(documentId: Ref<string>) {
 	const identity = useIdentityStore();
 	const actionError = ref<string | null>(null);
 	const actionSuccess = ref<string | null>(null);
+	const hasDraftRevisionConflict = ref(false);
 
 	const { data: document, isPending, error, refetch } = useQuery(() =>
 		getDocumentQuery({
@@ -181,6 +184,13 @@ export function useDocumentWorkspace(documentId: Ref<string>) {
 		},
 	});
 
+	const { mutateAsync: abandonSupersedeAsync, isLoading: isAbandoningSupersede } = useMutation({
+		...abandonSupersedeMutation(),
+		async onSettled() {
+			await invalidateDocumentQueries();
+		},
+	});
+
 	const { mutateAsync: publishPdfAsync, isLoading: isPublishingPdf } = useMutation({
 		...publishDocumentPdfMutation(),
 		async onSettled() {
@@ -194,12 +204,16 @@ export function useDocumentWorkspace(documentId: Ref<string>) {
 	function clearActionFeedback(): void {
 		actionError.value = null;
 		actionSuccess.value = null;
+		hasDraftRevisionConflict.value = false;
 	}
 
 	async function onSaveDraft(): Promise<void> {
 		clearActionFeedback();
 		if (!canAct.value) {
 			actionError.value = 'Sign-in identity is required.';
+			return;
+		}
+		if (!document.value) {
 			return;
 		}
 		try {
@@ -209,14 +223,31 @@ export function useDocumentWorkspace(documentId: Ref<string>) {
 					title: forms.draftForm.title,
 					bodyMarkdown: forms.draftForm.bodyMarkdown,
 					summary: forms.draftForm.summary || undefined,
+					expectedContentRevision: document.value.contentRevision,
 				},
 			});
 			forms.markDraftClean();
 			actionSuccess.value = 'Draft saved. Ready for the approval chain when content is complete.';
 		}
 		catch(saveError) {
+			if (getApiErrorCode(saveError) === 'revision_conflict') {
+				hasDraftRevisionConflict.value = true;
+				actionError.value = getApiErrorMessage(
+					saveError,
+					'Draft was updated by someone else; reload and retry',
+				);
+				return;
+			}
 			actionError.value = getApiErrorMessage(saveError, 'Failed to save draft');
 		}
+	}
+
+	async function onReloadDraftAfterConflict(): Promise<void> {
+		hasDraftRevisionConflict.value = false;
+		actionError.value = null;
+		await refetch();
+		forms.hydrateFromDocument(true);
+		actionSuccess.value = 'Draft reloaded from the server.';
 	}
 
 	async function onSubmitForApproval(): Promise<void> {
@@ -317,6 +348,20 @@ export function useDocumentWorkspace(documentId: Ref<string>) {
 		}
 	}
 
+	async function onAbandonSupersede(): Promise<void> {
+		clearActionFeedback();
+		try {
+			await abandonSupersedeAsync({
+				path: { documentId: documentId.value },
+				body: {},
+			});
+			actionSuccess.value = 'Supersede successor abandoned. A new supersede can be opened on the prior published document.';
+		}
+		catch(abandonError) {
+			actionError.value = getApiErrorMessage(abandonError, 'Failed to abandon successor');
+		}
+	}
+
 	async function onDecision(decision: 'approve' | 'reject'): Promise<void> {
 		clearActionFeedback();
 		const step = activeStep.value;
@@ -380,16 +425,38 @@ export function useDocumentWorkspace(documentId: Ref<string>) {
 		}
 	}
 
-	const canDraft = computed(
-		() =>
-			Boolean(canAct.value)
-			&& document.value
-			&& ['requested', 'drafting'].includes(document.value.status),
-	);
+	const canDraft = computed(() => {
+		const doc = document.value;
+		const actor = context.value.email;
+		if (!canAct.value || !doc || !actor) {
+			return false;
+		}
+		return canActorEditDraft(
+			{
+				...doc,
+				collaboratorEmails: doc.collaboratorEmails ?? [],
+				currentPoolEmails: doc.currentPoolEmails ?? [],
+				approvalSteps: doc.approvalSteps ?? [],
+			},
+			actor,
+		);
+	});
 
-	const canSubmitApproval = computed(
-		() => Boolean(canAct.value) && document.value?.status === 'drafting',
-	);
+	const canSubmitApproval = computed(() => {
+		const doc = document.value;
+		const actor = context.value.email;
+		if (!canAct.value || !doc || !actor || doc.status !== 'drafting') {
+			return false;
+		}
+		return canActorMutateDraft(
+			{
+				requesterEmail: doc.requesterEmail,
+				authorEmail: doc.authorEmail,
+				collaboratorEmails: doc.collaboratorEmails ?? [],
+			},
+			actor,
+		);
+	});
 	const canClaim = computed(() => {
 		const step = activeStep.value;
 		const actor = context.value.email;
@@ -464,6 +531,25 @@ export function useDocumentWorkspace(documentId: Ref<string>) {
 		);
 	});
 
+	const canAbandonSupersede = computed(() => {
+		const doc = document.value;
+		const actor = (context.value.email || '').toLowerCase();
+		if (!canAct.value || !doc || !actor || !doc.supersedesDocumentId) {
+			return false;
+		}
+		if (!['requested', 'drafting', 'in_review', 'approved'].includes(doc.status)) {
+			return false;
+		}
+		if (identity.hasRole('admin')) {
+			return true;
+		}
+		return (
+			doc.requesterEmail.toLowerCase() === actor
+			|| doc.authorEmail?.toLowerCase() === actor
+			|| (doc.collaboratorEmails ?? []).some((email) => email.toLowerCase() === actor)
+		);
+	});
+
 	const publishedLibraryPath = computed(() => {
 		const number = document.value?.documentNumber;
 		if (!number || (document.value?.status !== 'published' && document.value?.status !== 'superseded')) {
@@ -494,14 +580,18 @@ export function useDocumentWorkspace(documentId: Ref<string>) {
 		isProcessingSla,
 		isWithdrawing,
 		isSuperseding,
+		isAbandoningSupersede,
 		isPublishingPdf,
+		hasDraftRevisionConflict,
 		onSaveDraft,
+		onReloadDraftAfterConflict,
 		onSubmitForApproval,
 		onClaim,
 		onRelease,
 		onProcessSla,
 		onWithdrawAndRevise,
 		onSupersede,
+		onAbandonSupersede,
 		onDecision,
 		onPublish,
 		canDraft,
@@ -513,6 +603,7 @@ export function useDocumentWorkspace(documentId: Ref<string>) {
 		canProcessSla,
 		canWithdraw,
 		canSupersede,
+		canAbandonSupersede,
 		publishedLibraryPath,
 	};
 }

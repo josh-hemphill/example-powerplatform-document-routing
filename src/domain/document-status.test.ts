@@ -13,8 +13,10 @@ describe('document workflow stages', () => {
 		expect(getWorkflowStageIndex('published')).toBe(4);
 	});
 
-	it('keeps rejected documents on the approval stage', () => {
+	it('keeps rejected and abandoned documents on the approval stage', () => {
 		expect(getWorkflowStageIndex('rejected')).toBe(2);
+		expect(getWorkflowStageIndex('abandoned')).toBe(2);
+		expect(DOCUMENT_STATUS_LABELS.abandoned).toBe('Abandoned');
 	});
 
 	it('maps superseded onto the published stage', () => {
