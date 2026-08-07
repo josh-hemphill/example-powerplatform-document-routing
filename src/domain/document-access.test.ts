@@ -1,9 +1,11 @@
 import type { AccessibleDocument } from './document-access.ts';
 import { describe, expect, it } from 'vitest';
 import {
+	canActorAbandonSupersedeSuccessor,
 	canActorAccessDocument,
 	canActorEditDraft,
 	canActorMutateDraft,
+	canActorSupersedeDocument,
 	isDraftEditableStatus,
 } from './document-access.ts';
 
@@ -91,5 +93,40 @@ describe('document access', () => {
 		});
 		expect(canActorAccessDocument(doc, 'first@contoso.com')).toBe(true);
 		expect(canActorAccessDocument(doc, 'future@contoso.com')).toBe(false);
+	});
+
+	it('allows stakeholders and admins to supersede published documents', () => {
+		const published = baseDoc({
+			status: 'published',
+			authorEmail: 'casey.author@contoso.com',
+			collaboratorEmails: ['dev@example.com'],
+		});
+		expect(canActorSupersedeDocument(published, 'alex.requester@contoso.com')).toBe(true);
+		expect(canActorSupersedeDocument(published, 'dev@example.com')).toBe(true);
+		expect(canActorSupersedeDocument(published, 'stranger@contoso.com')).toBe(false);
+		expect(
+			canActorSupersedeDocument(published, 'stranger@contoso.com', { isAdmin: true }),
+		).toBe(true);
+		expect(
+			canActorSupersedeDocument(published, 'alex.requester@contoso.com', { canAct: false }),
+		).toBe(false);
+	});
+
+	it('allows abandoning open supersede successors for stakeholders', () => {
+		const successor = {
+			...baseDoc({
+				status: 'drafting',
+				authorEmail: 'casey.author@contoso.com',
+			}),
+			supersedesDocumentId: 'prior-1',
+		};
+		expect(canActorAbandonSupersedeSuccessor(successor, 'alex.requester@contoso.com')).toBe(true);
+		expect(canActorAbandonSupersedeSuccessor(successor, 'stranger@contoso.com')).toBe(false);
+		expect(
+			canActorAbandonSupersedeSuccessor(
+				{ ...successor, status: 'published' },
+				'alex.requester@contoso.com',
+			),
+		).toBe(false);
 	});
 });

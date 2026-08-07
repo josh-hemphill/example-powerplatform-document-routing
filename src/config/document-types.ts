@@ -1,6 +1,10 @@
 /**
- * Document types and default approval chains.
- * Supports named assignees and pool/self-assign steps with SLA elevation.
+ * Bundled document-type **seed** and template helpers for local demo / first boot.
+ *
+ * Runtime policy (labels, chains, pools, destinations) should come from the control API
+ * (`listDocumentTypes` / Admin). Prefer API items in UI; use `findDocumentType` /
+ * `getDocumentType` only as offline fallback when the control store is empty or a type
+ * id is missing from the API response.
  */
 import type { ApproverPerson } from '../domain/approval-queue.ts';
 
@@ -216,8 +220,8 @@ export function findDocumentType(
 }
 
 /**
- * Looks up a document type by id, falling back to the default type for display only.
- * Prefer `findDocumentType` for create/submit validation.
+ * Seed-config lookup with default fallback for display/offline only.
+ * Prefer control API types in UI; use `findDocumentType` when absence must be explicit.
  */
 export function getDocumentType(
 	id: string | null | undefined,
