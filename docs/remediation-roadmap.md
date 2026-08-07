@@ -5,7 +5,7 @@ Plan to address the codebase review findings by making **Dataverse the system of
 This is intentional scaffolding evolution for an example Code App — not a rewrite of the Vue shell.
 
 > **Phases 0–8 status:** Implemented on `main`.  
-> **Next work:** Post–Phase 8 bugs and UI polish are tracked in [`post-phase-8-review-roadmap.md`](./post-phase-8-review-roadmap.md) (Phases **9–13**: identity/authz → workflow concurrency → approval UX → nav/responsive → admin/a11y).
+> **Post–Phase 8:** Phases **9–11** implemented (identity/authz, workflow concurrency, approval UX). Remaining: Phases **12–13** in [`post-phase-8-review-roadmap.md`](./post-phase-8-review-roadmap.md) (nav/responsive → admin/a11y).
 
 ---
 
