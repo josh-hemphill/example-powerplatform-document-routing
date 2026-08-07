@@ -251,7 +251,7 @@ async function handleAbandonSupersede(): Promise<void> {
 
 			<div
 				v-if="canSupersede || canAbandonSupersede"
-				class="mb-4 d-flex flex-wrap ga-2"
+				class="mb-4 d-flex flex-wrap justify-end ga-2"
 			>
 				<v-btn
 					v-if="canSupersede"

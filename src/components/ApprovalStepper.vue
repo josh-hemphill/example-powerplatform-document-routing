@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { APPROVAL_STEP_STATUS_LABELS } from '@/domain/approval-queue';
+
 defineProps<{
 	steps: Array<{
 		id: string;
@@ -74,7 +76,7 @@ function formatDue(dueAt: string | null | undefined): string {
 			</v-list-item-title>
 			<v-list-item-subtitle>
 				{{ step.assignmentMode === 'pool' ? 'Pool' : 'Named' }}
-				· {{ step.status }}
+				· {{ APPROVAL_STEP_STATUS_LABELS[step.status] }}
 				<span v-if="step.approverEmail"> · {{ step.approverEmail }}</span>
 				<span v-if="step.status === 'queued' && step.pool?.length">
 					· {{ step.pool.length }} eligible
