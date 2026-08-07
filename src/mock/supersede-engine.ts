@@ -3,6 +3,10 @@
  */
 import type { MockDocumentRecord } from './seed-documents.ts';
 import { randomUUID } from 'node:crypto';
+import {
+	canActorAbandonSupersedeSuccessor,
+	canActorSupersedeDocument,
+} from '../domain/document-access.ts';
 import { engineError } from './approval-engine.ts';
 import { getDocumentStore } from './document-store.ts';
 
@@ -12,18 +16,6 @@ const OPEN_SUCCESSOR_STATUSES = new Set([
 	'in_review',
 	'approved',
 ]);
-
-function canSupersedeActor(document: MockDocumentRecord, actorEmail: string): boolean {
-	const email = actorEmail.trim().toLowerCase();
-	if (!email) {
-		return false;
-	}
-	return (
-		document.requesterEmail.toLowerCase() === email
-		|| document.authorEmail?.toLowerCase() === email
-		|| document.collaboratorEmails.some((item) => item.toLowerCase() === email)
-	);
-}
 
 /**
  * True when another non-terminal case already supersedes this published document.
@@ -50,7 +42,7 @@ export function supersedeDocument(
 			'invalid_state',
 		);
 	}
-	if (!options.isAdmin && !canSupersedeActor(prior, actorEmail)) {
+	if (!canActorSupersedeDocument(prior, actorEmail, { isAdmin: options.isAdmin })) {
 		throw engineError(
 			'Only requester, author, collaborators, or Admin can supersede',
 			'forbidden',
@@ -139,7 +131,7 @@ export function abandonSupersedeSuccessor(
 			'invalid_state',
 		);
 	}
-	if (!options.isAdmin && !canSupersedeActor(successor, actorEmail)) {
+	if (!canActorAbandonSupersedeSuccessor(successor, actorEmail, { isAdmin: options.isAdmin })) {
 		throw engineError(
 			'Only requester, author, collaborators, or Admin can abandon a successor',
 			'forbidden',

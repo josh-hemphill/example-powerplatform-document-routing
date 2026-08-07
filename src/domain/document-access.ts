@@ -110,3 +110,84 @@ export function canActorEditDraft(
 ): boolean {
 	return isDraftEditableStatus(document.status) && canActorMutateDraft(document, actorEmail);
 }
+
+export interface SupersedeEligibleDocument {
+	status: string;
+	requesterEmail: string;
+	authorEmail?: string | null;
+	collaboratorEmails?: string[] | null;
+	supersedesDocumentId?: string | null;
+}
+
+const ABANDON_SUCCESSOR_STATUSES = new Set([
+	'requested',
+	'drafting',
+	'in_review',
+	'approved',
+]);
+
+/**
+ * True when the actor is requester, author, or collaborator (ignores admin elevation).
+ */
+export function isDocumentStakeholder(
+	document: Pick<
+		SupersedeEligibleDocument,
+		'requesterEmail' | 'authorEmail' | 'collaboratorEmails'
+	>,
+	actorEmail: string,
+): boolean {
+	const email = actorEmail.trim().toLowerCase();
+	if (!email) {
+		return false;
+	}
+	return (
+		document.requesterEmail.toLowerCase() === email
+		|| document.authorEmail?.toLowerCase() === email
+		|| (document.collaboratorEmails ?? []).some((item) => item.toLowerCase() === email)
+	);
+}
+
+/**
+ * True when the actor may open a supersede successor for a published document.
+ */
+export function canActorSupersedeDocument(
+	document: SupersedeEligibleDocument,
+	actorEmail: string,
+	options: { isAdmin?: boolean; canAct?: boolean } = {},
+): boolean {
+	if (options.canAct === false) {
+		return false;
+	}
+	const email = actorEmail.trim().toLowerCase();
+	if (!email || document.status !== 'published') {
+		return false;
+	}
+	if (options.isAdmin) {
+		return true;
+	}
+	return isDocumentStakeholder(document, email);
+}
+
+/**
+ * True when the actor may abandon an open supersede successor case.
+ */
+export function canActorAbandonSupersedeSuccessor(
+	document: SupersedeEligibleDocument,
+	actorEmail: string,
+	options: { isAdmin?: boolean; canAct?: boolean } = {},
+): boolean {
+	if (options.canAct === false) {
+		return false;
+	}
+	const email = actorEmail.trim().toLowerCase();
+	if (!email || !document.supersedesDocumentId) {
+		return false;
+	}
+	if (!ABANDON_SUCCESSOR_STATUSES.has(document.status)) {
+		return false;
+	}
+	if (options.isAdmin) {
+		return true;
+	}
+	return isDocumentStakeholder(document, email);
+}
