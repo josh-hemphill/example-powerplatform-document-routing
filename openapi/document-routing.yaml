@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Document Routing API
-  version: 1.6.0
+  version: 1.7.0
   description: |
     Routes freeform document requests through drafting and a chain of approvals,
     then publishes an approved PDF to SharePoint. In Power Platform, this API is
@@ -12,11 +12,13 @@ info:
     `X-Document-Routing-Actor` (and optional `X-Document-Routing-Roles`) as a
     stand-in. Request bodies must not carry spoofable `actorEmail` / requester identity.
 
-    **Workflow (Phase 3):** Submit materializes approval steps from document-type
-    control data (client step override only when `allowApproverOverride` is on).
-    Claim/release preserve `activateDueAt`. SLA elevation converts overdue named
-    steps to an elevated pool queue. Production SLA sweeps run via Cloud Flow;
-    the mock accepts a DEV-only `now` clock override.
+    **Workflow (Phase 3 / 10):** Submit materializes approval steps from document-type
+    control data sorted by `order` (contiguous `1..n`). Client step override only when
+    `allowApproverOverride` is on **and** the actor is Admin. Draft PUT requires
+    `expectedContentRevision` (409 `revision_conflict` on mismatch). Claim/release
+    preserve `activateDueAt`. Named SLA without an elevation pool is an intentional
+    no-op. Production SLA sweeps run via Cloud Flow; the mock accepts a DEV-only
+    `now` clock override.
 
     **Control / Admin (Phase 4):** `/control/*` mirrors Dataverse control tables.
     Reads of active document types are available to authenticated users; writes
@@ -187,9 +189,10 @@ paths:
       tags: [Approvals]
       summary: Move a draft into the approval chain
       description: |
-        Materializes steps from the document type’s control chain unless
-        `allowApproverOverride` is enabled and `steps` are supplied.
-        Rejects empty chains and unknown document types.
+        Materializes steps from the document type’s control chain sorted by `order`
+        (contiguous `1..n`). Client-supplied `steps` are accepted only when
+        `allowApproverOverride` is enabled **and** the actor is Admin; otherwise
+        override attempts return 403. Rejects empty chains and unknown document types.
       parameters:
         - $ref: '#/components/parameters/DocumentId'
       requestBody:
@@ -445,6 +448,41 @@ paths:
       responses:
         '201':
           description: Successor document created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /documents/{documentId}/abandon-supersede:
+    post:
+      operationId: abandonSupersede
+      tags: [Documents]
+      summary: Abandon an open supersede successor case
+      description: |
+        Marks a successor (`supersedesDocumentId` set) as `abandoned` when it is
+        still open (`requested` / `drafting` / `in_review` / `approved`). After
+        abandon, a new supersede may be opened on the prior published document.
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                comment:
+                  type: string
+      responses:
+        '200':
+          description: Successor abandoned
           content:
             application/json:
               schema:
@@ -943,6 +981,7 @@ components:
         - rejected
         - published
         - superseded
+        - abandoned
     ApprovalStepStatus:
       type: string
       enum:
@@ -1096,14 +1135,17 @@ components:
         requestedPublishSiteUrl:
           type: string
           format: uri
-          description: Target SharePoint site for the final PDF
+          deprecated: true
+          description: |
+            Ignored. Trusted publish uses allowlisted destinations only; do not
+            send free-form SharePoint URLs.
         requestedLibraryName:
           type: string
-          description: SharePoint document library display name
-          default: Published Documents
+          deprecated: true
+          description: Ignored. Trusted publish uses allowlisted destinations only.
     UpdateDraftRequest:
       type: object
-      required: [title, bodyMarkdown]
+      required: [title, bodyMarkdown, expectedContentRevision]
       properties:
         title:
           type: string
@@ -1112,10 +1154,17 @@ components:
         bodyMarkdown:
           type: string
           minLength: 1
+          description: Non-whitespace draft markdown
         summary:
           type: string
           maxLength: 500
           description: Optional summary; author is set from the authenticated principal
+        expectedContentRevision:
+          type: integer
+          minimum: 0
+          description: |
+            Must match the document’s current `contentRevision`. Mismatch returns
+            409 with code `revision_conflict`.
     DocumentSummary:
       type: object
       required:
@@ -1420,7 +1469,10 @@ components:
         nextSequence:
           type: integer
           minimum: 1
-          description: Next sequence value for number allocation (server-managed)
+          description: Next sequence value for number allocation within sequenceYear
+        sequenceYear:
+          type: integer
+          description: Calendar year for nextSequence; allocation resets when the year advances
         approvalChain:
           type: array
           items:
@@ -1474,7 +1526,10 @@ components:
         nextSequence:
           type: integer
           minimum: 1
-          description: Next sequence value for number allocation (server-managed)
+          description: Next sequence value for number allocation within sequenceYear
+        sequenceYear:
+          type: integer
+          description: Calendar year for nextSequence (server-managed with nextSequence)
         approvalChain:
           type: array
           items:

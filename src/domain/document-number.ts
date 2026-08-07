@@ -8,6 +8,8 @@ export interface NumberSequenceSource {
 	numberPrefix: string;
 	numberPattern: string;
 	nextSequence: number;
+	/** Year the current `nextSequence` applies to; resets sequence when the clock year advances. */
+	sequenceYear?: number | null;
 }
 
 const SEQ_TOKEN = /\{seq(?::(\d+))?\}/;
@@ -37,22 +39,29 @@ export function formatDocumentNumber(options: {
 }
 
 /**
- * Allocates the next number and returns the updated sequence counter.
+ * Allocates the next number and returns the updated sequence counter + year.
+ * Resets the sequence to 1 when the clock year differs from `sequenceYear`.
  * Does not mutate the input object.
  */
 export function allocateDocumentNumber(
 	source: NumberSequenceSource,
 	clock: Date = new Date(),
-): { documentNumber: string; nextSequence: number } {
-	const sequence = Math.max(1, Math.trunc(source.nextSequence || 1));
+): { documentNumber: string; nextSequence: number; sequenceYear: number } {
+	const year = clock.getUTCFullYear();
+	const priorYear = source.sequenceYear ?? year;
+	const sequence
+		= priorYear === year
+			? Math.max(1, Math.trunc(source.nextSequence || 1))
+			: 1;
 	const documentNumber = formatDocumentNumber({
 		prefix: source.numberPrefix,
 		pattern: source.numberPattern,
-		year: clock.getUTCFullYear(),
+		year,
 		sequence,
 	});
 	return {
 		documentNumber,
 		nextSequence: sequence + 1,
+		sequenceYear: year,
 	};
 }

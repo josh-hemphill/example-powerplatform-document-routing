@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
+	bodyMarkdownRules,
 	emailRules,
 	FREEFORM_MIN_LENGTH,
 	freeformRequestRules,
+	SUMMARY_MAX_LENGTH,
+	summaryRules,
 	TITLE_MAX_LENGTH,
 	titleRules,
+	validateBodyMarkdown,
+	validateSummary,
 } from '@/api/form-rules';
 
 describe('form-rules', () => {
@@ -27,5 +32,18 @@ describe('form-rules', () => {
 		expect(rule('')).toBe(true);
 		expect(rule('not-an-email')).not.toBe(true);
 		expect(rule('a@b.co')).toBe(true);
+	});
+
+	it('rejects whitespace-only draft bodies', () => {
+		expect(validateBodyMarkdown('   ')).not.toBeNull();
+		expect(validateBodyMarkdown('# Heading')).toBeNull();
+		expect(bodyMarkdownRules()[0](' \n\t ')).not.toBe(true);
+	});
+
+	it('enforces summary max length', () => {
+		expect(validateSummary(undefined)).toBeNull();
+		expect(validateSummary('ok')).toBeNull();
+		expect(validateSummary('x'.repeat(SUMMARY_MAX_LENGTH + 1))).not.toBeNull();
+		expect(summaryRules()[0]('x'.repeat(SUMMARY_MAX_LENGTH))).toBe(true);
 	});
 });

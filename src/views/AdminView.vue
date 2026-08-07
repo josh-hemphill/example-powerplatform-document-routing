@@ -553,7 +553,8 @@ const poolSelectItems = computed(() =>
 						/>
 						<p class="text-body-2 text-medium-emphasis mb-4">
 							Default off. When off, submit always materializes the chain from control
-							tables / pools — requesters cannot invent approvers.
+							tables / pools. When on, only an <strong>Admin</strong> may supply override
+							steps at submit — requesters and authors cannot invent approvers.
 						</p>
 						<v-text-field
 							v-model="settingsForm.collaborationMode"

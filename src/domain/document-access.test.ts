@@ -52,4 +52,24 @@ describe('document access', () => {
 			canActorAccessDocument(baseDoc({ status: 'superseded' }), 'stranger@contoso.com'),
 		).toBe(true);
 	});
+
+	it('does not grant access via future waiting approval steps', () => {
+		const doc = baseDoc({
+			status: 'rejected',
+			approvalSteps: [
+				{
+					status: 'rejected',
+					approverEmail: 'first@contoso.com',
+					pool: [],
+				},
+				{
+					status: 'waiting',
+					approverEmail: null,
+					pool: [{ email: 'future@contoso.com' }],
+				},
+			],
+		});
+		expect(canActorAccessDocument(doc, 'first@contoso.com')).toBe(true);
+		expect(canActorAccessDocument(doc, 'future@contoso.com')).toBe(false);
+	});
 });

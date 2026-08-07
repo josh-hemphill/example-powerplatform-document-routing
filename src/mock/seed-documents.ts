@@ -14,7 +14,8 @@ export type MockDocumentStatus
 		| 'approved'
 		| 'rejected'
 		| 'published'
-		| 'superseded';
+		| 'superseded'
+		| 'abandoned';
 
 export interface MockApprovalStep {
 	id: string;

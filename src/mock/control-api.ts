@@ -76,6 +76,11 @@ function validateChain(chain: ControlChainStep[]): string | null {
 			return `Step ${step.order} slaHours must be greater than 0`;
 		}
 	}
+	for (let expected = 1; expected <= chain.length; expected += 1) {
+		if (!seenOrders.has(expected)) {
+			return `Approval step orders must be contiguous 1..${chain.length}`;
+		}
+	}
 	return null;
 }
 
@@ -155,7 +160,10 @@ export function handleControlApiRequest(options: {
 					|| body.id.trim().slice(0, 3).toUpperCase(),
 				numberPattern: body.numberPattern?.trim() || '{prefix}-{yyyy}-{seq:5}',
 				nextSequence: normalizeNextSequence(body.nextSequence, 1),
-				approvalChain: body.approvalChain,
+				sequenceYear: new Date().getUTCFullYear(),
+				approvalChain: [...(body.approvalChain ?? [])].sort(
+					(a, b) => a.order - b.order,
+				),
 			};
 			getControlStore().documentTypes.push(created);
 			sendJson(res, 201, created);
@@ -206,7 +214,9 @@ export function handleControlApiRequest(options: {
 						body.nextSequence === undefined
 							? type.nextSequence
 							: normalizeNextSequence(body.nextSequence, type.nextSequence),
-					approvalChain: body.approvalChain ?? type.approvalChain,
+					approvalChain: [...(body.approvalChain ?? type.approvalChain)].sort(
+						(a, b) => a.order - b.order,
+					),
 				});
 				sendJson(res, 200, type);
 				return true;
@@ -371,9 +381,17 @@ export function handleControlApiRequest(options: {
 					return true;
 				}
 				const body = await readJson<typeof destination>(req);
+				const nextSiteUrl = body.siteUrl ?? destination.siteUrl;
+				if (!/^https:\/\//i.test(nextSiteUrl)) {
+					sendJson(res, 400, {
+						message: 'siteUrl must be HTTPS',
+						code: 'validation_error',
+					});
+					return true;
+				}
 				Object.assign(destination, {
 					name: body.name ?? destination.name,
-					siteUrl: body.siteUrl ?? destination.siteUrl,
+					siteUrl: nextSiteUrl,
 					libraryName: body.libraryName ?? destination.libraryName,
 					folderPath: body.folderPath ?? destination.folderPath,
 					active: body.active ?? destination.active,

@@ -64,11 +64,12 @@ export function freeformRequestRules(label = 'Freeform request'): FieldRule[] {
 
 /**
  * Draft body markdown rules matching UpdateDraftRequest.
+ * Rejects whitespace-only bodies.
  */
 export function bodyMarkdownRules(label = 'Draft'): FieldRule[] {
 	return [
 		(value) => {
-			const text = typeof value === 'string' ? value : '';
+			const text = typeof value === 'string' ? value.trim() : '';
 			if (text.length < BODY_MARKDOWN_MIN_LENGTH) {
 				return `${label} is required`;
 			}
@@ -156,6 +157,19 @@ export function validateFreeformRequest(value: unknown): string | null {
  */
 export function validateBodyMarkdown(value: unknown): string | null {
 	for (const rule of bodyMarkdownRules()) {
+		const result = rule(value);
+		if (result !== true) {
+			return result;
+		}
+	}
+	return null;
+}
+
+/**
+ * Returns a validation message when optional summary exceeds max length.
+ */
+export function validateSummary(value: unknown): string | null {
+	for (const rule of summaryRules()) {
 		const result = rule(value);
 		if (result !== true) {
 			return result;

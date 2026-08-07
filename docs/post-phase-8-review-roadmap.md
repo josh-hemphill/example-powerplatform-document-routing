@@ -106,7 +106,7 @@ Retain these citations when implementing Phases 11–13 so UX decisions stay gro
 
 ## Phase 10 — Workflow correctness & concurrency
 
-**Status:** Planned.
+**Status:** Implemented.
 
 **Goal:** Chain order, override, supersede lifecycle, draft CAS, and publish/destination validation match the intended product rules—and stay tested in the mock.
 

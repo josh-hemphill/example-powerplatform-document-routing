@@ -120,6 +120,30 @@ describe('approval engine', () => {
 		expect(step.activateDueAt).toBe(addHoursIso(2, overdueClock));
 	});
 
+	it('leaves overdue named steps unchanged when no elevation pool is configured', () => {
+		const activated = new Date('2020-01-01T00:00:00.000Z');
+		const step = createStepFromInput(
+			{
+				assignmentMode: 'named',
+				role: 'Compliance',
+				slaHours: 2,
+				assignee: {
+					email: 'sam.compliance@contoso.com',
+					displayName: 'Sam',
+				},
+			},
+			1,
+			activated,
+			true,
+			2,
+		);
+		const result = processStepSla(step, new Date('2020-01-01T03:00:00.000Z'));
+		expect(result.changed).toBe(false);
+		expect(step.assignmentMode).toBe('named');
+		expect(step.status).toBe('pending');
+		expect(step.elevated).toBe(false);
+	});
+
 	it('does not extend SLA when elevating is unavailable and only requeues claimed pool steps', () => {
 		const activated = new Date('2020-01-01T00:00:00.000Z');
 		const step = createStepFromInput(

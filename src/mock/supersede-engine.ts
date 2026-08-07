@@ -6,6 +6,13 @@ import { randomUUID } from 'node:crypto';
 import { engineError } from './approval-engine.ts';
 import { getDocumentStore } from './document-store.ts';
 
+const OPEN_SUCCESSOR_STATUSES = new Set([
+	'requested',
+	'drafting',
+	'in_review',
+	'approved',
+]);
+
 function canSupersedeActor(document: MockDocumentRecord, actorEmail: string): boolean {
 	const email = actorEmail.trim().toLowerCase();
 	if (!email) {
@@ -25,8 +32,7 @@ export function findOpenSuccessor(priorId: string): MockDocumentRecord | undefin
 	return [...getDocumentStore().values()].find(
 		(item) =>
 			item.supersedesDocumentId === priorId
-			&& item.status !== 'superseded'
-			&& item.status !== 'rejected',
+			&& OPEN_SUCCESSOR_STATUSES.has(item.status),
 	);
 }
 
@@ -86,7 +92,7 @@ export function supersedeDocument(
 		draftBodyMarkdown: prior.draftBodyMarkdown,
 		draftSummary: prior.draftSummary,
 		authorEmail: actorEmail,
-		contentRevision: prior.contentRevision,
+		contentRevision: 0,
 		submittedContentRevision: null,
 		publishedContentRevision: null,
 		documentNumber: null,
@@ -110,6 +116,57 @@ export function supersedeDocument(
 		requestedLibraryName: prior.requestedLibraryName,
 	};
 	getDocumentStore().set(successor.id, successor);
+	return successor;
+}
+
+/**
+ * Abandons an open supersede successor so a new supersede can be opened.
+ */
+export function abandonSupersedeSuccessor(
+	successor: MockDocumentRecord,
+	actorEmail: string,
+	options: { isAdmin?: boolean; comment?: string } = {},
+): MockDocumentRecord {
+	if (!successor.supersedesDocumentId) {
+		throw engineError(
+			'Only supersede successor cases can be abandoned',
+			'invalid_state',
+		);
+	}
+	if (!OPEN_SUCCESSOR_STATUSES.has(successor.status)) {
+		throw engineError(
+			'Only open successors (requested/drafting/in_review/approved) can be abandoned',
+			'invalid_state',
+		);
+	}
+	if (!options.isAdmin && !canSupersedeActor(successor, actorEmail)) {
+		throw engineError(
+			'Only requester, author, collaborators, or Admin can abandon a successor',
+			'forbidden',
+		);
+	}
+
+	const at = new Date().toISOString();
+	successor.status = 'abandoned';
+	successor.updatedAt = at;
+	successor.approvalSteps = [];
+	successor.currentApproverEmail = null;
+	successor.currentStepStatus = null;
+	successor.currentStepDueAt = null;
+	successor.currentStepElevated = null;
+	successor.currentPoolEmails = [];
+	successor.history = [
+		...successor.history,
+		{
+			id: randomUUID(),
+			at,
+			actorEmail,
+			action: 'supersede_abandoned',
+			message:
+				options.comment?.trim()
+				|| `Abandoned supersede successor for ${successor.supersedesDocumentId}`,
+		},
+	];
 	return successor;
 }
 

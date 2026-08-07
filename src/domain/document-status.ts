@@ -10,6 +10,7 @@ export const DOCUMENT_STATUS_LABELS: Record<DocumentStatus, string> = {
 	rejected: 'Rejected',
 	published: 'Published',
 	superseded: 'Superseded',
+	abandoned: 'Abandoned',
 };
 
 export const DOCUMENT_STATUS_COLORS: Record<
@@ -23,6 +24,7 @@ export const DOCUMENT_STATUS_COLORS: Record<
 	rejected: 'error',
 	published: 'primary',
 	superseded: 'default',
+	abandoned: 'default',
 };
 
 /** Ordered workflow stages shown in the document workspace stepper. */
@@ -38,7 +40,7 @@ export const WORKFLOW_STAGES = [
  * Maps a document status to the active workflow stage index.
  */
 export function getWorkflowStageIndex(status: DocumentStatus): number {
-	if (status === 'rejected') {
+	if (status === 'rejected' || status === 'abandoned') {
 		return WORKFLOW_STAGES.indexOf('in_review');
 	}
 	if (status === 'superseded') {

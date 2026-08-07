@@ -16,7 +16,7 @@ export type Principal = {
     securityRoleNames?: Array<string>;
 };
 
-export type DocumentStatus = 'requested' | 'drafting' | 'in_review' | 'approved' | 'rejected' | 'published' | 'superseded';
+export type DocumentStatus = 'requested' | 'drafting' | 'in_review' | 'approved' | 'rejected' | 'published' | 'superseded' | 'abandoned';
 
 export type ApprovalStepStatus = 'waiting' | 'queued' | 'pending' | 'approved' | 'rejected' | 'skipped';
 
@@ -135,22 +135,37 @@ export type CreateDocumentRequest = {
     freeformRequest: string;
     priority?: 'low' | 'normal' | 'high';
     /**
-     * Target SharePoint site for the final PDF
+     * Ignored. Trusted publish uses allowlisted destinations only; do not
+     * send free-form SharePoint URLs.
+     *
+     *
+     * @deprecated
      */
     requestedPublishSiteUrl?: string;
     /**
-     * SharePoint document library display name
+     * Ignored. Trusted publish uses allowlisted destinations only.
+     *
+     * @deprecated
      */
     requestedLibraryName?: string;
 };
 
 export type UpdateDraftRequest = {
     title: string;
+    /**
+     * Non-whitespace draft markdown
+     */
     bodyMarkdown: string;
     /**
      * Optional summary; author is set from the authenticated principal
      */
     summary?: string;
+    /**
+     * Must match the document’s current `contentRevision`. Mismatch returns
+     * 409 with code `revision_conflict`.
+     *
+     */
+    expectedContentRevision: number;
 };
 
 export type DocumentSummary = {
@@ -311,9 +326,13 @@ export type ControlDocumentType = {
      */
     numberPattern?: string;
     /**
-     * Next sequence value for number allocation (server-managed)
+     * Next sequence value for number allocation within sequenceYear
      */
     nextSequence?: number;
+    /**
+     * Calendar year for nextSequence; allocation resets when the year advances
+     */
+    sequenceYear?: number;
     approvalChain: Array<ControlChainStep>;
 };
 
@@ -337,9 +356,13 @@ export type ControlDocumentTypeWrite = {
      */
     numberPattern?: string;
     /**
-     * Next sequence value for number allocation (server-managed)
+     * Next sequence value for number allocation within sequenceYear
      */
     nextSequence?: number;
+    /**
+     * Calendar year for nextSequence (server-managed with nextSequence)
+     */
+    sequenceYear?: number;
     approvalChain: Array<ControlChainStep>;
 };
 
@@ -901,6 +924,47 @@ export type SupersedeDocumentResponses = {
 };
 
 export type SupersedeDocumentResponse = SupersedeDocumentResponses[keyof SupersedeDocumentResponses];
+
+export type AbandonSupersedeData = {
+    body?: {
+        comment?: string;
+    };
+    path: {
+        documentId: string;
+    };
+    query?: never;
+    url: '/documents/{documentId}/abandon-supersede';
+};
+
+export type AbandonSupersedeErrors = {
+    /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
+    /**
+     * Caller is not allowed to perform this action
+     */
+    403: Error;
+    /**
+     * Resource not found
+     */
+    404: Error;
+    /**
+     * Invalid state transition
+     */
+    409: Error;
+};
+
+export type AbandonSupersedeError = AbandonSupersedeErrors[keyof AbandonSupersedeErrors];
+
+export type AbandonSupersedeResponses = {
+    /**
+     * Successor abandoned
+     */
+    200: Document;
+};
+
+export type AbandonSupersedeResponse = AbandonSupersedeResponses[keyof AbandonSupersedeResponses];
 
 export type ListLibraryDocumentsData = {
     body?: never;

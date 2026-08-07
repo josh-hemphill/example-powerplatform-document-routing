@@ -13,10 +13,12 @@ defineProps<{
 	canDraft: boolean;
 	isSaving: boolean;
 	isDirty: boolean;
+	hasRevisionConflict: boolean;
 }>();
 const emit = defineEmits<{
 	save: [];
 	discard: [];
+	reload: [];
 }>();
 const title = defineModel<string>('title', { required: true });
 const summary = defineModel<string>('summary', { required: true });
@@ -38,6 +40,26 @@ const bodyMarkdown = defineModel<string>('bodyMarkdown', { required: true });
 				Unsaved changes
 			</v-chip>
 		</div>
+		<v-alert
+			v-if="hasRevisionConflict"
+			type="warning"
+			variant="tonal"
+			class="mb-3"
+			density="comfortable"
+		>
+			<div class="d-flex flex-wrap align-center justify-space-between ga-2">
+				<span>
+					Someone else saved a newer draft revision. Reload the server version before saving again.
+				</span>
+				<v-btn
+					size="small"
+					variant="tonal"
+					@click="emit('reload')"
+				>
+					Reload draft
+				</v-btn>
+			</div>
+		</v-alert>
 		<p class="text-body-2 text-medium-emphasis mb-2">
 			Signed in as {{ actorEmail }}. Collaborative authors on this type can co-edit before submit.
 		</p>
@@ -77,7 +99,7 @@ const bodyMarkdown = defineModel<string>('bodyMarkdown', { required: true });
 		<div class="d-flex flex-wrap ga-2">
 			<v-btn
 				color="secondary"
-				:disabled="!canDraft"
+				:disabled="!canDraft || hasRevisionConflict"
 				:loading="isSaving"
 				@click="emit('save')"
 			>
