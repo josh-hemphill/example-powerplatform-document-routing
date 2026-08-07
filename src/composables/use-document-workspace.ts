@@ -23,6 +23,7 @@ import {
 } from '@/client/@pinia/colada.gen';
 import { useDocumentFormState } from '@/composables/use-document-form-state';
 import { usePowerAppsContext } from '@/composables/use-power-apps-context';
+import { useToast } from '@/composables/use-toast';
 import { getDocumentType } from '@/config/document-types';
 import { isEmailInPool } from '@/domain/approval-queue';
 import { canActorEditDraft, canActorMutateDraft } from '@/domain/document-access';
@@ -37,8 +38,8 @@ export function useDocumentWorkspace(documentId: Ref<string>) {
 	const queryCache = useQueryCache();
 	const { context, canAct } = usePowerAppsContext();
 	const identity = useIdentityStore();
+	const toast = useToast();
 	const actionError = ref<string | null>(null);
-	const actionSuccess = ref<string | null>(null);
 	const hasDraftRevisionConflict = ref(false);
 
 	const { data: document, isPending, error, refetch } = useQuery(() =>
@@ -203,8 +204,11 @@ export function useDocumentWorkspace(documentId: Ref<string>) {
 
 	function clearActionFeedback(): void {
 		actionError.value = null;
-		actionSuccess.value = null;
 		hasDraftRevisionConflict.value = false;
+	}
+
+	function showSuccess(message: string): void {
+		toast.success(message);
 	}
 
 	async function onSaveDraft(): Promise<void> {
@@ -227,7 +231,7 @@ export function useDocumentWorkspace(documentId: Ref<string>) {
 				},
 			});
 			forms.markDraftClean();
-			actionSuccess.value = 'Draft saved. Ready for the approval chain when content is complete.';
+			showSuccess('Draft saved. Ready for the approval chain when content is complete.');
 		}
 		catch(saveError) {
 			if (getApiErrorCode(saveError) === 'revision_conflict') {
@@ -247,7 +251,7 @@ export function useDocumentWorkspace(documentId: Ref<string>) {
 		actionError.value = null;
 		await refetch();
 		forms.hydrateFromDocument(true);
-		actionSuccess.value = 'Draft reloaded from the server.';
+		showSuccess('Draft reloaded from the server.');
 	}
 
 	async function onSubmitForApproval(): Promise<void> {
@@ -259,7 +263,7 @@ export function useDocumentWorkspace(documentId: Ref<string>) {
 					comment: forms.approvalForm.comment || undefined,
 				},
 			});
-			actionSuccess.value = 'Submitted to the approval chain.';
+			showSuccess('Submitted to the approval chain.');
 		}
 		catch(submitError) {
 			actionError.value = getApiErrorMessage(submitError, 'Failed to submit for approval');
@@ -278,7 +282,7 @@ export function useDocumentWorkspace(documentId: Ref<string>) {
 				path: { documentId: documentId.value, stepId: step.id },
 				body: {},
 			});
-			actionSuccess.value = 'Step claimed. You can approve or reject.';
+			showSuccess('Step claimed. You can approve or reject.');
 		}
 		catch(claimError) {
 			actionError.value = getApiErrorMessage(claimError, 'Failed to claim step');
@@ -297,7 +301,7 @@ export function useDocumentWorkspace(documentId: Ref<string>) {
 				path: { documentId: documentId.value, stepId: step.id },
 				body: {},
 			});
-			actionSuccess.value = 'Returned to the pool queue.';
+			showSuccess('Returned to the pool queue.');
 		}
 		catch(releaseError) {
 			actionError.value = getApiErrorMessage(releaseError, 'Failed to release step');
@@ -311,7 +315,7 @@ export function useDocumentWorkspace(documentId: Ref<string>) {
 				path: { documentId: documentId.value },
 				body: {},
 			});
-			actionSuccess.value = 'SLA processor ran (elevates overdue steps when due).';
+			showSuccess('SLA processor ran (elevates overdue steps when due).');
 		}
 		catch(slaError) {
 			actionError.value = getApiErrorMessage(slaError, 'Failed to process SLA');
@@ -325,7 +329,7 @@ export function useDocumentWorkspace(documentId: Ref<string>) {
 				path: { documentId: documentId.value },
 				body: {},
 			});
-			actionSuccess.value = 'Withdrawn for revision. Draft editing is available again.';
+			showSuccess('Withdrawn for revision. Draft editing is available again.');
 		}
 		catch(withdrawError) {
 			actionError.value = getApiErrorMessage(withdrawError, 'Failed to withdraw and revise');
@@ -339,7 +343,7 @@ export function useDocumentWorkspace(documentId: Ref<string>) {
 				path: { documentId: documentId.value },
 				body: {},
 			});
-			actionSuccess.value = 'Successor draft opened for supersession.';
+			showSuccess('Successor draft opened for supersession.');
 			return successor.id;
 		}
 		catch(supersedeError) {
@@ -355,7 +359,7 @@ export function useDocumentWorkspace(documentId: Ref<string>) {
 				path: { documentId: documentId.value },
 				body: {},
 			});
-			actionSuccess.value = 'Supersede successor abandoned. A new supersede can be opened on the prior published document.';
+			showSuccess('Supersede successor abandoned. A new supersede can be opened on the prior published document.');
 		}
 		catch(abandonError) {
 			actionError.value = getApiErrorMessage(abandonError, 'Failed to abandon successor');
@@ -380,8 +384,7 @@ export function useDocumentWorkspace(documentId: Ref<string>) {
 					comment: forms.decisionForm.comment || undefined,
 				},
 			});
-			actionSuccess.value
-				= decision === 'approve' ? 'Approval recorded.' : 'Document rejected.';
+			showSuccess(decision === 'approve' ? 'Approval recorded.' : 'Document rejected.');
 		}
 		catch(decisionError) {
 			actionError.value = getApiErrorMessage(decisionError, 'Failed to record decision');
@@ -416,9 +419,11 @@ export function useDocumentWorkspace(documentId: Ref<string>) {
 				},
 			});
 			forms.markPublishClean();
-			actionSuccess.value = result.idempotent
-				? `Already published (same revision): ${result.sharePointUrl}`
-				: `Published to SharePoint: ${result.sharePointUrl}`;
+			showSuccess(
+				result.idempotent
+					? `Already published (same revision): ${result.sharePointUrl}`
+					: `Published to SharePoint: ${result.sharePointUrl}`,
+			);
 		}
 		catch(publishError) {
 			actionError.value = getApiErrorMessage(publishError, 'Failed to publish PDF');
@@ -565,7 +570,6 @@ export function useDocumentWorkspace(documentId: Ref<string>) {
 		refetch,
 		context,
 		actionError,
-		actionSuccess,
 		documentType,
 		approvalChainPreview,
 		destinationItems,

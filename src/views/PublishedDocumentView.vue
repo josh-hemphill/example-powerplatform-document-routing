@@ -10,7 +10,9 @@ import {
 	supersedeDocumentMutation,
 } from '@/client/@pinia/colada.gen';
 import DocumentStatusChip from '@/components/DocumentStatusChip.vue';
+import { useConfirmDialog } from '@/composables/use-confirm-dialog';
 import { usePowerAppsContext } from '@/composables/use-power-apps-context';
+import { useToast } from '@/composables/use-toast';
 import { useIdentityStore } from '@/stores/identity';
 
 const route = useRoute();
@@ -18,10 +20,11 @@ const router = useRouter();
 const queryCache = useQueryCache();
 const { context, canAct } = usePowerAppsContext();
 const identity = useIdentityStore();
+const { confirm } = useConfirmDialog();
+const toast = useToast();
 
 const documentNumber = computed(() => String(route.params.documentNumber));
 const actionError = ref<string | null>(null);
-const actionSuccess = ref<string | null>(null);
 
 const { data: document, isPending, error, refetch } = useQuery(() =>
 	getDocumentByNumberQuery({
@@ -57,8 +60,16 @@ const canSupersede = computed(() => {
 
 async function onSupersede(): Promise<void> {
 	actionError.value = null;
-	actionSuccess.value = null;
 	if (!document.value) {
+		return;
+	}
+	const ok = await confirm({
+		title: 'Supersede with a new case?',
+		message: 'Opens a drafting successor. This published document stays current until the successor publishes.',
+		confirmText: 'Supersede',
+		color: 'primary',
+	});
+	if (!ok) {
 		return;
 	}
 	try {
@@ -66,7 +77,7 @@ async function onSupersede(): Promise<void> {
 			path: { documentId: document.value.id },
 			body: {},
 		});
-		actionSuccess.value = 'Successor draft opened.';
+		toast.success('Successor draft opened.');
 		await router.push({ name: 'document', params: { documentId: successor.id } });
 	}
 	catch(supersedeError) {
@@ -82,6 +93,7 @@ async function onSupersede(): Promise<void> {
 			type="error"
 			variant="tonal"
 			class="mb-4"
+			role="alert"
 		>
 			<div class="d-flex flex-wrap align-center justify-space-between ga-3">
 				<div>
@@ -103,16 +115,9 @@ async function onSupersede(): Promise<void> {
 			type="error"
 			variant="tonal"
 			class="mb-4"
+			role="alert"
 		>
 			{{ actionError }}
-		</v-alert>
-		<v-alert
-			v-if="actionSuccess"
-			type="success"
-			variant="tonal"
-			class="mb-4"
-		>
-			{{ actionSuccess }}
 		</v-alert>
 
 		<v-skeleton-loader v-if="isPending" type="article, actions" />

@@ -156,7 +156,7 @@ Retain these citations when implementing Phases 11–13 so UX decisions stay gro
 
 ## Phase 11 — Approval actions, feedback & progressive disclosure
 
-**Status:** Planned.
+**Status:** Implemented.
 
 **Goal:** Approval and irreversible actions follow error-prevention and progressive-disclosure practice; feedback closes Norman’s gulf of evaluation without sticky alert clutter.
 

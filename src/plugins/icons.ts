@@ -6,6 +6,8 @@ import {
 	mdiArrowLeft,
 	mdiBookOpenOutline,
 	mdiCheckCircle,
+	mdiChevronDown,
+	mdiChevronUp,
 	mdiClockOutline,
 	mdiCloseCircle,
 	mdiCogOutline,
@@ -27,6 +29,8 @@ export const appIconAliases = {
 	minusCircle: mdiMinusCircle,
 	cogOutline: mdiCogOutline,
 	bookOpenOutline: mdiBookOpenOutline,
+	chevronDown: mdiChevronDown,
+	chevronUp: mdiChevronUp,
 } as const;
 
 export type AppIconAlias = keyof typeof appIconAliases;
