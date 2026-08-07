@@ -33,6 +33,7 @@ const bodyMarkdown = defineModel<string>('bodyMarkdown', { required: true });
 			<button
 				type="button"
 				class="stage-toggle text-subtitle-1 font-weight-bold"
+				:aria-expanded="expanded"
 				@click="emit('toggle')"
 			>
 				2. Author / draft
@@ -51,6 +52,7 @@ const bodyMarkdown = defineModel<string>('bodyMarkdown', { required: true });
 					size="small"
 					:icon="expanded ? '$chevronUp' : '$chevronDown'"
 					:aria-label="expanded ? 'Collapse draft' : 'Expand draft'"
+					:aria-expanded="expanded"
 					@click="emit('toggle')"
 				/>
 			</div>
