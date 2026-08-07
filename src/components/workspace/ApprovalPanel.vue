@@ -75,7 +75,7 @@ function hasSteps(steps: ApprovalStep[]): boolean {
 			v-if="!expanded"
 			class="text-body-2 text-medium-emphasis mb-0"
 		>
-			{{ hasSteps(document.approvalSteps) ? `${document.approvalSteps.length} steps · ${document.status}` : 'Not submitted yet' }}
+			{{ hasSteps(document.approvalSteps) ? `${document.approvalSteps.length} steps · ${document.status.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase())}` : 'Not submitted yet' }}
 		</p>
 		<template v-else-if="!hasSteps(document.approvalSteps)">
 			<p class="text-body-2 text-medium-emphasis mb-3">
