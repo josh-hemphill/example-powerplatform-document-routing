@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import AppToast from '@/components/AppToast.vue';
+import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import SetupBanner from '@/components/SetupBanner.vue';
 import { usePowerAppsContext } from '@/composables/use-power-apps-context';
 import { appConfig } from '@/config/app.config';
@@ -141,5 +143,8 @@ const hostChipLabel = computed(() => {
 				<slot />
 			</v-container>
 		</v-main>
+
+		<ConfirmDialog />
+		<AppToast />
 	</v-app>
 </template>

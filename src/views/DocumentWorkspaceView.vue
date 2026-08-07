@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import type { WorkspaceStageId } from '@/domain/workspace-stages';
+import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { getApiErrorMessage } from '@/api/api-error';
 import ApprovalPanel from '@/components/workspace/ApprovalPanel.vue';
@@ -8,10 +9,13 @@ import FreeformRequestPanel from '@/components/workspace/FreeformRequestPanel.vu
 import HistoryPanel from '@/components/workspace/HistoryPanel.vue';
 import PublishPanel from '@/components/workspace/PublishPanel.vue';
 import WorkspaceHeader from '@/components/workspace/WorkspaceHeader.vue';
+import { useConfirmDialog } from '@/composables/use-confirm-dialog';
 import { useDocumentWorkspace } from '@/composables/use-document-workspace';
+import { primaryWorkspaceStage } from '@/domain/workspace-stages';
 
 const route = useRoute();
 const router = useRouter();
+const { confirm } = useConfirmDialog();
 const documentId = computed(() => String(route.params.documentId));
 
 const {
@@ -21,7 +25,6 @@ const {
 	refetch,
 	context,
 	actionError,
-	actionSuccess,
 	documentType,
 	approvalChainPreview,
 	destinationItems,
@@ -70,11 +73,106 @@ const {
 
 const typeLabel = computed(() => documentType.value.label);
 
+/** Manual overrides; reset when document status changes. */
+const stageOverrides = ref<Partial<Record<WorkspaceStageId, boolean>> | null>(null);
+
+watch(
+	() => document.value?.status,
+	() => {
+		stageOverrides.value = null;
+	},
+);
+
+function isStageExpanded(stage: WorkspaceStageId): boolean {
+	if (stageOverrides.value && stage in stageOverrides.value) {
+		return Boolean(stageOverrides.value[stage]);
+	}
+	const primary = document.value ? primaryWorkspaceStage(document.value.status) : null;
+	return primary === stage;
+}
+
+function toggleStage(stage: WorkspaceStageId): void {
+	const currentlyOpen = isStageExpanded(stage);
+	const primary = document.value ? primaryWorkspaceStage(document.value.status) : null;
+	const next: Partial<Record<WorkspaceStageId, boolean>> = {
+		...(stageOverrides.value ?? {}),
+	};
+	// Ensure primary stays as baseline when first toggling.
+	if (!stageOverrides.value && primary) {
+		for (const id of ['freeform', 'draft', 'approval', 'publish'] as const) {
+			next[id] = id === primary;
+		}
+	}
+	next[stage] = !currentlyOpen;
+	stageOverrides.value = next;
+}
+
+async function handleReject(): Promise<void> {
+	const ok = await confirm({
+		title: 'Reject this document?',
+		message: 'Rejection ends the current approval chain. Authors can withdraw and revise afterward.',
+		confirmText: 'Reject',
+		color: 'error',
+	});
+	if (!ok) {
+		return;
+	}
+	await onDecision('reject');
+}
+
+async function handleWithdraw(): Promise<void> {
+	const ok = await confirm({
+		title: 'Withdraw and revise?',
+		message: 'Approval steps will be cleared and the case returns to drafting.',
+		confirmText: 'Withdraw & revise',
+		color: 'warning',
+	});
+	if (!ok) {
+		return;
+	}
+	await onWithdrawAndRevise();
+}
+
+async function handlePublish(): Promise<void> {
+	const ok = await confirm({
+		title: 'Publish PDF to SharePoint?',
+		message: 'This publishes the approved revision to the allowlisted destination. Republishing the same revision is idempotent.',
+		confirmText: 'Publish PDF',
+		color: 'primary',
+	});
+	if (!ok) {
+		return;
+	}
+	await onPublish();
+}
+
 async function handleSupersede(): Promise<void> {
+	const ok = await confirm({
+		title: 'Supersede with a new case?',
+		message: 'Opens a drafting successor. The current published document stays current until the successor publishes.',
+		confirmText: 'Supersede',
+		color: 'primary',
+	});
+	if (!ok) {
+		return;
+	}
 	const successorId = await onSupersede();
 	if (successorId) {
 		await router.push({ name: 'document', params: { documentId: successorId } });
 	}
+}
+
+async function handleAbandonSupersede(): Promise<void> {
+	const ok = await confirm({
+		title: 'Abandon this supersede successor?',
+		message: 'The successor case will be abandoned so a new supersede can be opened on the prior published document.',
+		confirmText: 'Abandon successor',
+		color: 'warning',
+	});
+	if (!ok) {
+		return;
+	}
+	await onAbandonSupersede();
 }
 </script>
 
@@ -85,6 +183,7 @@ async function handleSupersede(): Promise<void> {
 			type="error"
 			variant="tonal"
 			class="mb-4"
+			role="alert"
 		>
 			<div class="d-flex flex-wrap align-center justify-space-between ga-3">
 				<div>
@@ -105,16 +204,9 @@ async function handleSupersede(): Promise<void> {
 			type="error"
 			variant="tonal"
 			class="mb-4"
+			role="alert"
 		>
 			{{ actionError }}
-		</v-alert>
-		<v-alert
-			v-if="actionSuccess"
-			type="success"
-			variant="tonal"
-			class="mb-4"
-		>
-			{{ actionSuccess }}
 		</v-alert>
 
 		<v-skeleton-loader v-if="isPending" type="article, actions" />
@@ -174,7 +266,7 @@ async function handleSupersede(): Promise<void> {
 					variant="tonal"
 					color="warning"
 					:loading="isAbandoningSupersede"
-					@click="onAbandonSupersede"
+					@click="handleAbandonSupersede"
 				>
 					Abandon supersede successor
 				</v-btn>
@@ -182,7 +274,11 @@ async function handleSupersede(): Promise<void> {
 
 			<v-row>
 				<v-col cols="12" md="7">
-					<FreeformRequestPanel :freeform-request="document.freeformRequest" />
+					<FreeformRequestPanel
+						:freeform-request="document.freeformRequest"
+						:expanded="isStageExpanded('freeform')"
+						@toggle="toggleStage('freeform')"
+					/>
 
 					<DraftPanel
 						v-model:title="draftForm.title"
@@ -194,9 +290,11 @@ async function handleSupersede(): Promise<void> {
 						:is-saving="isSavingDraft"
 						:is-dirty="isDraftDirty"
 						:has-revision-conflict="hasDraftRevisionConflict"
+						:expanded="isStageExpanded('draft')"
 						@save="onSaveDraft"
 						@discard="() => hydrateFromDocument(true)"
 						@reload="onReloadDraftAfterConflict"
+						@toggle="toggleStage('draft')"
 					/>
 
 					<ApprovalPanel
@@ -218,13 +316,15 @@ async function handleSupersede(): Promise<void> {
 						:is-deciding-step="isDecidingStep"
 						:is-processing-sla="isProcessingSla"
 						:is-withdrawing="isWithdrawing"
+						:expanded="isStageExpanded('approval')"
 						@submit="onSubmitForApproval"
 						@claim="onClaim"
 						@release="onRelease"
 						@approve="() => onDecision('approve')"
-						@reject="() => onDecision('reject')"
+						@reject="handleReject"
 						@process-sla="onProcessSla"
-						@withdraw="onWithdrawAndRevise"
+						@withdraw="handleWithdraw"
+						@toggle="toggleStage('approval')"
 					/>
 
 					<PublishPanel
@@ -236,7 +336,9 @@ async function handleSupersede(): Promise<void> {
 						:published-pdf-url="document.publishedPdfUrl"
 						:can-publish="Boolean(canPublish)"
 						:is-publishing="isPublishingPdf"
-						@publish="onPublish"
+						:expanded="isStageExpanded('publish')"
+						@publish="handlePublish"
+						@toggle="toggleStage('publish')"
 					/>
 				</v-col>
 

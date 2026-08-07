@@ -19,6 +19,7 @@ defineProps<{
 	isDecidingStep: boolean;
 	isProcessingSla: boolean;
 	isWithdrawing: boolean;
+	expanded: boolean;
 }>();
 const emit = defineEmits<{
 	submit: [];
@@ -28,6 +29,7 @@ const emit = defineEmits<{
 	reject: [];
 	processSla: [];
 	withdraw: [];
+	toggle: [];
 }>();
 const approvalComment = defineModel<string>('approvalComment', { required: true });
 const decisionComment = defineModel<string>('decisionComment', { required: true });
@@ -51,10 +53,29 @@ function hasSteps(steps: ApprovalStep[]): boolean {
 
 <template>
 	<v-card class="pa-4 mb-4">
-		<div class="text-subtitle-1 font-weight-bold mb-3">
-			3. Approval chain
+		<div class="d-flex align-center justify-space-between ga-2 mb-3">
+			<button
+				type="button"
+				class="stage-toggle text-subtitle-1 font-weight-bold"
+				@click="emit('toggle')"
+			>
+				3. Approval chain
+			</button>
+			<v-btn
+				variant="text"
+				size="small"
+				:icon="expanded ? '$chevronUp' : '$chevronDown'"
+				:aria-label="expanded ? 'Collapse approval' : 'Expand approval'"
+				@click="emit('toggle')"
+			/>
 		</div>
-		<template v-if="!hasSteps(document.approvalSteps)">
+		<p
+			v-if="!expanded"
+			class="text-body-2 text-medium-emphasis mb-0"
+		>
+			{{ hasSteps(document.approvalSteps) ? `${document.approvalSteps.length} steps · ${document.status}` : 'Not submitted yet' }}
+		</p>
+		<template v-else-if="!hasSteps(document.approvalSteps)">
 			<p class="text-body-2 text-medium-emphasis mb-3">
 				Chain comes from Admin control data for
 				<strong>{{ typeLabel }}</strong> (named and/or pool + SLA).
@@ -90,7 +111,11 @@ function hasSteps(steps: ApprovalStep[]): boolean {
 					(switch persona in the app bar for local demos).
 				</p>
 				<v-text-field v-model="decisionComment" label="Comment" class="mb-3" />
-				<div class="d-flex flex-wrap ga-2">
+
+				<div class="text-caption text-medium-emphasis mb-1">
+					Queue
+				</div>
+				<div class="d-flex flex-wrap ga-2 mb-4">
 					<v-btn
 						color="info"
 						:disabled="!canClaim"
@@ -107,6 +132,12 @@ function hasSteps(steps: ApprovalStep[]): boolean {
 					>
 						Release to queue
 					</v-btn>
+				</div>
+
+				<div class="text-caption text-medium-emphasis mb-1">
+					Decide
+				</div>
+				<div class="d-flex flex-wrap align-center ga-2 mb-4">
 					<v-btn
 						color="success"
 						:disabled="!canDecide"
@@ -115,6 +146,11 @@ function hasSteps(steps: ApprovalStep[]): boolean {
 					>
 						Approve step
 					</v-btn>
+					<v-divider
+						vertical
+						class="mx-1 d-none d-sm-flex"
+						style="height: 28px"
+					/>
 					<v-btn
 						color="error"
 						variant="tonal"
@@ -124,14 +160,12 @@ function hasSteps(steps: ApprovalStep[]): boolean {
 					>
 						Reject
 					</v-btn>
-					<v-btn
-						v-if="canProcessSla"
-						variant="outlined"
-						:loading="isProcessingSla"
-						@click="emit('processSla')"
-					>
-						Process SLA
-					</v-btn>
+				</div>
+
+				<div class="text-caption text-medium-emphasis mb-1">
+					Revise
+				</div>
+				<div class="d-flex flex-wrap ga-2 mb-2">
 					<v-btn
 						variant="tonal"
 						color="secondary"
@@ -142,7 +176,37 @@ function hasSteps(steps: ApprovalStep[]): boolean {
 						Withdraw &amp; revise
 					</v-btn>
 				</div>
+
+				<div
+					v-if="canProcessSla"
+					class="mt-4 pt-3"
+					style="border-top: 1px solid rgba(0, 0, 0, 0.08)"
+				>
+					<div class="text-caption text-medium-emphasis mb-1">
+						Admin
+					</div>
+					<v-btn
+						variant="outlined"
+						size="small"
+						:loading="isProcessingSla"
+						@click="emit('processSla')"
+					>
+						Process SLA
+					</v-btn>
+				</div>
 			</div>
 		</template>
 	</v-card>
 </template>
+
+<style scoped>
+.stage-toggle {
+	background: none;
+	border: 0;
+	padding: 0;
+	cursor: pointer;
+	text-align: start;
+	color: inherit;
+	font: inherit;
+}
+</style>
