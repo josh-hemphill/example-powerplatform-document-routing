@@ -24,6 +24,7 @@ const folderPathOverride = defineModel<string>('folderPathOverride', { required:
 			<button
 				type="button"
 				class="stage-toggle text-subtitle-1 font-weight-bold"
+				:aria-expanded="expanded"
 				@click="emit('toggle')"
 			>
 				4. Publish PDF to SharePoint
@@ -33,6 +34,7 @@ const folderPathOverride = defineModel<string>('folderPathOverride', { required:
 				size="small"
 				:icon="expanded ? '$chevronUp' : '$chevronDown'"
 				:aria-label="expanded ? 'Collapse publish' : 'Expand publish'"
+				:aria-expanded="expanded"
 				@click="emit('toggle')"
 			/>
 		</div>
