@@ -125,8 +125,8 @@ function hasSteps(steps: ApprovalStep[]): boolean {
 						Reject
 					</v-btn>
 					<v-btn
+						v-if="canProcessSla"
 						variant="outlined"
-						:disabled="!canProcessSla"
 						:loading="isProcessingSla"
 						@click="emit('processSla')"
 					>

@@ -25,6 +25,7 @@ export function usePowerAppsContext() {
 		canAct,
 		status,
 		ensureLoaded: store.ensureLoaded,
+		retryLoad: store.retryLoad,
 		switchLocalPersona: store.switchLocalPersona,
 	};
 }

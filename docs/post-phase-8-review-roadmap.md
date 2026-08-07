@@ -10,37 +10,37 @@ Findings from the August 2026 codebase + UI review, after Phases 0–8 of [`reme
 
 ## Finding → phase map
 
-| Finding (summary) | Severity | Phase |
-| ----------------- | -------- | ----- |
-| Hosted identity hardcodes publisher (all roles except admin) | Critical | 9 |
-| `process-sla` unauthenticated document read/mutate (IDOR) | Critical | 9 |
-| Publish authorization is role-only (no case membership) | Critical | 9 |
-| Host context timeout → demo Admin principal / no retry | High | 9 |
-| Admin role never assigned hosted; router has no admin guard | High | 9 |
-| Client role headers are mock authz (must not ship as real) | High | 9 |
-| `allowApproverOverride` lets any submitter invent the chain | High | 10 |
-| Approval chain runs in JSON array order, ignoring `order` | High | 10 |
-| No way to abandon an open supersede successor | High | 10 |
-| Concurrent draft edits: last write wins | High | 10 |
-| Idempotent / non-idempotent publish `publishedAt` wrong | Medium | 10 |
-| PUT publish destination skips HTTPS validation | Medium | 10 |
-| Create still accepts free-form SharePoint URLs | Medium | 10 |
-| Draft summary / whitespace body not enforced server-side | Medium | 10 |
-| Rejected cases readable by unused future approvers | Medium | 10 |
-| Document number sequence does not reset per year | Medium | 10 |
-| UI capability flags omit collaboration checks | Medium | 10 |
-| Named SLA with no elevation pool never escalates | Low | 10 |
-| Supersede copies prior `contentRevision` | Low | 10 |
-| Approval action strip: 6 peers, no confirm, SLA beside decide | High (UX) | 11 |
-| No snackbars; sticky non-dismissible success alerts | Medium (UX) | 11 |
-| No confirmation for Reject / Withdraw / Publish / Supersede | High (UX) | 11 |
-| Workspace shows all stages disabled (weak progressive disclosure) | Medium (UX) | 11 |
-| Inbox missing from primary nav; Library duplicated | Medium (UX) | 12 |
-| Global tagline under every page H1; shell “Document” title | Medium (UX) | 12 |
-| Inbox persona auto-switch fights manual choice | Medium (UX) | 12 |
-| Crowded app bar / no mobile drawer; tables not mobile-friendly | Medium (UX) | 12 |
-| Inconsistent primary CTA alignment; status enum vs labels | Low (UX) | 12 |
-| Admin JSON textareas; empty states; a11y gaps | Medium (UX) | 13 |
+| Finding (summary)                                                 | Severity    | Phase |
+| ----------------------------------------------------------------- | ----------- | ----- |
+| Hosted identity hardcodes publisher (all roles except admin)      | Critical    | 9     |
+| `process-sla` unauthenticated document read/mutate (IDOR)         | Critical    | 9     |
+| Publish authorization is role-only (no case membership)           | Critical    | 9     |
+| Host context timeout → demo Admin principal / no retry            | High        | 9     |
+| Admin role never assigned hosted; router has no admin guard       | High        | 9     |
+| Client role headers are mock authz (must not ship as real)        | High        | 9     |
+| `allowApproverOverride` lets any submitter invent the chain       | High        | 10    |
+| Approval chain runs in JSON array order, ignoring `order`         | High        | 10    |
+| No way to abandon an open supersede successor                     | High        | 10    |
+| Concurrent draft edits: last write wins                           | High        | 10    |
+| Idempotent / non-idempotent publish `publishedAt` wrong           | Medium      | 10    |
+| PUT publish destination skips HTTPS validation                    | Medium      | 10    |
+| Create still accepts free-form SharePoint URLs                    | Medium      | 10    |
+| Draft summary / whitespace body not enforced server-side          | Medium      | 10    |
+| Rejected cases readable by unused future approvers                | Medium      | 10    |
+| Document number sequence does not reset per year                  | Medium      | 10    |
+| UI capability flags omit collaboration checks                     | Medium      | 10    |
+| Named SLA with no elevation pool never escalates                  | Low         | 10    |
+| Supersede copies prior `contentRevision`                          | Low         | 10    |
+| Approval action strip: 6 peers, no confirm, SLA beside decide     | High (UX)   | 11    |
+| No snackbars; sticky non-dismissible success alerts               | Medium (UX) | 11    |
+| No confirmation for Reject / Withdraw / Publish / Supersede       | High (UX)   | 11    |
+| Workspace shows all stages disabled (weak progressive disclosure) | Medium (UX) | 11    |
+| Inbox missing from primary nav; Library duplicated                | Medium (UX) | 12    |
+| Global tagline under every page H1; shell “Document” title        | Medium (UX) | 12    |
+| Inbox persona auto-switch fights manual choice                    | Medium (UX) | 12    |
+| Crowded app bar / no mobile drawer; tables not mobile-friendly    | Medium (UX) | 12    |
+| Inconsistent primary CTA alignment; status enum vs labels         | Low (UX)    | 12    |
+| Admin JSON textareas; empty states; a11y gaps                     | Medium (UX) | 13    |
 
 ---
 
@@ -48,24 +48,24 @@ Findings from the August 2026 codebase + UI review, after Phases 0–8 of [`reme
 
 Retain these citations when implementing Phases 11–13 so UX decisions stay grounded:
 
-| Principle | Source | Application here |
-| --------- | ------ | ---------------- |
-| Visibility of system status; error prevention; consistency | Nielsen, *10 Usability Heuristics for User Interface Design* (NN/g) | Toasts, confirms, status labels, nav consistency |
-| Affordances, feedback, gulf of evaluation | Norman, *The Design of Everyday Things* | Post-action feedback; page-specific signifiers vs static tagline |
-| Decision time vs number of choices | Hick–Hyman law | Collapse/group approval actions |
-| Target size & distance → error rate | Fitts’s law | Separate Approve vs Reject; touch targets on mobile |
-| Proximity / similarity grouping | Gestalt principles | Claim/release vs decide vs revise clusters |
-| Progressive disclosure | Nielsen Norman Group | Hide inactive workspace stages; secondary ops behind menus |
-| Consistency; reduce short-term memory load | Shneiderman, *Eight Golden Rules* / *Designing the User Interface* | CTA alignment; structured Admin editors |
-| Dialogue principles (suitability for task) | ISO 9241-110 | Show only task-relevant controls |
-| Status messages; target size | WCAG 2.2 (4.1.3, 2.5.5) | Live regions for alerts; touch-friendly controls |
-| Adaptive navigation & density | Microsoft Fluent design guidance | App-bar collapse / drawer; list alternatives for tables |
+| Principle                                                  | Source                                                              | Application here                                                 |
+| ---------------------------------------------------------- | ------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Visibility of system status; error prevention; consistency | Nielsen, _10 Usability Heuristics for User Interface Design_ (NN/g) | Toasts, confirms, status labels, nav consistency                 |
+| Affordances, feedback, gulf of evaluation                  | Norman, _The Design of Everyday Things_                             | Post-action feedback; page-specific signifiers vs static tagline |
+| Decision time vs number of choices                         | Hick–Hyman law                                                      | Collapse/group approval actions                                  |
+| Target size & distance → error rate                        | Fitts’s law                                                         | Separate Approve vs Reject; touch targets on mobile              |
+| Proximity / similarity grouping                            | Gestalt principles                                                  | Claim/release vs decide vs revise clusters                       |
+| Progressive disclosure                                     | Nielsen Norman Group                                                | Hide inactive workspace stages; secondary ops behind menus       |
+| Consistency; reduce short-term memory load                 | Shneiderman, _Eight Golden Rules_ / _Designing the User Interface_  | CTA alignment; structured Admin editors                          |
+| Dialogue principles (suitability for task)                 | ISO 9241-110                                                        | Show only task-relevant controls                                 |
+| Status messages; target size                               | WCAG 2.2 (4.1.3, 2.5.5)                                             | Live regions for alerts; touch-friendly controls                 |
+| Adaptive navigation & density                              | Microsoft Fluent design guidance                                    | App-bar collapse / drawer; list alternatives for tables          |
 
 ---
 
 ## Phase 9 — Hosted identity & authorization
 
-**Status:** Planned.
+**Status:** Implemented.
 
 **Goal:** Hosted builds never grant publisher/approver by default; privileged endpoints require real principals and case access; demo identity cannot leak into a live host.
 
@@ -178,7 +178,7 @@ Retain these citations when implementing Phases 11–13 so UX decisions stay gro
 
 ### Design rationale (retain)
 
-- Nielsen: *Error prevention*, *Visibility of system status*, *User control and freedom*.
+- Nielsen: _Error prevention_, _Visibility of system status_, _User control and freedom_.
 - Hick–Hyman: fewer equally salient choices → faster, safer decisions.
 - Fitts: risky targets should not share the same row density as routine ones.
 - NN/g progressive disclosure: advanced/secondary ops behind disclosure, not the default strip.
@@ -219,7 +219,7 @@ Retain these citations when implementing Phases 11–13 so UX decisions stay gro
 
 ### Design rationale (retain)
 
-- Nielsen *Match between system and real world* / *Consistency*: Inbox is the hub; treat it as such.
+- Nielsen _Match between system and real world_ / _Consistency_: Inbox is the hub; treat it as such.
 - Norman: signifiers should reflect **current** context—not a static pipeline slogan on Admin/404.
 - Fluent adaptive layouts + WCAG target size: touch-first collapse of dense chrome.
 
@@ -254,7 +254,7 @@ Retain these citations when implementing Phases 11–13 so UX decisions stay gro
 ### Design rationale (retain)
 
 - Shneiderman: reduce short-term memory load—structured fields over free JSON for policy data.
-- Nielsen *Help users recover from errors*: empty states with next action; Retry everywhere lists can fail.
+- Nielsen _Help users recover from errors_: empty states with next action; Retry everywhere lists can fail.
 - WCAG 2.2: keyboard focus visibility, name/role/value for custom steppers.
 
 ### Exit criteria
@@ -285,17 +285,17 @@ Phases 11 and 12 may proceed in parallel after Phase 9 hides SLA from end users 
 
 ## PR / delivery slicing
 
-| PR | Title focus |
-| -- | ----------- |
-| 9a | Hosted role resolution + identity retry/timeout hardening |
-| 9b | Publish case-access check; SLA service-only; hide Process SLA |
-| 9c | Admin router guard + hosted admin role mapping |
-| 10a | Chain `order` sort/validate; override admin-only |
-| 10b | Draft `expectedContentRevision` + UI conflict |
+| PR  | Title focus                                                        |
+| --- | ------------------------------------------------------------------ |
+| 9a  | Hosted role resolution + identity retry/timeout hardening          |
+| 9b  | Publish case-access check; SLA service-only; hide Process SLA      |
+| 9c  | Admin router guard + hosted admin role mapping                     |
+| 10a | Chain `order` sort/validate; override admin-only                   |
+| 10b | Draft `expectedContentRevision` + UI conflict                      |
 | 10c | Supersede abandon; number year sequence; publish/destination fixes |
-| 11 | Approval action groups, confirms, toasts, stage disclosure |
-| 12 | Inbox nav, persona stability, responsive shell, hierarchy |
-| 13 | Admin structured editors, empty states, a11y smoke |
+| 11  | Approval action groups, confirms, toasts, stage disclosure         |
+| 12  | Inbox nav, persona stability, responsive shell, hierarchy          |
+| 13  | Admin structured editors, empty states, a11y smoke                 |
 
 ---
 

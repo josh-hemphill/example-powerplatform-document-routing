@@ -9,11 +9,17 @@ import {
 } from '../api/form-rules.ts';
 import { appConfig } from '../config/app.config.ts';
 import { toApprovalStepInputs } from '../config/document-types.ts';
+import { resolvePrincipalRolesByEmail } from '../config/local-personas.ts';
 import {
 	canActorAccessDocument,
 	canActorMutateDraft,
 	isDraftEditableStatus,
 } from '../domain/document-access.ts';
+import {
+	canActorProcessSla,
+	canActorPublishDocument,
+} from '../domain/document-authz.ts';
+import { toDataverseSecurityRoleNames } from '../domain/security-roles.ts';
 import {
 	PublishValidationError,
 	resolveTrustedPublishTarget,
@@ -181,6 +187,16 @@ export function documentRoutingMockPlugin(): Plugin {
 					const method = req.method ?? 'GET';
 					const actor = requireActor(req, res);
 					if (!actor) {
+						return;
+					}
+
+					if (method === 'GET' && path === '/api/principal') {
+						const roles = resolvePrincipalRolesByEmail(actor);
+						sendJson(res, 200, {
+							email: actor,
+							roles,
+							securityRoleNames: toDataverseSecurityRoleNames(roles),
+						});
 						return;
 					}
 
@@ -624,6 +640,15 @@ export function documentRoutingMockPlugin(): Plugin {
 							sendJson(res, 404, { message: 'Document not found', code: 'not_found' });
 							return;
 						}
+						const roles = readActorRoles(req);
+						if (!canActorProcessSla(roles, actor)) {
+							sendJson(res, 403, {
+								message:
+									'SLA processing requires Admin or a Flow/service principal',
+								code: 'forbidden',
+							});
+							return;
+						}
 						const body = await readJson<{ now?: string }>(req);
 						let clock: Date;
 						try {
@@ -858,11 +883,10 @@ export function documentRoutingMockPlugin(): Plugin {
 						}
 
 						const roles = readActorRoles(req);
-						const canPublish
-							= roles.includes('publisher') || roles.includes('admin');
-						if (!canPublish) {
+						if (!canActorPublishDocument(document, actor, roles)) {
 							sendJson(res, 403, {
-								message: 'Publisher or Admin role required to publish',
+								message:
+									'Publisher or Admin role and document access required to publish',
 								code: 'forbidden',
 							});
 							return;

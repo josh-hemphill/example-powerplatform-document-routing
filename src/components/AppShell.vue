@@ -50,6 +50,9 @@ const hostChipLabel = computed(() => {
 				size="small"
 				:color="status === 'hosted' ? 'success' : status === 'failed' ? 'error' : 'default'"
 				variant="tonal"
+				:style="status === 'failed' ? 'cursor: pointer' : undefined"
+				:title="status === 'failed' ? 'Retry identity load' : undefined"
+				@click="status === 'failed' ? identityStore.retryLoad() : undefined"
 			>
 				{{ hostChipLabel }}
 			</v-chip>
