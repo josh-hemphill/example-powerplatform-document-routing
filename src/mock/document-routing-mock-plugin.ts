@@ -90,7 +90,14 @@ export function documentRoutingMockPlugin(): Plugin {
 					sendJson(res, 404, { message: `No mock route for ${method} ${path}` });
 				}
 				catch(error) {
-					next(error);
+					if (res.headersSent) {
+						next(error);
+						return;
+					}
+					sendJson(res, 500, {
+						message: error instanceof Error ? error.message : 'Mock API failure',
+						code: 'mock_error',
+					});
 				}
 			});
 		},
