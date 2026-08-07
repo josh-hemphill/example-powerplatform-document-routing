@@ -1,5 +1,5 @@
-import type { MockDocumentRecord } from '../seed-documents.ts';
 import type { MockHttpContext } from '../http.ts';
+import type { MockDocumentRecord } from '../seed-documents.ts';
 import { randomUUID } from 'node:crypto';
 import {
 	validateBodyMarkdown,
@@ -16,7 +16,7 @@ import {
 	findControlDocumentType,
 	toDocumentTypeDefinition,
 } from '../control-store.ts';
-import { toSummary, pushHistory } from '../document-http.ts';
+import { pushHistory, toSummary } from '../document-http.ts';
 import { getDocumentStore } from '../document-store.ts';
 
 export async function handleDocumentRoutes(context: MockHttpContext): Promise<boolean> {
