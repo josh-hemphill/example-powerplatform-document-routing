@@ -124,6 +124,11 @@ const items = computed(() => data.value?.items ?? []);
 							{{ typeLabel(item.documentType) }}
 							· v{{ item.documentVersion ?? '—' }}
 						</span>
+						<span class="text-caption text-medium-emphasis">
+							{{ typeLabel(item.documentType) }}
+							<template v-if="item.documentVersion">· v{{ item.documentVersion }}</template>
+							<template v-else>· —</template>
+						</span>
 					</div>
 					<div class="text-caption text-medium-emphasis">
 						{{ item.publishedAt ? new Date(item.publishedAt).toLocaleString() : '—' }}
