@@ -193,7 +193,7 @@ Retain these citations when implementing Phases 11–13 so UX decisions stay gro
 
 ## Phase 12 — Navigation, hierarchy & responsive shell
 
-**Status:** Planned.
+**Status:** Implemented.
 
 **Goal:** Information architecture matches the product hub (Inbox), page hierarchy is local to the route, and the shell works on narrow viewports.
 

@@ -8,6 +8,16 @@ export type { ApprovalAssignmentMode, ApprovalStepStatus };
 
 export type ApproverPerson = Approver;
 
+/** Human-readable labels for approval step status tokens. */
+export const APPROVAL_STEP_STATUS_LABELS: Record<ApprovalStepStatus, string> = {
+	waiting: 'Waiting',
+	queued: 'In queue',
+	pending: 'Pending decision',
+	approved: 'Approved',
+	rejected: 'Rejected',
+	skipped: 'Skipped',
+};
+
 /**
  * Adds hours to an ISO timestamp (or now).
  */

@@ -12,13 +12,24 @@ import { findDocumentType } from '@/config/document-types';
 import {
 	INBOX_PERSONAS,
 	matchesInboxPersona,
+	suggestInboxPersona,
 } from '@/config/inbox-personas';
+import { DOCUMENT_STATUS_LABELS } from '@/domain/document-status';
 
 const { context } = usePowerAppsContext();
 const statusFilter = ref<DocumentStatus | null>(null);
 const typeFilter = ref<string | null>(null);
 const search = ref('');
 const persona = ref<InboxPersona>('all');
+/** Email for which we already ran one-shot persona auto-select. */
+const autoSelectedForEmail = ref<string | null>(null);
+
+const statusFilterItems = computed(() => [
+	{ title: 'All statuses', value: null as DocumentStatus | null },
+	...(Object.entries(DOCUMENT_STATUS_LABELS) as Array<[DocumentStatus, string]>).map(
+		([value, title]) => ({ title, value }),
+	),
+]);
 
 const { data: typesData } = useQuery(() => listDocumentTypesQuery());
 const typeSelectItems = computed(() =>
@@ -56,30 +67,21 @@ const items = computed(() => {
 watch(
 	[() => context.value.email, () => data.value?.items],
 	([email, list]) => {
-		if (!email || !list?.length) {
+		if (!email) {
 			return;
 		}
-		const lower = email.toLowerCase();
-		// Prefer actionable claimed/named work over claimable pool items.
-		if (
-			list.some(
-				(item) =>
-					item.currentStepStatus === 'pending'
-					&& item.currentApproverEmail?.toLowerCase() === lower,
-			)
-		) {
-			persona.value = 'waiting_on_me';
+		// One-shot per signed-in identity — list refetches must not override a manual chip.
+		if (autoSelectedForEmail.value === email) {
 			return;
 		}
-		if (
-			list.some(
-				(item) =>
-					item.currentStepStatus === 'queued'
-					&& item.currentPoolEmails?.some((member) => member.toLowerCase() === lower),
-			)
-		) {
-			persona.value = 'available_in_pool';
+		if (!list?.length) {
+			return;
 		}
+		const suggested = suggestInboxPersona(list, email);
+		if (suggested) {
+			persona.value = suggested;
+		}
+		autoSelectedForEmail.value = email;
 	},
 	{ immediate: true },
 );
@@ -87,6 +89,9 @@ watch(
 
 <template>
 	<div>
+		<p class="text-body-2 text-medium-emphasis mb-2">
+			{{ INBOX_PERSONAS.find((option) => option.value === persona)?.description }}
+		</p>
 		<v-chip-group
 			v-model="persona"
 			mandatory
@@ -97,6 +102,7 @@ watch(
 				v-for="option in INBOX_PERSONAS"
 				:key="option.value"
 				:value="option.value"
+				:title="option.description"
 				filter
 				variant="outlined"
 			>
@@ -117,17 +123,7 @@ watch(
 			<v-col cols="12" md="3">
 				<v-select
 					v-model="statusFilter"
-					:items="[
-						{ title: 'All statuses', value: null },
-						{ title: 'Requested', value: 'requested' },
-						{ title: 'Drafting', value: 'drafting' },
-						{ title: 'In review', value: 'in_review' },
-						{ title: 'Approved', value: 'approved' },
-						{ title: 'Rejected', value: 'rejected' },
-						{ title: 'Published', value: 'published' },
-						{ title: 'Superseded', value: 'superseded' },
-						{ title: 'Abandoned', value: 'abandoned' },
-					]"
+					:items="statusFilterItems"
 					label="Status"
 					hide-details
 				/>
@@ -160,69 +156,131 @@ watch(
 
 		<v-skeleton-loader v-if="isPending" type="table" />
 
-		<v-table v-else hover>
-			<thead>
-				<tr>
-					<th scope="col">
-						Title
-					</th>
-					<th scope="col">
-						Type
-					</th>
-					<th scope="col">
-						Status
-					</th>
-					<th scope="col">
-						Requester
-					</th>
-					<th scope="col">
-						Updated
-					</th>
-				</tr>
-			</thead>
-			<tbody>
-				<tr
+		<template v-else>
+			<!-- Mobile / narrow: stacked cards -->
+			<div class="d-md-none">
+				<v-card
 					v-for="item in items"
 					:key="item.id"
-					class="inbox-row"
+					class="mb-3 pa-3"
+					variant="outlined"
 				>
-					<td>
-						<RouterLink
-							class="inbox-row__link"
-							:to="{ name: 'document', params: { documentId: item.id } }"
-						>
-							<span class="font-weight-medium">
-								{{ item.title }}
-							</span>
-							<span v-if="item.currentStepStatus === 'queued'" class="text-caption text-medium-emphasis d-block">
-								Pool queue
-								<span v-if="item.currentStepDueAt">
-									· due {{ new Date(item.currentStepDueAt).toLocaleString() }}
-								</span>
-								<span v-if="item.currentStepElevated"> · elevated</span>
-							</span>
-							<span
-								v-else-if="item.currentApproverEmail"
-								class="text-caption text-medium-emphasis d-block"
-							>
-								Waiting on {{ item.currentApproverEmail }}
-							</span>
-						</RouterLink>
-					</td>
-					<td>{{ typeLabel(item.documentType) }}</td>
-					<td>
+					<RouterLink
+						class="inbox-row__link"
+						:to="{ name: 'document', params: { documentId: item.id } }"
+					>
+						<div class="font-weight-medium mb-1">
+							{{ item.title }}
+						</div>
+					</RouterLink>
+					<div class="d-flex flex-wrap align-center ga-2 mb-2">
 						<DocumentStatusChip :status="item.status" />
-					</td>
-					<td>{{ item.requesterEmail }}</td>
-					<td>{{ new Date(item.updatedAt).toLocaleString() }}</td>
-				</tr>
-				<tr v-if="items.length === 0">
-					<td colspan="5" class="text-medium-emphasis py-8 text-center">
-						No documents match this view. Create a request or switch persona filters.
-					</td>
-				</tr>
-			</tbody>
-		</v-table>
+						<span class="text-caption text-medium-emphasis">
+							{{ typeLabel(item.documentType) }}
+						</span>
+					</div>
+					<div class="text-caption text-medium-emphasis">
+						{{ item.requesterEmail }}
+						· {{ new Date(item.updatedAt).toLocaleString() }}
+					</div>
+					<div
+						v-if="item.currentStepStatus === 'queued'"
+						class="text-caption text-medium-emphasis mt-1"
+					>
+						Pool queue
+						<span v-if="item.currentStepDueAt">
+							· due {{ new Date(item.currentStepDueAt).toLocaleString() }}
+						</span>
+						<span v-if="item.currentStepElevated"> · elevated</span>
+					</div>
+					<div
+						v-else-if="item.currentApproverEmail"
+						class="text-caption text-medium-emphasis mt-1"
+					>
+						Waiting on {{ item.currentApproverEmail }}
+					</div>
+				</v-card>
+				<p
+					v-if="items.length === 0"
+					class="text-medium-emphasis py-8 text-center"
+				>
+					No documents match this view. Create a request or switch persona filters.
+				</p>
+			</div>
+
+			<!-- Desktop table with horizontal scroll + sticky title -->
+			<div class="d-none d-md-block table-scroll">
+				<v-table hover>
+					<thead>
+						<tr>
+							<th
+								scope="col"
+								class="table-scroll__sticky"
+							>
+								Title
+							</th>
+							<th scope="col">
+								Type
+							</th>
+							<th scope="col">
+								Status
+							</th>
+							<th scope="col">
+								Requester
+							</th>
+							<th scope="col">
+								Updated
+							</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr
+							v-for="item in items"
+							:key="item.id"
+							class="inbox-row"
+						>
+							<td class="table-scroll__sticky">
+								<RouterLink
+									class="inbox-row__link"
+									:to="{ name: 'document', params: { documentId: item.id } }"
+								>
+									<span class="font-weight-medium">
+										{{ item.title }}
+									</span>
+									<span
+										v-if="item.currentStepStatus === 'queued'"
+										class="text-caption text-medium-emphasis d-block"
+									>
+										Pool queue
+										<span v-if="item.currentStepDueAt">
+											· due {{ new Date(item.currentStepDueAt).toLocaleString() }}
+										</span>
+										<span v-if="item.currentStepElevated"> · elevated</span>
+									</span>
+									<span
+										v-else-if="item.currentApproverEmail"
+										class="text-caption text-medium-emphasis d-block"
+									>
+										Waiting on {{ item.currentApproverEmail }}
+									</span>
+								</RouterLink>
+							</td>
+							<td>{{ typeLabel(item.documentType) }}</td>
+							<td>
+								<DocumentStatusChip :status="item.status" />
+							</td>
+							<td>{{ item.requesterEmail }}</td>
+							<td>{{ new Date(item.updatedAt).toLocaleString() }}</td>
+						</tr>
+						<tr v-if="items.length === 0">
+							<td colspan="5" class="text-medium-emphasis py-8 text-center">
+								No documents match this view. Create a request or switch persona filters.
+							</td>
+						</tr>
+					</tbody>
+				</v-table>
+			</div>
+		</template>
 	</div>
 </template>
 
@@ -240,5 +298,18 @@ watch(
 
 .inbox-row__link:focus-visible {
 	outline: 2px solid rgb(var(--v-theme-primary));
+}
+
+.table-scroll {
+	overflow-x: auto;
+	-webkit-overflow-scrolling: touch;
+}
+
+.table-scroll__sticky {
+	position: sticky;
+	left: 0;
+	z-index: 1;
+	background: rgb(var(--v-theme-surface));
+	min-width: 12rem;
 }
 </style>

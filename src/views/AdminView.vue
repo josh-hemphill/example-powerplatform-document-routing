@@ -472,14 +472,16 @@ const poolSelectItems = computed(() =>
 							Pool keys:
 							{{ poolSelectItems.map(item => item.value).join(', ') || '—' }}
 						</p>
-						<v-btn
-							color="primary"
-							:disabled="!canAct"
-							:loading="savingType"
-							@click="saveType"
-						>
-							Save document type
-						</v-btn>
+						<div class="d-flex justify-end">
+							<v-btn
+								color="primary"
+								:disabled="!canAct"
+								:loading="savingType"
+								@click="saveType"
+							>
+								Save document type
+							</v-btn>
+						</div>
 					</v-card>
 				</v-tabs-window-item>
 
@@ -501,14 +503,16 @@ const poolSelectItems = computed(() =>
 							rows="10"
 							class="mb-3"
 						/>
-						<v-btn
-							color="primary"
-							:disabled="!canAct"
-							:loading="savingPool"
-							@click="savePool"
-						>
-							Save pool members
-						</v-btn>
+						<div class="d-flex justify-end">
+							<v-btn
+								color="primary"
+								:disabled="!canAct"
+								:loading="savingPool"
+								@click="savePool"
+							>
+								Save pool members
+							</v-btn>
+						</div>
 					</v-card>
 				</v-tabs-window-item>
 
@@ -532,14 +536,16 @@ const poolSelectItems = computed(() =>
 							color="primary"
 							class="mb-3"
 						/>
-						<v-btn
-							color="primary"
-							:disabled="!canAct"
-							:loading="savingDestination"
-							@click="saveDestination"
-						>
-							Save destination
-						</v-btn>
+						<div class="d-flex justify-end">
+							<v-btn
+								color="primary"
+								:disabled="!canAct"
+								:loading="savingDestination"
+								@click="saveDestination"
+							>
+								Save destination
+							</v-btn>
+						</div>
 					</v-card>
 				</v-tabs-window-item>
 
@@ -561,14 +567,16 @@ const poolSelectItems = computed(() =>
 							label="Collaboration mode"
 							class="mb-3"
 						/>
-						<v-btn
-							color="primary"
-							:disabled="!canAct"
-							:loading="savingSettings"
-							@click="saveSettings"
-						>
-							Save settings
-						</v-btn>
+						<div class="d-flex justify-end">
+							<v-btn
+								color="primary"
+								:disabled="!canAct"
+								:loading="savingSettings"
+								@click="saveSettings"
+							>
+								Save settings
+							</v-btn>
+						</div>
 					</v-card>
 				</v-tabs-window-item>
 

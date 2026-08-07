@@ -11,6 +11,7 @@ import {
 	mdiClockOutline,
 	mdiCloseCircle,
 	mdiCogOutline,
+	mdiInboxOutline,
 	mdiMagnify,
 	mdiMinusCircle,
 	mdiPlus,
@@ -29,6 +30,7 @@ export const appIconAliases = {
 	minusCircle: mdiMinusCircle,
 	cogOutline: mdiCogOutline,
 	bookOpenOutline: mdiBookOpenOutline,
+	inboxOutline: mdiInboxOutline,
 	chevronDown: mdiChevronDown,
 	chevronUp: mdiChevronUp,
 } as const;

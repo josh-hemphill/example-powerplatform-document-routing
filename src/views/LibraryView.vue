@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useQuery } from '@pinia/colada';
 import { computed, ref, watch } from 'vue';
+import { RouterLink } from 'vue-router';
 import { getApiErrorMessage } from '@/api/api-error';
 import {
 	listDocumentTypesQuery,
@@ -96,36 +97,15 @@ const items = computed(() => data.value?.items ?? []);
 
 		<v-skeleton-loader v-if="isPending" type="table" />
 
-		<v-table v-else hover>
-			<thead>
-				<tr>
-					<th scope="col">
-						Number
-					</th>
-					<th scope="col">
-						Title
-					</th>
-					<th scope="col">
-						Type
-					</th>
-					<th scope="col">
-						Version
-					</th>
-					<th scope="col">
-						Status
-					</th>
-					<th scope="col">
-						Published
-					</th>
-				</tr>
-			</thead>
-			<tbody>
-				<tr
+		<template v-else>
+			<div class="d-md-none">
+				<v-card
 					v-for="item in items"
 					:key="item.id"
-					class="library-row"
+					class="mb-3 pa-3"
+					variant="outlined"
 				>
-					<td>
+					<div class="font-weight-medium mb-1">
 						<RouterLink
 							v-if="item.documentNumber && item.status === 'published'"
 							class="library-row__link"
@@ -134,24 +114,96 @@ const items = computed(() => data.value?.items ?? []);
 							{{ item.documentNumber }}
 						</RouterLink>
 						<span v-else>{{ item.documentNumber ?? '—' }}</span>
-					</td>
-					<td>{{ item.title }}</td>
-					<td>{{ typeLabel(item.documentType) }}</td>
-					<td>{{ item.documentVersion ?? '—' }}</td>
-					<td>
+					</div>
+					<div class="text-body-2 mb-2">
+						{{ item.title }}
+					</div>
+					<div class="d-flex flex-wrap align-center ga-2 mb-1">
 						<DocumentStatusChip :status="item.status" />
-					</td>
-					<td class="text-body-2 text-medium-emphasis">
+						<span class="text-caption text-medium-emphasis">
+							{{ typeLabel(item.documentType) }}
+							· v{{ item.documentVersion ?? '—' }}
+						</span>
+						<span class="text-caption text-medium-emphasis">
+							{{ typeLabel(item.documentType) }}
+							<template v-if="item.documentVersion">· v{{ item.documentVersion }}</template>
+							<template v-else>· —</template>
+						</span>
+					</div>
+					<div class="text-caption text-medium-emphasis">
 						{{ item.publishedAt ? new Date(item.publishedAt).toLocaleString() : '—' }}
-					</td>
-				</tr>
-				<tr v-if="items.length === 0">
-					<td colspan="6" class="text-medium-emphasis text-center py-8">
-						No controlled documents in the library yet.
-					</td>
-				</tr>
-			</tbody>
-		</v-table>
+					</div>
+				</v-card>
+				<p
+					v-if="items.length === 0"
+					class="text-medium-emphasis text-center py-8"
+				>
+					No controlled documents in the library yet.
+				</p>
+			</div>
+
+			<div class="d-none d-md-block table-scroll">
+				<v-table hover>
+					<thead>
+						<tr>
+							<th
+								scope="col"
+								class="table-scroll__sticky"
+							>
+								Number
+							</th>
+							<th scope="col">
+								Title
+							</th>
+							<th scope="col">
+								Type
+							</th>
+							<th scope="col">
+								Version
+							</th>
+							<th scope="col">
+								Status
+							</th>
+							<th scope="col">
+								Published
+							</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr
+							v-for="item in items"
+							:key="item.id"
+							class="library-row"
+						>
+							<td class="table-scroll__sticky">
+								<RouterLink
+									v-if="item.documentNumber && item.status === 'published'"
+									class="library-row__link"
+									:to="{ name: 'library-document', params: { documentNumber: item.documentNumber } }"
+								>
+									{{ item.documentNumber }}
+								</RouterLink>
+								<span v-else>{{ item.documentNumber ?? '—' }}</span>
+							</td>
+							<td>{{ item.title }}</td>
+							<td>{{ typeLabel(item.documentType) }}</td>
+							<td>{{ item.documentVersion ?? '—' }}</td>
+							<td>
+								<DocumentStatusChip :status="item.status" />
+							</td>
+							<td class="text-body-2 text-medium-emphasis">
+								{{ item.publishedAt ? new Date(item.publishedAt).toLocaleString() : '—' }}
+							</td>
+						</tr>
+						<tr v-if="items.length === 0">
+							<td colspan="6" class="text-medium-emphasis text-center py-8">
+								No controlled documents in the library yet.
+							</td>
+						</tr>
+					</tbody>
+				</v-table>
+			</div>
+		</template>
 	</div>
 </template>
 
@@ -160,9 +212,27 @@ const items = computed(() => data.value?.items ?? []);
 	color: inherit;
 	font-weight: 600;
 	text-decoration: none;
+	outline-offset: 2px;
 }
 
 .library-row__link:hover {
 	text-decoration: underline;
+}
+
+.library-row__link:focus-visible {
+	outline: 2px solid rgb(var(--v-theme-primary));
+}
+
+.table-scroll {
+	overflow-x: auto;
+	-webkit-overflow-scrolling: touch;
+}
+
+.table-scroll__sticky {
+	position: sticky;
+	left: 0;
+	z-index: 1;
+	background: rgb(var(--v-theme-surface));
+	min-width: 8rem;
 }
 </style>

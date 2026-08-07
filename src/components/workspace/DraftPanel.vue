@@ -120,15 +120,7 @@ const bodyMarkdown = defineModel<string>('bodyMarkdown', { required: true });
 				:disabled="!canDraft"
 				class="mb-3"
 			/>
-			<div class="d-flex flex-wrap ga-2">
-				<v-btn
-					color="secondary"
-					:disabled="!canDraft || hasRevisionConflict"
-					:loading="isSaving"
-					@click="emit('save')"
-				>
-					Save draft
-				</v-btn>
+			<div class="d-flex flex-wrap justify-end ga-2">
 				<v-btn
 					v-if="isDirty"
 					variant="text"
@@ -136,6 +128,14 @@ const bodyMarkdown = defineModel<string>('bodyMarkdown', { required: true });
 					@click="emit('discard')"
 				>
 					Discard changes
+				</v-btn>
+				<v-btn
+					color="secondary"
+					:disabled="!canDraft || hasRevisionConflict"
+					:loading="isSaving"
+					@click="emit('save')"
+				>
+					Save draft
 				</v-btn>
 			</div>
 		</template>

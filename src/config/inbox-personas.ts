@@ -59,6 +59,39 @@ export interface PersonaFilterableDocument {
 }
 
 /**
+ * Suggests an actionable persona from the current list (waiting on me, then pool).
+ * Returns null when nothing actionable is found.
+ */
+export function suggestInboxPersona(
+	documents: PersonaFilterableDocument[],
+	userEmail: string | undefined,
+): InboxPersona | null {
+	const email = userEmail?.toLowerCase();
+	if (!email || documents.length === 0) {
+		return null;
+	}
+	if (
+		documents.some(
+			(item) =>
+				item.currentStepStatus === 'pending'
+				&& item.currentApproverEmail?.toLowerCase() === email,
+		)
+	) {
+		return 'waiting_on_me';
+	}
+	if (
+		documents.some(
+			(item) =>
+				item.currentStepStatus === 'queued'
+				&& item.currentPoolEmails?.some((member) => member.toLowerCase() === email),
+		)
+	) {
+		return 'available_in_pool';
+	}
+	return null;
+}
+
+/**
  * Filters documents for persona-based inbox tabs using the signed-in email.
  */
 export function matchesInboxPersona(

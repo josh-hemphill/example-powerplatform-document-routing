@@ -4,6 +4,10 @@ import { useIdentityStore } from '@/stores/identity';
 declare module 'vue-router' {
 	interface RouteMeta {
 		title?: string;
+		/** Route-specific subtitle; null omits. */
+		subtitle?: string | null;
+		/** Skip shell H1 when the view owns the page title. */
+		hidePageHeading?: boolean;
 		requiresAdmin?: boolean;
 	}
 }
@@ -16,43 +20,59 @@ export const router = createRouter({
 			path: '/',
 			name: 'inbox',
 			component: async() => import('@/views/InboxView.vue'),
-			meta: { title: 'Inbox' },
+			meta: {
+				title: 'Inbox',
+				subtitle: 'Requests, drafts, and approvals assigned to you',
+			},
 		},
 		{
 			path: '/requests/new',
 			name: 'new-request',
 			component: async() => import('@/views/NewRequestView.vue'),
-			meta: { title: 'New request' },
+			meta: {
+				title: 'New request',
+				subtitle: null,
+			},
 		},
 		{
 			path: '/documents/:documentId',
 			name: 'document',
 			component: async() => import('@/views/DocumentWorkspaceView.vue'),
-			meta: { title: 'Document' },
+			meta: { hidePageHeading: true },
 		},
 		{
 			path: '/admin',
 			name: 'admin',
 			component: async() => import('@/views/AdminView.vue'),
-			meta: { title: 'Admin', requiresAdmin: true },
+			meta: {
+				title: 'Admin',
+				subtitle: 'Document types, pools, destinations, and settings',
+				requiresAdmin: true,
+			},
 		},
 		{
 			path: '/library',
 			name: 'library',
 			component: async() => import('@/views/LibraryView.vue'),
-			meta: { title: 'Library' },
+			meta: {
+				title: 'Library',
+				subtitle: 'Published controlled documents',
+			},
 		},
 		{
 			path: '/library/:documentNumber',
 			name: 'library-document',
 			component: async() => import('@/views/PublishedDocumentView.vue'),
-			meta: { title: 'Published document' },
+			meta: { hidePageHeading: true },
 		},
 		{
 			path: '/:pathMatch(.*)*',
 			name: 'not-found',
 			component: async() => import('@/views/NotFoundView.vue'),
-			meta: { title: 'Not found' },
+			meta: {
+				title: 'Not found',
+				subtitle: null,
+			},
 		},
 	],
 });

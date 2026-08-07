@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ApprovalStep, ControlChainStep, Document } from '@/client/types.gen';
 import ApprovalStepper from '@/components/ApprovalStepper.vue';
+import { DOCUMENT_STATUS_LABELS } from '@/domain/document-status';
 
 defineProps<{
 	document: Document;
@@ -75,7 +76,7 @@ function hasSteps(steps: ApprovalStep[]): boolean {
 			v-if="!expanded"
 			class="text-body-2 text-medium-emphasis mb-0"
 		>
-			{{ hasSteps(document.approvalSteps) ? `${document.approvalSteps.length} steps · ${document.status.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase())}` : 'Not submitted yet' }}
+			{{ hasSteps(document.approvalSteps) ? `${document.approvalSteps.length} steps · ${DOCUMENT_STATUS_LABELS[document.status]}` : 'Not submitted yet' }}
 		</p>
 		<template v-else-if="!hasSteps(document.approvalSteps)">
 			<p class="text-body-2 text-medium-emphasis mb-3">

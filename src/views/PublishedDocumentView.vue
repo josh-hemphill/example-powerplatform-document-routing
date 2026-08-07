@@ -157,7 +157,7 @@ async function onSupersede(): Promise<void> {
 							:disabled="!canAct"
 							@click="onSupersede"
 						>
-							Supersede
+							Supersede with new case
 						</v-btn>
 					</div>
 				</div>

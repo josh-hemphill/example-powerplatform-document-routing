@@ -72,14 +72,16 @@ const folderPathOverride = defineModel<string>('folderPathOverride', { required:
 				disabled
 				class="mb-3"
 			/>
-			<v-btn
-				color="primary"
-				:disabled="!canPublish"
-				:loading="isPublishing"
-				@click="emit('publish')"
-			>
-				Publish PDF
-			</v-btn>
+			<div class="d-flex justify-end">
+				<v-btn
+					color="primary"
+					:disabled="!canPublish"
+					:loading="isPublishing"
+					@click="emit('publish')"
+				>
+					Publish PDF
+				</v-btn>
+			</div>
 			<div v-if="publishedPdfUrl" class="mt-3">
 				<a :href="publishedPdfUrl" target="_blank" rel="noreferrer">
 					{{ publishedPdfUrl }}
