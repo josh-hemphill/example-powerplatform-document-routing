@@ -7,8 +7,8 @@ import { RouterLink } from 'vue-router';
 import { getApiErrorMessage } from '@/api/api-error';
 import { listDocumentsQuery, listDocumentTypesQuery } from '@/client/@pinia/colada.gen';
 import DocumentStatusChip from '@/components/DocumentStatusChip.vue';
+import { useDocumentTypeLabel } from '@/composables/use-document-type-label';
 import { usePowerAppsContext } from '@/composables/use-power-apps-context';
-import { findDocumentType } from '@/config/document-types';
 import {
 	INBOX_PERSONAS,
 	matchesInboxPersona,
@@ -38,12 +38,7 @@ const typeSelectItems = computed(() =>
 		value: item.id,
 	})),
 );
-
-function typeLabel(id: string): string {
-	return typesData.value?.items?.find((item) => item.id === id)?.label
-		?? findDocumentType(id)?.label
-		?? id;
-}
+const { typeLabel } = useDocumentTypeLabel(() => typesData.value?.items);
 
 const queryInput = computed(() => ({
 	query: {

@@ -8,6 +8,7 @@ import {
 	listLibraryDocumentsQuery,
 } from '@/client/@pinia/colada.gen';
 import DocumentStatusChip from '@/components/DocumentStatusChip.vue';
+import { useDocumentTypeLabel } from '@/composables/use-document-type-label';
 
 const search = ref('');
 const typeFilter = ref<string | null>(null);
@@ -40,10 +41,7 @@ const typeSelectItems = computed(() =>
 		value: item.id,
 	})),
 );
-
-function typeLabel(id: string): string {
-	return typesData.value?.items?.find((item) => item.id === id)?.label ?? id;
-}
+const { typeLabel } = useDocumentTypeLabel(() => typesData.value?.items);
 
 const items = computed(() => data.value?.items ?? []);
 

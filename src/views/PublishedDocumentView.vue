@@ -13,6 +13,7 @@ import DocumentStatusChip from '@/components/DocumentStatusChip.vue';
 import { useConfirmDialog } from '@/composables/use-confirm-dialog';
 import { usePowerAppsContext } from '@/composables/use-power-apps-context';
 import { useToast } from '@/composables/use-toast';
+import { canActorSupersedeDocument } from '@/domain/document-access';
 import { useIdentityStore } from '@/stores/identity';
 
 const route = useRoute();
@@ -44,18 +45,13 @@ const { mutateAsync: supersedeAsync, isLoading: isSuperseding } = useMutation({
 
 const canSupersede = computed(() => {
 	const doc = document.value;
-	const actor = (context.value.email || '').toLowerCase();
-	if (!canAct.value || !doc || doc.status !== 'published' || !actor) {
+	if (!doc) {
 		return false;
 	}
-	if (identity.hasRole('admin')) {
-		return true;
-	}
-	return (
-		doc.requesterEmail.toLowerCase() === actor
-		|| doc.authorEmail?.toLowerCase() === actor
-		|| (doc.collaboratorEmails ?? []).some((email) => email.toLowerCase() === actor)
-	);
+	return canActorSupersedeDocument(doc, context.value.email ?? '', {
+		canAct: canAct.value,
+		isAdmin: identity.hasRole('admin'),
+	});
 });
 
 async function onSupersede(): Promise<void> {
