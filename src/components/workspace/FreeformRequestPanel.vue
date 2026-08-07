@@ -14,6 +14,7 @@ const emit = defineEmits<{
 			<button
 				type="button"
 				class="stage-toggle text-subtitle-1 font-weight-bold"
+				:aria-expanded="expanded"
 				@click="emit('toggle')"
 			>
 				1. Freeform request
@@ -23,6 +24,7 @@ const emit = defineEmits<{
 				size="small"
 				:icon="expanded ? '$chevronUp' : '$chevronDown'"
 				:aria-label="expanded ? 'Collapse freeform request' : 'Expand freeform request'"
+				:aria-expanded="expanded"
 				@click="emit('toggle')"
 			/>
 		</div>
