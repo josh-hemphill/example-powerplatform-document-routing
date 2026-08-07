@@ -10,7 +10,9 @@ import {
 	mdiChevronUp,
 	mdiClockOutline,
 	mdiCloseCircle,
+	mdiCodeJson,
 	mdiCogOutline,
+	mdiDeleteOutline,
 	mdiInboxOutline,
 	mdiMagnify,
 	mdiMinusCircle,
@@ -33,6 +35,8 @@ export const appIconAliases = {
 	inboxOutline: mdiInboxOutline,
 	chevronDown: mdiChevronDown,
 	chevronUp: mdiChevronUp,
+	deleteOutline: mdiDeleteOutline,
+	codeJson: mdiCodeJson,
 } as const;
 
 export type AppIconAlias = keyof typeof appIconAliases;

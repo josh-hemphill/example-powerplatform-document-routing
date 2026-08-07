@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useQuery } from '@pinia/colada';
 import { computed, ref, watch } from 'vue';
-import { RouterLink } from 'vue-router';
+import { useRouter } from 'vue-router';
 import { getApiErrorMessage } from '@/api/api-error';
 import {
 	listDocumentTypesQuery,
@@ -9,6 +9,7 @@ import {
 } from '@/client/@pinia/colada.gen';
 import DocumentStatusChip from '@/components/DocumentStatusChip.vue';
 
+const router = useRouter();
 const search = ref('');
 const typeFilter = ref<string | null>(null);
 const includeSuperseded = ref(false);
@@ -46,6 +47,34 @@ function typeLabel(id: string): string {
 }
 
 const items = computed(() => data.value?.items ?? []);
+
+function isOpenable(item: { documentNumber?: string | null; status: string }): boolean {
+	return Boolean(item.documentNumber && item.status === 'published');
+}
+
+function openLibraryDocument(documentNumber: string): void {
+	void router.push({ name: 'library-document', params: { documentNumber } });
+}
+
+function onRowKeydown(
+	event: KeyboardEvent,
+	item: { documentNumber?: string | null; status: string },
+): void {
+	if (!isOpenable(item) || !item.documentNumber) {
+		return;
+	}
+	if (event.key === 'Enter' || event.key === ' ') {
+		event.preventDefault();
+		openLibraryDocument(item.documentNumber);
+	}
+}
+
+function onRowClick(item: { documentNumber?: string | null; status: string }): void {
+	if (!isOpenable(item) || !item.documentNumber) {
+		return;
+	}
+	openLibraryDocument(item.documentNumber);
+}
 </script>
 
 <template>
@@ -91,8 +120,20 @@ const items = computed(() => data.value?.items ?? []);
 			type="error"
 			variant="tonal"
 			class="mb-4"
+			role="alert"
 		>
-			{{ getApiErrorMessage(error, 'Failed to load library') }}
+			<div class="d-flex flex-wrap align-center justify-space-between ga-3">
+				<div>
+					{{ getApiErrorMessage(error, 'Failed to load library') }}
+				</div>
+				<v-btn
+					size="small"
+					variant="tonal"
+					@click="() => refetch()"
+				>
+					Retry
+				</v-btn>
+			</div>
 		</v-alert>
 
 		<v-skeleton-loader v-if="isPending" type="table" />
@@ -103,17 +144,16 @@ const items = computed(() => data.value?.items ?? []);
 					v-for="item in items"
 					:key="item.id"
 					class="mb-3 pa-3"
+					:class="{ 'library-card--clickable': isOpenable(item) }"
 					variant="outlined"
+					:role="isOpenable(item) ? 'link' : undefined"
+					:tabindex="isOpenable(item) ? 0 : undefined"
+					:aria-label="isOpenable(item) ? `Open ${item.documentNumber}` : undefined"
+					@click="onRowClick(item)"
+					@keydown="onRowKeydown($event, item)"
 				>
 					<div class="font-weight-medium mb-1">
-						<RouterLink
-							v-if="item.documentNumber && item.status === 'published'"
-							class="library-row__link"
-							:to="{ name: 'library-document', params: { documentNumber: item.documentNumber } }"
-						>
-							{{ item.documentNumber }}
-						</RouterLink>
-						<span v-else>{{ item.documentNumber ?? '—' }}</span>
+						{{ item.documentNumber ?? '—' }}
 					</div>
 					<div class="text-body-2 mb-2">
 						{{ item.title }}
@@ -123,11 +163,6 @@ const items = computed(() => data.value?.items ?? []);
 						<span class="text-caption text-medium-emphasis">
 							{{ typeLabel(item.documentType) }}
 							· v{{ item.documentVersion ?? '—' }}
-						</span>
-						<span class="text-caption text-medium-emphasis">
-							{{ typeLabel(item.documentType) }}
-							<template v-if="item.documentVersion">· v{{ item.documentVersion }}</template>
-							<template v-else>· —</template>
 						</span>
 					</div>
 					<div class="text-caption text-medium-emphasis">
@@ -143,7 +178,7 @@ const items = computed(() => data.value?.items ?? []);
 			</div>
 
 			<div class="d-none d-md-block table-scroll">
-				<v-table hover>
+				<v-table>
 					<thead>
 						<tr>
 							<th
@@ -173,17 +208,15 @@ const items = computed(() => data.value?.items ?? []);
 						<tr
 							v-for="item in items"
 							:key="item.id"
-							class="library-row"
+							:class="{ 'library-row--clickable': isOpenable(item) }"
+							:role="isOpenable(item) ? 'link' : undefined"
+							:tabindex="isOpenable(item) ? 0 : undefined"
+							:aria-label="isOpenable(item) ? `Open ${item.documentNumber}` : undefined"
+							@click="onRowClick(item)"
+							@keydown="onRowKeydown($event, item)"
 						>
-							<td class="table-scroll__sticky">
-								<RouterLink
-									v-if="item.documentNumber && item.status === 'published'"
-									class="library-row__link"
-									:to="{ name: 'library-document', params: { documentNumber: item.documentNumber } }"
-								>
-									{{ item.documentNumber }}
-								</RouterLink>
-								<span v-else>{{ item.documentNumber ?? '—' }}</span>
+							<td class="table-scroll__sticky font-weight-medium">
+								{{ item.documentNumber ?? '—' }}
 							</td>
 							<td>{{ item.title }}</td>
 							<td>{{ typeLabel(item.documentType) }}</td>
@@ -208,19 +241,20 @@ const items = computed(() => data.value?.items ?? []);
 </template>
 
 <style scoped>
-.library-row__link {
-	color: inherit;
-	font-weight: 600;
-	text-decoration: none;
-	outline-offset: 2px;
+.library-row--clickable,
+.library-card--clickable {
+	cursor: pointer;
 }
 
-.library-row__link:hover {
-	text-decoration: underline;
+.library-row--clickable:hover,
+.library-card--clickable:hover {
+	background: rgba(var(--v-theme-on-surface), 0.04);
 }
 
-.library-row__link:focus-visible {
+.library-row--clickable:focus-visible,
+.library-card--clickable:focus-visible {
 	outline: 2px solid rgb(var(--v-theme-primary));
+	outline-offset: -2px;
 }
 
 .table-scroll {

@@ -233,7 +233,7 @@ Retain these citations when implementing Phases 11–13 so UX decisions stay gro
 
 ## Phase 13 — Admin editors, empty states & accessibility
 
-**Status:** Planned.
+**Status:** Implemented.
 
 **Goal:** Admin remains powerful but safer; empty/loading/error patterns and a11y catch up with inbox/workspace quality.
 

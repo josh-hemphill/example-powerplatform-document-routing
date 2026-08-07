@@ -46,15 +46,30 @@ function formatDue(dueAt: string | null | undefined): string {
 </script>
 
 <template>
-	<v-list lines="three" class="bg-transparent pa-0">
+	<v-list
+		lines="three"
+		class="bg-transparent pa-0"
+		aria-label="Approval steps"
+		role="list"
+	>
 		<v-list-item
 			v-for="step in steps"
 			:key="step.id"
 			class="px-0"
+			role="listitem"
 		>
 			<template #prepend>
-				<v-avatar :color="statusColor[step.status]" variant="tonal" size="36">
-					<v-icon :icon="statusIcon[step.status]" size="20" />
+				<v-avatar
+					:color="statusColor[step.status]"
+					variant="tonal"
+					size="36"
+					aria-hidden="true"
+				>
+					<v-icon
+						:icon="statusIcon[step.status]"
+						size="20"
+						aria-hidden="true"
+					/>
 				</v-avatar>
 			</template>
 			<v-list-item-title>

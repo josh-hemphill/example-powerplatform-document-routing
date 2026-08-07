@@ -3,7 +3,7 @@ import type { DocumentStatus } from '@/client/types.gen';
 import type { InboxPersona } from '@/config/inbox-personas';
 import { useQuery } from '@pinia/colada';
 import { computed, ref, watch } from 'vue';
-import { RouterLink } from 'vue-router';
+import { useRouter } from 'vue-router';
 import { getApiErrorMessage } from '@/api/api-error';
 import { listDocumentsQuery, listDocumentTypesQuery } from '@/client/@pinia/colada.gen';
 import DocumentStatusChip from '@/components/DocumentStatusChip.vue';
@@ -16,6 +16,7 @@ import {
 } from '@/config/inbox-personas';
 import { DOCUMENT_STATUS_LABELS } from '@/domain/document-status';
 
+const router = useRouter();
 const { context } = usePowerAppsContext();
 const statusFilter = ref<DocumentStatus | null>(null);
 const typeFilter = ref<string | null>(null);
@@ -85,6 +86,17 @@ watch(
 	},
 	{ immediate: true },
 );
+
+function openDocument(documentId: string): void {
+	void router.push({ name: 'document', params: { documentId } });
+}
+
+function onRowKeydown(event: KeyboardEvent, documentId: string): void {
+	if (event.key === 'Enter' || event.key === ' ') {
+		event.preventDefault();
+		openDocument(documentId);
+	}
+}
 </script>
 
 <template>
@@ -150,29 +162,40 @@ watch(
 			type="error"
 			variant="tonal"
 			class="mb-4"
+			role="alert"
 		>
-			{{ getApiErrorMessage(error, 'Failed to load documents') }}
+			<div class="d-flex flex-wrap align-center justify-space-between ga-3">
+				<div>
+					{{ getApiErrorMessage(error, 'Failed to load documents') }}
+				</div>
+				<v-btn
+					size="small"
+					variant="tonal"
+					@click="() => refetch()"
+				>
+					Retry
+				</v-btn>
+			</div>
 		</v-alert>
 
 		<v-skeleton-loader v-if="isPending" type="table" />
 
 		<template v-else>
-			<!-- Mobile / narrow: stacked cards -->
 			<div class="d-md-none">
 				<v-card
 					v-for="item in items"
 					:key="item.id"
-					class="mb-3 pa-3"
+					class="mb-3 pa-3 inbox-card"
 					variant="outlined"
+					role="link"
+					tabindex="0"
+					:aria-label="`Open ${item.title}`"
+					@click="openDocument(item.id)"
+					@keydown="onRowKeydown($event, item.id)"
 				>
-					<RouterLink
-						class="inbox-row__link"
-						:to="{ name: 'document', params: { documentId: item.id } }"
-					>
-						<div class="font-weight-medium mb-1">
-							{{ item.title }}
-						</div>
-					</RouterLink>
+					<div class="font-weight-medium mb-1">
+						{{ item.title }}
+					</div>
 					<div class="d-flex flex-wrap align-center ga-2 mb-2">
 						<DocumentStatusChip :status="item.status" />
 						<span class="text-caption text-medium-emphasis">
@@ -210,7 +233,7 @@ watch(
 
 			<!-- Desktop table with horizontal scroll + sticky title -->
 			<div class="d-none d-md-block table-scroll">
-				<v-table hover>
+				<v-table>
 					<thead>
 						<tr>
 							<th
@@ -238,32 +261,32 @@ watch(
 							v-for="item in items"
 							:key="item.id"
 							class="inbox-row"
+							role="link"
+							tabindex="0"
+							:aria-label="`Open ${item.title}`"
+							@click="openDocument(item.id)"
+							@keydown="onRowKeydown($event, item.id)"
 						>
 							<td class="table-scroll__sticky">
-								<RouterLink
-									class="inbox-row__link"
-									:to="{ name: 'document', params: { documentId: item.id } }"
+								<span class="font-weight-medium">
+									{{ item.title }}
+								</span>
+								<span
+									v-if="item.currentStepStatus === 'queued'"
+									class="text-caption text-medium-emphasis d-block"
 								>
-									<span class="font-weight-medium">
-										{{ item.title }}
+									Pool queue
+									<span v-if="item.currentStepDueAt">
+										· due {{ new Date(item.currentStepDueAt).toLocaleString() }}
 									</span>
-									<span
-										v-if="item.currentStepStatus === 'queued'"
-										class="text-caption text-medium-emphasis d-block"
-									>
-										Pool queue
-										<span v-if="item.currentStepDueAt">
-											· due {{ new Date(item.currentStepDueAt).toLocaleString() }}
-										</span>
-										<span v-if="item.currentStepElevated"> · elevated</span>
-									</span>
-									<span
-										v-else-if="item.currentApproverEmail"
-										class="text-caption text-medium-emphasis d-block"
-									>
-										Waiting on {{ item.currentApproverEmail }}
-									</span>
-								</RouterLink>
+									<span v-if="item.currentStepElevated"> · elevated</span>
+								</span>
+								<span
+									v-else-if="item.currentApproverEmail"
+									class="text-caption text-medium-emphasis d-block"
+								>
+									Waiting on {{ item.currentApproverEmail }}
+								</span>
 							</td>
 							<td>{{ typeLabel(item.documentType) }}</td>
 							<td>
@@ -285,19 +308,23 @@ watch(
 </template>
 
 <style scoped>
-.inbox-row:hover {
+.inbox-row {
+	cursor: pointer;
+}
+
+.inbox-row:hover,
+.inbox-card:hover {
 	background: rgba(var(--v-theme-on-surface), 0.04);
 }
 
-.inbox-row__link {
-	display: block;
-	color: inherit;
-	text-decoration: none;
-	outline-offset: 2px;
+.inbox-row:focus-visible,
+.inbox-card:focus-visible {
+	outline: 2px solid rgb(var(--v-theme-primary));
+	outline-offset: -2px;
 }
 
-.inbox-row__link:focus-visible {
-	outline: 2px solid rgb(var(--v-theme-primary));
+.inbox-card {
+	cursor: pointer;
 }
 
 .table-scroll {
