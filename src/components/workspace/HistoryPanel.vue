@@ -10,10 +10,24 @@ defineProps<{
 <template>
 	<div>
 		<v-card class="pa-4 mb-4">
-			<div class="text-subtitle-1 font-weight-bold mb-2">
+			<div
+				id="history-heading"
+				class="text-subtitle-1 font-weight-bold mb-2"
+			>
 				History
 			</div>
-			<v-timeline density="compact" side="end">
+			<p
+				v-if="history.length === 0"
+				class="text-body-2 text-medium-emphasis mb-0"
+			>
+				No history events yet. Saves, submits, and approval decisions will appear here.
+			</p>
+			<v-timeline
+				v-else
+				density="compact"
+				side="end"
+				aria-labelledby="history-heading"
+			>
 				<v-timeline-item
 					v-for="event in history"
 					:key="event.id"

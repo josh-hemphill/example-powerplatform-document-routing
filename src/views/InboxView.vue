@@ -150,28 +150,39 @@ watch(
 			type="error"
 			variant="tonal"
 			class="mb-4"
+			role="alert"
 		>
-			{{ getApiErrorMessage(error, 'Failed to load documents') }}
+			<div class="d-flex flex-wrap align-center justify-space-between ga-3">
+				<div>
+					{{ getApiErrorMessage(error, 'Failed to load documents') }}
+				</div>
+				<v-btn
+					size="small"
+					variant="tonal"
+					@click="() => refetch()"
+				>
+					Retry
+				</v-btn>
+			</div>
 		</v-alert>
 
 		<v-skeleton-loader v-if="isPending" type="table" />
 
 		<template v-else>
-			<!-- Mobile / narrow: stacked cards -->
 			<div class="d-md-none">
 				<v-card
 					v-for="item in items"
 					:key="item.id"
-					class="mb-3 pa-3"
+					class="mb-3 pa-3 inbox-card"
 					variant="outlined"
 				>
 					<RouterLink
-						class="inbox-row__link"
+						class="inbox-stretched-link"
 						:to="{ name: 'document', params: { documentId: item.id } }"
 					>
-						<div class="font-weight-medium mb-1">
+						<span class="font-weight-medium d-block mb-1">
 							{{ item.title }}
-						</div>
+						</span>
 					</RouterLink>
 					<div class="d-flex flex-wrap align-center ga-2 mb-2">
 						<DocumentStatusChip :status="item.status" />
@@ -208,9 +219,8 @@ watch(
 				</p>
 			</div>
 
-			<!-- Desktop table with horizontal scroll + sticky title -->
 			<div class="d-none d-md-block table-scroll">
-				<v-table hover>
+				<v-table>
 					<thead>
 						<tr>
 							<th
@@ -241,7 +251,7 @@ watch(
 						>
 							<td class="table-scroll__sticky">
 								<RouterLink
-									class="inbox-row__link"
+									class="inbox-stretched-link"
 									:to="{ name: 'document', params: { documentId: item.id } }"
 								>
 									<span class="font-weight-medium">
@@ -285,19 +295,36 @@ watch(
 </template>
 
 <style scoped>
-.inbox-row:hover {
+.inbox-row,
+.inbox-card {
+	position: relative;
+}
+
+.inbox-row:hover,
+.inbox-card:hover {
 	background: rgba(var(--v-theme-on-surface), 0.04);
 }
 
-.inbox-row__link {
-	display: block;
+.inbox-stretched-link {
 	color: inherit;
 	text-decoration: none;
 	outline-offset: 2px;
 }
 
-.inbox-row__link:focus-visible {
+.inbox-stretched-link::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	z-index: 2;
+}
+
+.inbox-stretched-link:focus-visible {
+	outline: none;
+}
+
+.inbox-stretched-link:focus-visible::after {
 	outline: 2px solid rgb(var(--v-theme-primary));
+	outline-offset: -2px;
 }
 
 .table-scroll {

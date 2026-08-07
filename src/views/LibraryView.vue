@@ -46,6 +46,10 @@ function typeLabel(id: string): string {
 }
 
 const items = computed(() => data.value?.items ?? []);
+
+function isOpenable(item: { documentNumber?: string | null; status: string }): boolean {
+	return Boolean(item.documentNumber && item.status === 'published');
+}
 </script>
 
 <template>
@@ -91,8 +95,20 @@ const items = computed(() => data.value?.items ?? []);
 			type="error"
 			variant="tonal"
 			class="mb-4"
+			role="alert"
 		>
-			{{ getApiErrorMessage(error, 'Failed to load library') }}
+			<div class="d-flex flex-wrap align-center justify-space-between ga-3">
+				<div>
+					{{ getApiErrorMessage(error, 'Failed to load library') }}
+				</div>
+				<v-btn
+					size="small"
+					variant="tonal"
+					@click="() => refetch()"
+				>
+					Retry
+				</v-btn>
+			</div>
 		</v-alert>
 
 		<v-skeleton-loader v-if="isPending" type="table" />
@@ -103,17 +119,24 @@ const items = computed(() => data.value?.items ?? []);
 					v-for="item in items"
 					:key="item.id"
 					class="mb-3 pa-3"
+					:class="{ 'library-card--clickable': isOpenable(item) }"
 					variant="outlined"
 				>
-					<div class="font-weight-medium mb-1">
+					<template v-if="isOpenable(item) && item.documentNumber">
 						<RouterLink
-							v-if="item.documentNumber && item.status === 'published'"
-							class="library-row__link"
+							class="library-stretched-link"
 							:to="{ name: 'library-document', params: { documentNumber: item.documentNumber } }"
 						>
-							{{ item.documentNumber }}
+							<span class="font-weight-medium d-block mb-1">
+								{{ item.documentNumber }}
+							</span>
 						</RouterLink>
-						<span v-else>{{ item.documentNumber ?? '—' }}</span>
+					</template>
+					<div
+						v-else
+						class="font-weight-medium mb-1"
+					>
+						{{ item.documentNumber ?? '—' }}
 					</div>
 					<div class="text-body-2 mb-2">
 						{{ item.title }}
@@ -123,11 +146,6 @@ const items = computed(() => data.value?.items ?? []);
 						<span class="text-caption text-medium-emphasis">
 							{{ typeLabel(item.documentType) }}
 							· v{{ item.documentVersion ?? '—' }}
-						</span>
-						<span class="text-caption text-medium-emphasis">
-							{{ typeLabel(item.documentType) }}
-							<template v-if="item.documentVersion">· v{{ item.documentVersion }}</template>
-							<template v-else>· —</template>
 						</span>
 					</div>
 					<div class="text-caption text-medium-emphasis">
@@ -143,7 +161,7 @@ const items = computed(() => data.value?.items ?? []);
 			</div>
 
 			<div class="d-none d-md-block table-scroll">
-				<v-table hover>
+				<v-table>
 					<thead>
 						<tr>
 							<th
@@ -173,17 +191,19 @@ const items = computed(() => data.value?.items ?? []);
 						<tr
 							v-for="item in items"
 							:key="item.id"
-							class="library-row"
+							:class="{ 'library-row--clickable': isOpenable(item) }"
 						>
-							<td class="table-scroll__sticky">
+							<td class="table-scroll__sticky font-weight-medium">
 								<RouterLink
-									v-if="item.documentNumber && item.status === 'published'"
-									class="library-row__link"
+									v-if="isOpenable(item) && item.documentNumber"
+									class="library-stretched-link"
 									:to="{ name: 'library-document', params: { documentNumber: item.documentNumber } }"
 								>
 									{{ item.documentNumber }}
 								</RouterLink>
-								<span v-else>{{ item.documentNumber ?? '—' }}</span>
+								<template v-else>
+									{{ item.documentNumber ?? '—' }}
+								</template>
 							</td>
 							<td>{{ item.title }}</td>
 							<td>{{ typeLabel(item.documentType) }}</td>
@@ -208,19 +228,37 @@ const items = computed(() => data.value?.items ?? []);
 </template>
 
 <style scoped>
-.library-row__link {
+.library-row--clickable,
+.library-card--clickable {
+	position: relative;
+}
+
+.library-row--clickable:hover,
+.library-card--clickable:hover {
+	background: rgba(var(--v-theme-on-surface), 0.04);
+}
+
+.library-stretched-link {
 	color: inherit;
 	font-weight: 600;
 	text-decoration: none;
 	outline-offset: 2px;
 }
 
-.library-row__link:hover {
-	text-decoration: underline;
+.library-stretched-link::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	z-index: 2;
 }
 
-.library-row__link:focus-visible {
+.library-stretched-link:focus-visible {
+	outline: none;
+}
+
+.library-stretched-link:focus-visible::after {
 	outline: 2px solid rgb(var(--v-theme-primary));
+	outline-offset: -2px;
 }
 
 .table-scroll {

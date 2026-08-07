@@ -104,6 +104,12 @@ watch(
 
 <template>
 	<v-app>
+		<a
+			href="#main-content"
+			class="skip-link"
+		>
+			Skip to content
+		</a>
 		<v-navigation-drawer
 			v-if="!mdAndUp"
 			v-model="drawerOpen"
@@ -224,7 +230,12 @@ watch(
 		</v-app-bar>
 
 		<v-main>
-			<v-container class="py-6" style="max-width: 1100px">
+			<v-container
+				id="main-content"
+				class="py-6"
+				style="max-width: 1100px"
+				tabindex="-1"
+			>
 				<SetupBanner />
 				<div
 					v-if="showPageHeading"
@@ -248,3 +259,24 @@ watch(
 		<AppToast />
 	</v-app>
 </template>
+
+<style scoped>
+.skip-link {
+	position: absolute;
+	left: 0.75rem;
+	top: -3rem;
+	z-index: 3000;
+	padding: 0.5rem 0.75rem;
+	border-radius: 4px;
+	background: rgb(var(--v-theme-primary));
+	color: rgb(var(--v-theme-on-primary));
+	text-decoration: none;
+	font-weight: 600;
+}
+
+.skip-link:focus {
+	top: 0.75rem;
+	outline: 2px solid rgb(var(--v-theme-on-primary));
+	outline-offset: 2px;
+}
+</style>
