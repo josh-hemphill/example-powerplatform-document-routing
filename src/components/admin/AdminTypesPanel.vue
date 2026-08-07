@@ -3,7 +3,6 @@ import type {
 	ControlApproverPool,
 	ControlChainStep,
 	ControlDocumentType,
-	ControlPublishDestination,
 } from '@/client';
 import { useMutation, useQuery, useQueryCache } from '@pinia/colada';
 import { computed, reactive, watch } from 'vue';
