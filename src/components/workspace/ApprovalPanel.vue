@@ -57,6 +57,7 @@ function hasSteps(steps: ApprovalStep[]): boolean {
 			<button
 				type="button"
 				class="stage-toggle text-subtitle-1 font-weight-bold"
+				:aria-expanded="expanded"
 				@click="emit('toggle')"
 			>
 				3. Approval chain
@@ -66,6 +67,7 @@ function hasSteps(steps: ApprovalStep[]): boolean {
 				size="small"
 				:icon="expanded ? '$chevronUp' : '$chevronDown'"
 				:aria-label="expanded ? 'Collapse approval' : 'Expand approval'"
+				:aria-expanded="expanded"
 				@click="emit('toggle')"
 			/>
 		</div>
