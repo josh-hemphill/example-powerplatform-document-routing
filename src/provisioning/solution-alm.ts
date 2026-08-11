@@ -674,20 +674,25 @@ export async function addPlanEnvironmentVariablesToSolution(
 }
 
 /**
- * Fetches a connection reference id by logical name.
+ * Fetches a connection reference by logical name (id + fields needed for a non-empty PATCH).
  */
-export async function fetchConnectionReferenceId(
+export async function fetchConnectionReference(
 	apiRoot: string,
 	logicalName: string,
 	accessToken: string,
 	fetchImpl: typeof fetch = fetch,
-): Promise<string> {
+): Promise<{
+	connectionreferenceid: string;
+	connectionreferencedisplayname: string;
+	description?: string;
+}> {
 	const filter = encodeURIComponent(
 		`connectionreferencelogicalname eq '${logicalName.replace(/'/g, '\'\'')}'`,
 	);
 	const url
 		= `${apiRoot}/connectionreferences`
-			+ `?$select=connectionreferenceid,connectionreferencelogicalname&$filter=${filter}`;
+			+ `?$select=connectionreferenceid,connectionreferencelogicalname,`
+			+ `connectionreferencedisplayname,description&$filter=${filter}`;
 	const response = await fetchImpl(url, { headers: odataHeaders(accessToken) });
 	if (!response.ok) {
 		const text = await response.text();
@@ -696,26 +701,65 @@ export async function fetchConnectionReferenceId(
 		);
 	}
 	const payload = (await response.json()) as {
-		value?: Array<{ connectionreferenceid?: string }>;
+		value?: Array<{
+			connectionreferenceid?: string;
+			connectionreferencedisplayname?: string;
+			description?: string;
+		}>;
 	};
-	const id = payload.value?.[0]?.connectionreferenceid;
+	const row = payload.value?.[0];
+	const id = row?.connectionreferenceid;
 	if (!id) {
 		throw new Error(`Connection reference ${logicalName} not found`);
 	}
-	return id;
+	return {
+		connectionreferenceid: id,
+		connectionreferencedisplayname:
+			row.connectionreferencedisplayname?.trim() || logicalName,
+		description: row.description,
+	};
+}
+
+/**
+ * Fetches a connection reference id by logical name.
+ */
+export async function fetchConnectionReferenceId(
+	apiRoot: string,
+	logicalName: string,
+	accessToken: string,
+	fetchImpl: typeof fetch = fetch,
+): Promise<string> {
+	const record = await fetchConnectionReference(
+		apiRoot,
+		logicalName,
+		accessToken,
+		fetchImpl,
+	);
+	return record.connectionreferenceid;
 }
 
 /**
  * Associates an existing connection reference with the unmanaged solution via solution header.
- * Connection references are solution-aware data rows; MSCRM.SolutionUniqueName on update is the documented path.
+ * Dataverse rejects empty PATCH bodies, so we re-assert display name (no-op update) with
+ * `MSCRM.SolutionUniqueName` — the documented way to add solution-aware data rows.
  */
 export async function associateConnectionReferenceWithSolution(
 	apiRoot: string,
 	connectionReferenceId: string,
 	solutionUniqueName: string,
 	accessToken: string,
+	patchFields: {
+		connectionreferencedisplayname: string;
+		description?: string;
+	},
 	fetchImpl: typeof fetch = fetch,
 ): Promise<void> {
+	const body: Record<string, string> = {
+		connectionreferencedisplayname: patchFields.connectionreferencedisplayname,
+	};
+	if (patchFields.description != null) {
+		body.description = patchFields.description;
+	}
 	const response = await fetchImpl(
 		`${apiRoot}/connectionreferences(${connectionReferenceId})`,
 		{
@@ -725,7 +769,7 @@ export async function associateConnectionReferenceWithSolution(
 				'MSCRM.SolutionUniqueName': solutionUniqueName,
 				'If-Match': '*',
 			},
-			body: JSON.stringify({}),
+			body: JSON.stringify(body),
 		},
 	);
 	if (!response.ok) {
@@ -755,7 +799,7 @@ export async function addPlanConnectionReferencesToSolution(
 
 	for (const logicalName of logicalNames) {
 		try {
-			const id = await fetchConnectionReferenceId(
+			const record = await fetchConnectionReference(
 				apiRoot,
 				logicalName,
 				accessToken,
@@ -763,9 +807,13 @@ export async function addPlanConnectionReferencesToSolution(
 			);
 			await associateConnectionReferenceWithSolution(
 				apiRoot,
-				id,
+				record.connectionreferenceid,
 				profile.solution.uniqueName,
 				accessToken,
+				{
+					connectionreferencedisplayname: record.connectionreferencedisplayname,
+					description: record.description,
+				},
 				fetchImpl,
 			);
 			added.push(logicalName);

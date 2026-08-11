@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { buildDataverseProvisionPlan } from './dataverse-provision-plan.ts';
 import {
 	addEntityToSolution,
+	addPlanConnectionReferencesToSolution,
 	assertSolutionOwnedByPublisher,
 	buildAlmManifest,
 	ensurePublisher,
@@ -386,5 +387,53 @@ describe('findPublishersByPrefix', () => {
 			fetchImpl,
 		);
 		expect(rows).toEqual([]);
+	});
+});
+
+describe('addPlanConnectionReferencesToSolution', () => {
+	it('pATCHes a non-empty body with MSCRM.SolutionUniqueName', async() => {
+		let patchBody: Record<string, unknown> | undefined;
+		let patchHeaders: Record<string, string> | undefined;
+		const fetchImpl = asFetch(async(url, init) => {
+			const href = String(url);
+			if (href.includes('connectionreferences?')) {
+				return new Response(
+					JSON.stringify({
+						value: [
+							{
+								connectionreferenceid: 'ref-1',
+								connectionreferencelogicalname: 'dr_sharepoint',
+								connectionreferencedisplayname: 'Document Routing SharePoint',
+								description: 'SharePoint library ref',
+							},
+						],
+					}),
+					{ status: 200, headers: { 'Content-Type': 'application/json' } },
+				);
+			}
+			if (init?.method === 'PATCH' && href.includes('connectionreferences(ref-1)')) {
+				patchBody = JSON.parse(String(init.body)) as Record<string, unknown>;
+				patchHeaders = init.headers as Record<string, string>;
+				return new Response(null, { status: 204 });
+			}
+			return new Response('unexpected', { status: 500 });
+		});
+
+		const result = await addPlanConnectionReferencesToSolution(
+			'https://data.fabrikam.internal/api/data/v9.2',
+			sampleProfile(),
+			['dr_sharepoint'],
+			'token',
+			fetchImpl,
+		);
+
+		expect(result.added).toEqual(['dr_sharepoint']);
+		expect(result.failed).toHaveLength(0);
+		expect(patchBody).toEqual({
+			connectionreferencedisplayname: 'Document Routing SharePoint',
+			description: 'SharePoint library ref',
+		});
+		expect(Object.keys(patchBody ?? {})).not.toHaveLength(0);
+		expect(patchHeaders?.['MSCRM.SolutionUniqueName']).toBe('DocumentRouting');
 	});
 });
