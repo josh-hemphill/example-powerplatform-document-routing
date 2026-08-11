@@ -2,8 +2,8 @@
 
 Plan to close the gaps between today’s **generate → optional Web API apply** toolkit and elegant adoption in **large shared Power Platform environments** (publisher ownership, solution ALM, connection references, security roles, prefix governance, and prefix-aware downstream artifacts).
 
-**Status:** Planned (not implemented).  
-**Context:** Assessment of current tooling — prefixing works for metadata; `solution` / `publisher.uniqueName` in the connection profile are largely unused; `provision:apply` creates bare unmanaged metadata; flows/docs still assume `dr_*` in places.
+**Status:** Phase 18 implemented; Phases 19–22 planned.  
+**Context:** Assessment of current tooling — prefixing works for metadata; Phases 19+ still need connection references, security roles in-solution, prefix-aware flows/docs, and shared-env CI wrappers.
 
 **Preceding app roadmaps:** [`remediation-roadmap.md`](./remediation-roadmap.md) (0–8), [`post-phase-8-review-roadmap.md`](./post-phase-8-review-roadmap.md) (9–13), [`post-phase-13-review-roadmap.md`](./post-phase-13-review-roadmap.md) (14–17).
 
@@ -13,92 +13,70 @@ Plan to close the gaps between today’s **generate → optional Web API apply**
 
 ## Guiding decisions
 
-| Decision | Choice |
-| -------- | ------ |
-| Primary ALM path | **Solution-first**: metadata, env vars, connection references, roles, and flows live in (or are added to) a Dataverse solution owned by a registered publisher. |
-| Web API apply | Keep as a **dev / scratch** path, but mark it explicitly non-production for shared orgs; prefer pack → import for shared environments. |
-| Prefix | Profile `publisher.prefix` remains the single stamp for tables/columns/relationships/env vars; **register** that publisher in Dataverse and **refuse apply/import** when the prefix is already owned by another publisher (or warn loudly). |
-| Connection wiring | Move from ad-hoc `pa connection create` toward **connection references** as solution components; `pa-connect.sh` becomes “bind refs + app data sources,” not the source of truth. |
-| Security roles | Provision as solution components (or documented privilege templates exported with the solution), mapped by `src/domain/security-roles.ts`. |
-| Downstream artifacts | Flow stubs, SUMMARY, runtime comments, and SETUP must be **prefix-parameterized** — no hardcoded `dr_*` once prefix ≠ `dr`. |
-| Shared-env coexistence | Unique publisher prefix + solution unique name + no unmanaged pollution from the happy path. |
+| Decision               | Choice                                                                                                                                                                                                                                      |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Primary ALM path       | **Solution-first**: metadata, env vars, connection references, roles, and flows live in (or are added to) a Dataverse solution owned by a registered publisher.                                                                             |
+| Web API apply          | Keep as a **dev / scratch** path, but mark it explicitly non-production for shared orgs; prefer pack → import for shared environments.                                                                                                      |
+| Prefix                 | Profile `publisher.prefix` remains the single stamp for tables/columns/relationships/env vars; **register** that publisher in Dataverse and **refuse apply/import** when the prefix is already owned by another publisher (or warn loudly). |
+| Connection wiring      | Move from ad-hoc `pa connection create` toward **connection references** as solution components; `pa-connect.sh` becomes “bind refs + app data sources,” not the source of truth.                                                           |
+| Security roles         | Provision as solution components (or documented privilege templates exported with the solution), mapped by `src/domain/security-roles.ts`.                                                                                                  |
+| Downstream artifacts   | Flow stubs, SUMMARY, runtime comments, and SETUP must be **prefix-parameterized** — no hardcoded `dr_*` once prefix ≠ `dr`.                                                                                                                 |
+| Shared-env coexistence | Unique publisher prefix + solution unique name + no unmanaged pollution from the happy path.                                                                                                                                                |
 
 ---
 
 ## Finding → phase map
 
-| Finding (summary) | Severity | Phase |
-| ----------------- | -------- | ----- |
-| `solution` profile block is unused (no pack/import/membership) | Critical | 18 |
-| `publisher.uniqueName` / friendlyName unused (no publisher registration) | Critical | 18 |
-| `provision:apply` writes unmanaged metadata outside a solution | Critical | 18 |
-| No prefix collision / ownership check against target org | High | 18 |
-| Connection references not first-class ALM components | High | 19 |
-| `pa-connect.sh` only creates connections / data sources | High | 19 |
-| Env var definitions not solution-scoped / no current-value ALM story | Medium | 19 |
-| Security roles documented only (`SECURITY_ROLES.md`) | High | 20 |
-| Role privilege sets not exported or applied with the solution | High | 20 |
-| Flow stubs hardcoded to `dr_*`; not packaged solutions | High | 21 |
-| SUMMARY / SETUP / runtime comments assume `dr_*` | Medium | 21 |
-| Control seed import not solution-aware / Contoso demo risk in shared orgs | Medium | 21 |
-| No PAC/CLI solution pack–export–import automation in CI-friendly scripts | High | 18–19 |
-| No “shared env adopter checklist” for multi-team orgs | Medium | 22 |
+| Finding (summary)                                                         | Severity | Phase |
+| ------------------------------------------------------------------------- | -------- | ----- |
+| `solution` profile block is unused (no pack/import/membership)            | Critical | 18    |
+| `publisher.uniqueName` / friendlyName unused (no publisher registration)  | Critical | 18    |
+| `provision:apply` writes unmanaged metadata outside a solution            | Critical | 18    |
+| No prefix collision / ownership check against target org                  | High     | 18    |
+| Connection references not first-class ALM components                      | High     | 19    |
+| `pa-connect.sh` only creates connections / data sources                   | High     | 19    |
+| Env var definitions not solution-scoped / no current-value ALM story      | Medium   | 19    |
+| Security roles documented only (`SECURITY_ROLES.md`)                      | High     | 20    |
+| Role privilege sets not exported or applied with the solution             | High     | 20    |
+| Flow stubs hardcoded to `dr_*`; not packaged solutions                    | High     | 21    |
+| SUMMARY / SETUP / runtime comments assume `dr_*`                          | Medium   | 21    |
+| Control seed import not solution-aware / Contoso demo risk in shared orgs | Medium   | 21    |
+| No PAC/CLI solution pack–export–import automation in CI-friendly scripts  | High     | 18–19 |
+| No “shared env adopter checklist” for multi-team orgs                     | Medium   | 22    |
 
 ---
 
 ## Design references
 
-| Principle | Application here |
-| --------- | ---------------- |
-| Solution is the unit of deploy | Everything adopters ship should be addable to `solution.uniqueName` |
-| Publisher owns the prefix | Register publisher before creating prefixed metadata; detect collisions |
-| Layered ALM | Dev unmanaged → export → build managed → import to shared/test/prod |
-| Least surprise | Profile fields that exist must drive behavior or be removed from the schema |
-| Host-agnostic URLs stay | Vanity SharePoint / custom Dataverse domains remain first-class |
+| Principle                      | Application here                                                            |
+| ------------------------------ | --------------------------------------------------------------------------- |
+| Solution is the unit of deploy | Everything adopters ship should be addable to `solution.uniqueName`         |
+| Publisher owns the prefix      | Register publisher before creating prefixed metadata; detect collisions     |
+| Layered ALM                    | Dev unmanaged → export → build managed → import to shared/test/prod         |
+| Least surprise                 | Profile fields that exist must drive behavior or be removed from the schema |
+| Host-agnostic URLs stay        | Vanity SharePoint / custom Dataverse domains remain first-class             |
 
 ---
 
 ## Phase 18 — Publisher ownership & solution-first scaffolding
 
+**Status:** Implemented.
+
 **Goal:** Make `publisher` and `solution` in `deploy/connections.json` real. Shared-env happy path is “ensure publisher → ensure solution → add components → pack/import,” not bare Web API entity creates.
 
-### Work
+### Delivered
 
-1. **Consume profile fields**
-   - Wire `publisher.uniqueName`, `friendlyName`, `prefix`, `optionValuePrefix` into provision artifacts and SUMMARY (stop leaving unique/friendly as dead config).
-   - Wire `solution.uniqueName`, `friendlyName`, `version` into pack/import scripts and generated manifests.
-
-2. **Publisher ensure / collision gate**
-   - Before apply or solution import: query Dataverse for publishers by prefix.
-   - If prefix exists with a **different** `uniqueName` → hard fail with remediation text.
-   - If missing → create publisher (Web API or `pac` / `pa` equivalent) when credentials allow; otherwise print exact manual steps.
-   - Document required privileges for publisher create.
-
-3. **Solution ensure**
-   - Create unmanaged solution if missing (`solution.uniqueName` / version).
-   - All subsequent component creates target that solution (Solution Component APIs or PAC `solution add-solution-component` / equivalent).
-
-4. **Dual-path clarity**
-   - **`pnpm provision:apply`**: retain for scratch/dev; require explicit `--unmanaged-ok` (or profile flag `allowUnmanagedApply`) and print a shared-env warning.
-   - **`pnpm provision:solution`** (new): generate + ensure publisher/solution + emit pack instructions / PAC commands; preferred for shared orgs.
-
-5. **Artifacts**
-   - Extend `deploy/generated/SUMMARY.md` with publisher ownership status, solution unique name, and “shared env: use solution path.”
-   - Add `deploy/generated/solution-pack.md` or a shell script listing PAC/CLI steps (pack, export, import).
+1. **Consume profile fields** — `alm-manifest.json`, SUMMARY publisher/solution section, `solution-pack.md` / `.sh`.
+2. **Publisher ensure / collision gate** — `ensurePublisher` / `PublisherCollisionError` before apply and `provision:solution`.
+3. **Solution ensure** — `ensureSolution` + `AddSolutionComponent` for planned tables via `--into-solution`.
+4. **Dual-path** — `provision:apply` gated by `--unmanaged-ok` / `allowUnmanagedApply`; `provision:solution` preferred; `--into-solution` for apply + membership.
+5. **Artifacts** — SUMMARY ALM section; pack guides under `deploy/generated/`.
 
 ### Exit criteria
 
-- Profile `solution` and `publisher.uniqueName` are read by provision code and appear in artifacts.
-- Prefix collision against another publisher fails closed on apply/solution ensure.
-- Docs state unmanaged Web API apply is scratch-only for shared environments.
-
-### PR slicing
-
-| PR | Focus |
-| -- | ----- |
-| 18a | Profile consumption + SUMMARY; dual-path flags/warnings |
-| 18b | Publisher ensure + prefix collision gate |
-| 18c | Solution ensure + component-add hooks for tables/attrs/relationships/env vars |
+- [x] Profile `solution` and `publisher.uniqueName` are read by provision code and appear in artifacts.
+- [x] Prefix collision against another publisher fails closed on apply/solution ensure.
+- [x] Docs state unmanaged Web API apply is scratch-only for shared environments.
 
 ---
 
@@ -133,10 +111,10 @@ Plan to close the gaps between today’s **generate → optional Web API apply**
 
 ### PR slicing
 
-| PR | Focus |
-| -- | ----- |
-| 19a | Connection reference schema + generation |
-| 19b | `pa-connect` bind-to-ref flow |
+| PR  | Focus                                         |
+| --- | --------------------------------------------- |
+| 19a | Connection reference schema + generation      |
+| 19b | `pa-connect` bind-to-ref flow                 |
 | 19c | Env var solution membership + GET-before-POST |
 
 ---
@@ -169,10 +147,10 @@ Plan to close the gaps between today’s **generate → optional Web API apply**
 
 ### PR slicing
 
-| PR | Focus |
-| -- | ----- |
-| 20a | Privilege template + prefix substitution |
-| 20b | Solution membership / apply or PAC import |
+| PR  | Focus                                            |
+| --- | ------------------------------------------------ |
+| 20a | Privilege template + prefix substitution         |
+| 20b | Solution membership / apply or PAC import        |
 | 20c | Docs + `/principal` / service principal guidance |
 
 ---
@@ -209,10 +187,10 @@ Plan to close the gaps between today’s **generate → optional Web API apply**
 
 ### PR slicing
 
-| PR | Focus |
-| -- | ----- |
-| 21a | Prefix-parameterized flow generation |
-| 21b | Docs/SUMMARY/runtime comment sweep |
+| PR  | Focus                                              |
+| --- | -------------------------------------------------- |
+| 21a | Prefix-parameterized flow generation               |
+| 21b | Docs/SUMMARY/runtime comment sweep                 |
 | 21c | Control seed opt-in + tests for non-default prefix |
 
 ---
@@ -253,10 +231,10 @@ Plan to close the gaps between today’s **generate → optional Web API apply**
 
 ### PR slicing
 
-| PR | Focus |
-| -- | ----- |
-| 22a | SHARED_ENV.md + SETUP cross-links |
-| 22b | PAC wrapper scripts + package.json entries |
+| PR  | Focus                                              |
+| --- | -------------------------------------------------- |
+| 22a | SHARED_ENV.md + SETUP cross-links                  |
+| 22b | PAC wrapper scripts + package.json entries         |
 | 22c | CI validation job for generated solution artifacts |
 
 ---
@@ -291,14 +269,14 @@ Phases 20 and 21 may proceed in parallel after 18c lands solution membership hoo
 
 ## Relationship to current code
 
-| Today | After this roadmap |
-| ----- | ------------------ |
-| `pnpm provision` generates Web API plan + `pa-connect.sh` | Same, plus solution/publisher-aware artifacts |
-| `pnpm provision:apply` creates bare tables | Scratch-only behind a gate; solution path preferred |
-| `solution` / `publisher.uniqueName` in JSON | Drive ensure/pack/import |
-| Prefix stamps logical names | + publisher ownership check |
-| Roles in markdown | Privilege templates in the solution |
-| Flow stubs with `dr_*` | Generated prefix-correct flows (+ optional solution package) |
+| Today                                                                | After this roadmap                                              |
+| -------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `pnpm provision` generates Web API plan + ALM manifest + pack guides | Same foundation; Phases 19+ add connection refs / roles / flows |
+| `pnpm provision:apply` gated; `provision:solution` preferred         | Scratch unmanaged vs solution-first dual path (Phase 18 done)   |
+| `solution` / `publisher.uniqueName` drive ensure/pack artifacts      | Connection refs + roles + flows still to follow                 |
+| Prefix stamps logical names + publisher ownership check              | Keep; extend to flows/docs in Phase 21                          |
+| Roles in markdown                                                    | Privilege templates in the solution                             |
+| Flow stubs with `dr_*`                                               | Generated prefix-correct flows (+ optional solution package)    |
 
 ---
 

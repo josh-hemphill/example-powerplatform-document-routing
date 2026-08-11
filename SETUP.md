@@ -82,10 +82,12 @@ Walk the seeded inbox: request → draft → approvals → publish. Demo cases l
 ```bash
 pnpm provision
 export DATAVERSE_ACCESS_TOKEN='…'
-pnpm provision:apply
+pnpm provision:solution                    # ensure publisher + unmanaged solution
+pnpm provision:apply -- --into-solution    # optional: apply schema into that solution
+# Scratch only: pnpm provision:apply -- --unmanaged-ok
 ```
 
-This scaffolds case tables plus control tables (`documenttype`, `approvalchainstep`, pools, destinations, `appsetting`). See [`deploy/README.md`](./deploy/README.md).
+This scaffolds case tables plus control tables (`documenttype`, `approvalchainstep`, pools, destinations, `appsetting`). Shared orgs should prefer the solution path — see [`deploy/README.md`](./deploy/README.md).
 
 ### Attach Code App data sources
 

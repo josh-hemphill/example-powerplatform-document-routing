@@ -31,6 +31,7 @@
 	"notes": [
 		"Copy this file to deploy/connections.json and replace REPLACE_ME / example hosts.",
 		"All URLs are free-form HTTPS endpoints — vanity SharePoint hosts, custom Dataverse domains, and private API hosts are supported.",
-		"Do not assume *.sharepoint.com or *.dynamics.com; use the hostnames your tenant actually serves."
+		"Do not assume *.sharepoint.com or *.dynamics.com; use the hostnames your tenant actually serves.",
+		"Prefer pnpm provision:solution (publisher + solution ensure). Scratch unmanaged apply needs allowUnmanagedApply or --unmanaged-ok."
 	]
 }

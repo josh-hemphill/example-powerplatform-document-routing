@@ -50,6 +50,11 @@ export interface ConnectionProfile {
 	dataverse: DataverseConnectionConfig;
 	sharePoint: SharePointConnectionConfig;
 	api: ApiConnectionConfig;
+	/**
+	 * When true, `pnpm provision:apply` may run without `--unmanaged-ok`.
+	 * Shared environments should leave this unset/false and use `provision:solution`.
+	 */
+	allowUnmanagedApply?: boolean;
 	notes?: string[];
 }
 

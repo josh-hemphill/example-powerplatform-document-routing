@@ -93,6 +93,10 @@
 				}
 			}
 		},
+		"allowUnmanagedApply": {
+			"type": "boolean",
+			"description": "When true, allows pnpm provision:apply without --unmanaged-ok (scratch/dev only; avoid in shared orgs)"
+		},
 		"notes": {
 			"type": "array",
 			"items": { "type": "string" }

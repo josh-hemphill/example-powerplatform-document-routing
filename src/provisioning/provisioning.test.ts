@@ -330,6 +330,25 @@ describe('writeProvisionArtifacts', () => {
 		expect(seed.documentTypes.length).toBeGreaterThan(0);
 		expect(seed.sampleIdentityEmails.length).toBeGreaterThan(0);
 	});
+
+	it('writes ALM manifest, solution pack guides, and publisher uniqueName in SUMMARY', () => {
+		const dir = mkdtempSync(join(tmpdir(), 'prov-alm-'));
+		tempDirs.push(dir);
+		const result = writeProvisionArtifacts(sampleProfile(), dir);
+		expect(result.validationErrors).toHaveLength(0);
+		expect(result.almManifest?.publisher.uniqueName).toBe('docrouting');
+		expect(result.almManifest?.solution.uniqueName).toBe('DocumentRouting');
+		expect(result.files.some((file) => file.endsWith('alm-manifest.json'))).toBe(true);
+		expect(result.files.some((file) => file.endsWith('solution-pack.md'))).toBe(true);
+		expect(result.files.some((file) => file.endsWith('solution-pack.sh'))).toBe(true);
+		const summary = readFileSync(join(dir, 'SUMMARY.md'), 'utf8');
+		expect(summary).toContain('docrouting');
+		expect(summary).toContain('DocumentRouting');
+		expect(summary).toContain('pnpm provision:solution');
+		const manifest = JSON.parse(readFileSync(join(dir, 'alm-manifest.json'), 'utf8'));
+		expect(manifest.publisher.uniqueName).toBe('docrouting');
+		expect(manifest.preferredPath).toBe('solution');
+	});
 });
 
 describe('control seed', () => {
