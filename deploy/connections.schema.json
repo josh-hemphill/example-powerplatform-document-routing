@@ -97,6 +97,45 @@
 			"type": "boolean",
 			"description": "When true, allows pnpm provision:apply without --unmanaged-ok (scratch/dev only; avoid in shared orgs)"
 		},
+		"legacyDirectConnection": {
+			"type": "boolean",
+			"description": "When true, pa-connect.sh uses legacy connection-id wiring instead of connection-reference bind path"
+		},
+		"connectionReferences": {
+			"type": "object",
+			"additionalProperties": false,
+			"description": "Optional overrides for generated SharePoint / Dataverse connection references",
+			"properties": {
+				"sharePoint": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"logicalName": { "type": "string", "minLength": 2 },
+						"displayName": { "type": "string", "minLength": 1 },
+						"connectorId": {
+							"type": "string",
+							"minLength": 1,
+							"description": "Connector id token (e.g. shared_sharepointonline) or full /providers/.../apis/... id"
+						}
+					}
+				},
+				"dataverse": {
+					"description": "Override Dataverse connection reference, or false to omit",
+					"oneOf": [
+						{ "type": "boolean", "const": false },
+						{
+							"type": "object",
+							"additionalProperties": false,
+							"properties": {
+								"logicalName": { "type": "string", "minLength": 2 },
+								"displayName": { "type": "string", "minLength": 1 },
+								"connectorId": { "type": "string", "minLength": 1 }
+							}
+						}
+					]
+				}
+			}
+		},
 		"notes": {
 			"type": "array",
 			"items": { "type": "string" }

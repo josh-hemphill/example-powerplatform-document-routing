@@ -1,8 +1,8 @@
 /**
  * Runtime host configuration.
  * Local Vite uses `VITE_*` at build time. Hosted Code Apps should prefer
- * Power Platform / Dataverse environment variables (`dr_*`) injected at runtime
- * (see deploy/generated/app.env.example and provision SUMMARY).
+ * Power Platform / Dataverse environment variables (`{publisherPrefix}_*`, e.g. `dr_*`)
+ * injected at runtime (see deploy/generated/environment-variable-values.md and SUMMARY).
  */
 
 export interface RuntimeHostConfig {

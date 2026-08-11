@@ -2,8 +2,8 @@
 
 Plan to close the gaps between today’s **generate → optional Web API apply** toolkit and elegant adoption in **large shared Power Platform environments** (publisher ownership, solution ALM, connection references, security roles, prefix governance, and prefix-aware downstream artifacts).
 
-**Status:** Phase 18 implemented; Phases 19–22 planned.  
-**Context:** Assessment of current tooling — prefixing works for metadata; Phases 19+ still need connection references, security roles in-solution, prefix-aware flows/docs, and shared-env CI wrappers.
+**Status:** Phases 18–19 implemented; Phases 20–22 planned.  
+**Context:** Publisher/solution scaffolding and connection-reference / env-var ALM are in place. Phases 20+ still need security roles in-solution, prefix-aware flows/docs, and shared-env CI wrappers.
 
 **Preceding app roadmaps:** [`remediation-roadmap.md`](./remediation-roadmap.md) (0–8), [`post-phase-8-review-roadmap.md`](./post-phase-8-review-roadmap.md) (9–13), [`post-phase-13-review-roadmap.md`](./post-phase-13-review-roadmap.md) (14–17).
 
@@ -82,40 +82,22 @@ Plan to close the gaps between today’s **generate → optional Web API apply**
 
 ## Phase 19 — Connection references & environment variable ALM
 
+**Status:** Implemented.
+
 **Goal:** Shared environments get solution-scoped connection references and env vars; `pa-connect.sh` binds rather than invents the ALM story.
 
-### Work
+### Delivered
 
-1. **Connection reference model**
-   - Extend connection profile (or generated plan) with named connection references for SharePoint (and Dataverse where needed).
-   - Generate connection-reference metadata into the solution (logical names prefixed or solution-unique).
-   - Document how adopters bind a real connection to each reference per environment.
-
-2. **Evolve `pa-connect-commands.ts`**
-   - Prefer: ensure connection → create/update connection reference in solution → `pa app add data-source` against the reference.
-   - Keep a “legacy direct connection” fallback behind a flag for local play.
-
-3. **Environment variables**
-   - Create env var **definitions** as solution components (already POSTed today — add solution membership).
-   - Emit per-environment **current value** guidance (or optional apply of values from profile) without baking secrets into git.
-   - Align runtime docs: hosted apps read `{prefix}_SharePointSiteUrl` etc., not hardcoded `dr_*`.
-
-4. **Idempotent env var ensure**
-   - GET-before-POST (or list-by-schemaname) like entities, not error-string matching alone.
+1. **Connection reference model** — `{prefix}_sharepoint` / `{prefix}_dataverse` (overridable); `connection-references.json`; Web API ensure + solution association on `--into-solution`.
+2. **`pa-connect` bind-to-ref** — default script binds CONNECTION_ID to the solution reference; `legacyDirectConnection` for scratch.
+3. **Environment variables** — definitions as solution components (type 380); `environment-variable-values.md` for per-env current values; runtime docs use `{prefix}_*`.
+4. **Idempotent ensure** — GET-before-POST by `schemaname` / `connectionreferencelogicalname`.
 
 ### Exit criteria
 
-- Generated solution path includes connection references + env var definitions.
-- SUMMARY no longer tells shared-env adopters that raw `pa connection create` is the primary wiring story.
-- Env var ensure is idempotent without relying solely on duplicate-error heuristics.
-
-### PR slicing
-
-| PR  | Focus                                         |
-| --- | --------------------------------------------- |
-| 19a | Connection reference schema + generation      |
-| 19b | `pa-connect` bind-to-ref flow                 |
-| 19c | Env var solution membership + GET-before-POST |
+- [x] Generated solution path includes connection references + env var definitions.
+- [x] SUMMARY no longer tells shared-env adopters that raw `pa connection create` is the primary wiring story.
+- [x] Env var ensure is idempotent without relying solely on duplicate-error heuristics.
 
 ---
 
@@ -269,14 +251,14 @@ Phases 20 and 21 may proceed in parallel after 18c lands solution membership hoo
 
 ## Relationship to current code
 
-| Today                                                                | After this roadmap                                              |
-| -------------------------------------------------------------------- | --------------------------------------------------------------- |
-| `pnpm provision` generates Web API plan + ALM manifest + pack guides | Same foundation; Phases 19+ add connection refs / roles / flows |
-| `pnpm provision:apply` gated; `provision:solution` preferred         | Scratch unmanaged vs solution-first dual path (Phase 18 done)   |
-| `solution` / `publisher.uniqueName` drive ensure/pack artifacts      | Connection refs + roles + flows still to follow                 |
-| Prefix stamps logical names + publisher ownership check              | Keep; extend to flows/docs in Phase 21                          |
-| Roles in markdown                                                    | Privilege templates in the solution                             |
-| Flow stubs with `dr_*`                                               | Generated prefix-correct flows (+ optional solution package)    |
+| Today                                                                                  | After this roadmap                                            |
+| -------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `pnpm provision` generates Web API plan + ALM manifest + connection refs + pack guides | Same foundation; Phases 20+ add roles / flows                 |
+| `pnpm provision:apply` gated; `provision:solution` preferred                           | Scratch unmanaged vs solution-first dual path (Phase 18 done) |
+| Connection refs + env var defs are solution-scoped; `pa-connect` binds to refs         | Roles + flows still to follow                                 |
+| Prefix stamps logical names + publisher ownership check                                | Keep; extend to flows/docs in Phase 21                        |
+| Roles in markdown                                                                      | Privilege templates in the solution                           |
+| Flow stubs with `dr_*`                                                                 | Generated prefix-correct flows (+ optional solution package)  |
 
 ---
 

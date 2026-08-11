@@ -15,7 +15,9 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { loadConnectionProfile } from '../src/provisioning/connection-config.ts';
 import {
+	addPlanConnectionReferencesToSolution,
 	addPlanEntitiesToSolution,
+	addPlanEnvironmentVariablesToSolution,
 	ensurePublisherAndSolution,
 	isUnmanagedApplyAllowed,
 	PublisherCollisionError,
@@ -208,7 +210,11 @@ export async function runProvision(argv: string[]): Promise<number> {
 	}
 
 	console.log(`Applying plan to ${artifacts.plan.apiRoot} …`);
-	const result = await applyDataversePlan(artifacts.plan, token);
+	const result = await applyDataversePlan(artifacts.plan, token, {
+		solutionUniqueName: flags.intoSolution
+			? profile.solution.uniqueName
+			: undefined,
+	});
 	console.log(
 		`Apply finished: ${result.applied} applied, ${result.skipped} skipped, `
 		+ `${result.failed.length} failed`,
@@ -228,13 +234,45 @@ export async function runProvision(argv: string[]): Promise<number> {
 			token,
 		);
 		console.log(
-			`Solution components: added ${addResult.added.length}, `
+			`Solution tables: added ${addResult.added.length}, `
 			+ `skipped ${addResult.skipped.length}, failed ${addResult.failed.length}`,
 		);
 		for (const failure of addResult.failed) {
 			console.error(` - FAIL add ${failure.table}: ${failure.error}`);
 		}
 		if (addResult.failed.length > 0) {
+			return 1;
+		}
+
+		const envResult = await addPlanEnvironmentVariablesToSolution(
+			artifacts.plan.apiRoot,
+			profile,
+			artifacts.plan.environmentVariableSchemaNames,
+			token,
+		);
+		console.log(
+			`Solution env vars: added ${envResult.added.length}, failed ${envResult.failed.length}`,
+		);
+		for (const failure of envResult.failed) {
+			console.error(` - FAIL add ${failure.schemaName}: ${failure.error}`);
+		}
+		if (envResult.failed.length > 0) {
+			return 1;
+		}
+
+		const refResult = await addPlanConnectionReferencesToSolution(
+			artifacts.plan.apiRoot,
+			profile,
+			artifacts.plan.connectionReferences.map((item) => item.logicalName),
+			token,
+		);
+		console.log(
+			`Solution connection refs: added ${refResult.added.length}, failed ${refResult.failed.length}`,
+		);
+		for (const failure of refResult.failed) {
+			console.error(` - FAIL add ${failure.logicalName}: ${failure.error}`);
+		}
+		if (refResult.failed.length > 0) {
 			return 1;
 		}
 	}
