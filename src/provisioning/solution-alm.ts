@@ -8,6 +8,8 @@ import { assertSafeCliToken, shellQuote } from './shell-quote.ts';
 
 /** Dataverse solution component type for entities. */
 export const SOLUTION_COMPONENT_ENTITY = 1;
+/** Dataverse solution component type for environment variable definitions. */
+export const SOLUTION_COMPONENT_ENVIRONMENT_VARIABLE = 380;
 
 export interface AlmManifest {
 	publisher: {
@@ -25,6 +27,13 @@ export interface AlmManifest {
 	dataverseEnvironmentUrl: string;
 	apiRoot: string;
 	tableLogicalNames: string[];
+	environmentVariableSchemaNames: string[];
+	connectionReferences: Array<{
+		purpose: string;
+		logicalName: string;
+		displayName: string;
+		connectorId: string;
+	}>;
 	preferredPath: 'solution';
 	unmanagedApply: {
 		allowedByProfile: boolean;
@@ -107,6 +116,13 @@ export function buildAlmManifest(
 		dataverseEnvironmentUrl: profile.dataverse.environmentUrl.replace(/\/$/, ''),
 		apiRoot: plan.apiRoot,
 		tableLogicalNames: [...plan.tableLogicalNames],
+		environmentVariableSchemaNames: [...plan.environmentVariableSchemaNames],
+		connectionReferences: plan.connectionReferences.map((item) => ({
+			purpose: item.purpose,
+			logicalName: item.logicalName,
+			displayName: item.displayName,
+			connectorId: item.connectorId,
+		})),
 		preferredPath: 'solution',
 		unmanagedApply: {
 			allowedByProfile: Boolean(profile.allowUnmanagedApply),
@@ -144,12 +160,25 @@ export function renderSolutionPackMarkdown(manifest: AlmManifest): string {
 		'',
 		...manifest.tableLogicalNames.map((name) => `- \`${name}\``),
 		'',
+		'## Environment variables',
+		'',
+		...manifest.environmentVariableSchemaNames.map((name) => `- \`${name}\``),
+		'',
+		'## Connection references',
+		'',
+		...manifest.connectionReferences.map(
+			(item) =>
+				`- \`${item.logicalName}\` (${item.purpose}, connector \`${item.connectorId}\`)`,
+		),
+		'',
 		'## Steps',
 		'',
 		'1. Run `pnpm provision:solution` with `DATAVERSE_ACCESS_TOKEN` to **ensure** the publisher and unmanaged solution (prefix collision fails closed).',
-		'2. Create or import schema components into that solution (Web API apply with `--into-solution`, or PAC / maker portal).',
-		'3. Export unmanaged from a dev environment, then pack **managed** for shared test/prod.',
-		'4. Bind connection references and assign security roles (Phases 19–20).',
+		'2. Create or import schema components into that solution (`pnpm provision:apply -- --into-solution`, or PAC / maker portal).',
+		'3. Bind real connections to the connection references per environment (see `pa-connect.sh` and maker portal).',
+		'4. Set per-environment **current values** for env vars using `environment-variable-values.md` (do not commit secrets).',
+		'5. Export unmanaged from a dev environment, then pack **managed** for shared test/prod.',
+		'6. Assign security roles (Phase 20).',
 		'',
 		'## PAC / CLI sketches',
 		'',
@@ -537,6 +566,267 @@ export async function addPlanEntitiesToSolution(
 	}
 
 	return { added, skipped, failed };
+}
+
+/**
+ * Fetches an environment variable definition id by schemaname.
+ */
+export async function fetchEnvironmentVariableDefinitionId(
+	apiRoot: string,
+	schemaName: string,
+	accessToken: string,
+	fetchImpl: typeof fetch = fetch,
+): Promise<string> {
+	const filter = encodeURIComponent(
+		`schemaname eq '${schemaName.replace(/'/g, '\'\'')}'`,
+	);
+	const url
+		= `${apiRoot}/environmentvariabledefinitions`
+			+ `?$select=environmentvariabledefinitionid,schemaname&$filter=${filter}`;
+	const response = await fetchImpl(url, { headers: odataHeaders(accessToken) });
+	if (!response.ok) {
+		const text = await response.text();
+		throw new Error(
+			`Failed to query environment variable ${schemaName}: HTTP ${response.status}: ${text.slice(0, 400)}`,
+		);
+	}
+	const payload = (await response.json()) as {
+		value?: Array<{ environmentvariabledefinitionid?: string }>;
+	};
+	const id = payload.value?.[0]?.environmentvariabledefinitionid;
+	if (!id) {
+		throw new Error(`Environment variable ${schemaName} not found`);
+	}
+	return id;
+}
+
+/**
+ * Adds an environment variable definition to the unmanaged solution.
+ */
+export async function addEnvironmentVariableToSolution(
+	apiRoot: string,
+	solutionUniqueName: string,
+	definitionId: string,
+	accessToken: string,
+	fetchImpl: typeof fetch = fetch,
+): Promise<void> {
+	const response = await fetchImpl(`${apiRoot}/AddSolutionComponent`, {
+		method: 'POST',
+		headers: odataHeaders(accessToken),
+		body: JSON.stringify({
+			ComponentId: definitionId,
+			ComponentType: SOLUTION_COMPONENT_ENVIRONMENT_VARIABLE,
+			SolutionUniqueName: solutionUniqueName,
+			AddRequiredComponents: false,
+			DoNotIncludeSubcomponents: false,
+		}),
+	});
+	if (!response.ok) {
+		const text = await response.text();
+		if (isAlreadySolutionComponent(response.status, text)) {
+			return;
+		}
+		throw new Error(
+			`AddSolutionComponent failed for env var ${definitionId}: HTTP ${response.status}: ${text.slice(0, 400)}`,
+		);
+	}
+}
+
+/**
+ * Adds each planned environment variable definition to the solution.
+ */
+export async function addPlanEnvironmentVariablesToSolution(
+	apiRoot: string,
+	profile: ConnectionProfile,
+	schemaNames: string[],
+	accessToken: string,
+	fetchImpl: typeof fetch = fetch,
+): Promise<{ added: string[]; failed: Array<{ schemaName: string; error: string }> }> {
+	const added: string[] = [];
+	const failed: Array<{ schemaName: string; error: string }> = [];
+
+	for (const schemaName of schemaNames) {
+		try {
+			const id = await fetchEnvironmentVariableDefinitionId(
+				apiRoot,
+				schemaName,
+				accessToken,
+				fetchImpl,
+			);
+			await addEnvironmentVariableToSolution(
+				apiRoot,
+				profile.solution.uniqueName,
+				id,
+				accessToken,
+				fetchImpl,
+			);
+			added.push(schemaName);
+		}
+		catch(error) {
+			failed.push({
+				schemaName,
+				error: error instanceof Error ? error.message : String(error),
+			});
+		}
+	}
+
+	return { added, failed };
+}
+
+/**
+ * Fetches a connection reference by logical name (id + fields needed for a non-empty PATCH).
+ */
+export async function fetchConnectionReference(
+	apiRoot: string,
+	logicalName: string,
+	accessToken: string,
+	fetchImpl: typeof fetch = fetch,
+): Promise<{
+	connectionreferenceid: string;
+	connectionreferencedisplayname: string;
+	description?: string;
+}> {
+	const filter = encodeURIComponent(
+		`connectionreferencelogicalname eq '${logicalName.replace(/'/g, '\'\'')}'`,
+	);
+	const url
+		= `${apiRoot}/connectionreferences`
+			+ `?$select=connectionreferenceid,connectionreferencelogicalname,`
+			+ `connectionreferencedisplayname,description&$filter=${filter}`;
+	const response = await fetchImpl(url, { headers: odataHeaders(accessToken) });
+	if (!response.ok) {
+		const text = await response.text();
+		throw new Error(
+			`Failed to query connection reference ${logicalName}: HTTP ${response.status}: ${text.slice(0, 400)}`,
+		);
+	}
+	const payload = (await response.json()) as {
+		value?: Array<{
+			connectionreferenceid?: string;
+			connectionreferencedisplayname?: string;
+			description?: string;
+		}>;
+	};
+	const row = payload.value?.[0];
+	const id = row?.connectionreferenceid;
+	if (!id) {
+		throw new Error(`Connection reference ${logicalName} not found`);
+	}
+	return {
+		connectionreferenceid: id,
+		connectionreferencedisplayname:
+			row.connectionreferencedisplayname?.trim() || logicalName,
+		description: row.description,
+	};
+}
+
+/**
+ * Fetches a connection reference id by logical name.
+ */
+export async function fetchConnectionReferenceId(
+	apiRoot: string,
+	logicalName: string,
+	accessToken: string,
+	fetchImpl: typeof fetch = fetch,
+): Promise<string> {
+	const record = await fetchConnectionReference(
+		apiRoot,
+		logicalName,
+		accessToken,
+		fetchImpl,
+	);
+	return record.connectionreferenceid;
+}
+
+/**
+ * Associates an existing connection reference with the unmanaged solution via solution header.
+ * Dataverse rejects empty PATCH bodies, so we re-assert display name (no-op update) with
+ * `MSCRM.SolutionUniqueName` — the documented way to add solution-aware data rows.
+ */
+export async function associateConnectionReferenceWithSolution(
+	apiRoot: string,
+	connectionReferenceId: string,
+	solutionUniqueName: string,
+	accessToken: string,
+	patchFields: {
+		connectionreferencedisplayname: string;
+		description?: string;
+	},
+	fetchImpl: typeof fetch = fetch,
+): Promise<void> {
+	const body: Record<string, string> = {
+		connectionreferencedisplayname: patchFields.connectionreferencedisplayname,
+	};
+	if (patchFields.description != null) {
+		body.description = patchFields.description;
+	}
+	const response = await fetchImpl(
+		`${apiRoot}/connectionreferences(${connectionReferenceId})`,
+		{
+			method: 'PATCH',
+			headers: {
+				...odataHeaders(accessToken),
+				'MSCRM.SolutionUniqueName': solutionUniqueName,
+				'If-Match': '*',
+			},
+			body: JSON.stringify(body),
+		},
+	);
+	if (!response.ok) {
+		const text = await response.text();
+		if (isAlreadySolutionComponent(response.status, text)) {
+			return;
+		}
+		throw new Error(
+			`Failed to associate connection reference ${connectionReferenceId} with solution `
+			+ `${solutionUniqueName}: HTTP ${response.status}: ${text.slice(0, 400)}`,
+		);
+	}
+}
+
+/**
+ * Ensures each planned connection reference is associated with the profile solution.
+ */
+export async function addPlanConnectionReferencesToSolution(
+	apiRoot: string,
+	profile: ConnectionProfile,
+	logicalNames: string[],
+	accessToken: string,
+	fetchImpl: typeof fetch = fetch,
+): Promise<{ added: string[]; failed: Array<{ logicalName: string; error: string }> }> {
+	const added: string[] = [];
+	const failed: Array<{ logicalName: string; error: string }> = [];
+
+	for (const logicalName of logicalNames) {
+		try {
+			const record = await fetchConnectionReference(
+				apiRoot,
+				logicalName,
+				accessToken,
+				fetchImpl,
+			);
+			await associateConnectionReferenceWithSolution(
+				apiRoot,
+				record.connectionreferenceid,
+				profile.solution.uniqueName,
+				accessToken,
+				{
+					connectionreferencedisplayname: record.connectionreferencedisplayname,
+					description: record.description,
+				},
+				fetchImpl,
+			);
+			added.push(logicalName);
+		}
+		catch(error) {
+			failed.push({
+				logicalName,
+				error: error instanceof Error ? error.message : String(error),
+			});
+		}
+	}
+
+	return { added, failed };
 }
 
 /**

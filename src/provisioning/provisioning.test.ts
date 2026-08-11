@@ -341,13 +341,21 @@ describe('writeProvisionArtifacts', () => {
 		expect(result.files.some((file) => file.endsWith('alm-manifest.json'))).toBe(true);
 		expect(result.files.some((file) => file.endsWith('solution-pack.md'))).toBe(true);
 		expect(result.files.some((file) => file.endsWith('solution-pack.sh'))).toBe(true);
+		expect(result.files.some((file) => file.endsWith('connection-references.json'))).toBe(true);
+		expect(result.files.some((file) => file.endsWith('environment-variable-values.md'))).toBe(true);
 		const summary = readFileSync(join(dir, 'SUMMARY.md'), 'utf8');
 		expect(summary).toContain('docrouting');
 		expect(summary).toContain('DocumentRouting');
 		expect(summary).toContain('pnpm provision:solution');
+		expect(summary).toContain('dr_sharepoint');
+		expect(summary).toMatch(/connection reference/i);
+		expect(summary).not.toMatch(/connection references arrive in Phase 19/i);
 		const manifest = JSON.parse(readFileSync(join(dir, 'alm-manifest.json'), 'utf8'));
 		expect(manifest.publisher.uniqueName).toBe('docrouting');
 		expect(manifest.preferredPath).toBe('solution');
+		expect(manifest.connectionReferences[0].logicalName).toBe('dr_sharepoint');
+		const paConnect = readFileSync(join(dir, 'pa-connect.sh'), 'utf8');
+		expect(paConnect).toMatch(/connection reference/i);
 	});
 });
 
@@ -440,5 +448,68 @@ describe('applyDataversePlan', () => {
 
 		expect(result.failed.length).toBeGreaterThan(0);
 		expect(result.failed.some((item) => /expects string|Integer/i.test(item.error))).toBe(true);
+	});
+
+	it('skips existing environment variables via GET-before-POST', async() => {
+		const profile = sampleProfile();
+		const plan = buildDataverseProvisionPlan(profile);
+		const envRequest = plan.requests.find((request) => request.kind === 'environmentvariable');
+		expect(envRequest).toBeTruthy();
+		const schemaName = String(
+			(envRequest!.body as { schemaname?: string }).schemaname ?? '',
+		);
+
+		const result = await applyDataversePlan(
+			{ ...plan, requests: [envRequest!] },
+			'token',
+			async(url, init) => {
+				if (String(url).includes('environmentvariabledefinitions?') && !init?.method) {
+					return new Response(
+						JSON.stringify({
+							value: [{ environmentvariabledefinitionid: 'ev-1', schemaname: schemaName }],
+						}),
+						{ status: 200, headers: { 'Content-Type': 'application/json' } },
+					);
+				}
+				return new Response('should not POST', { status: 500 });
+			},
+		);
+
+		expect(result.applied).toBe(0);
+		expect(result.skipped).toBe(1);
+		expect(result.failed).toHaveLength(0);
+	});
+
+	it('sends MSCRM.SolutionUniqueName when creating connection references into a solution', async() => {
+		const profile = sampleProfile();
+		const plan = buildDataverseProvisionPlan(profile);
+		const refRequest = plan.requests.find((request) => request.kind === 'connectionreference');
+		expect(refRequest).toBeTruthy();
+		let sawSolutionHeader = false;
+
+		const result = await applyDataversePlan(
+			{ ...plan, requests: [refRequest!] },
+			'token',
+			{
+				solutionUniqueName: 'DocumentRouting',
+				fetchImpl: async(url, init) => {
+					if (String(url).includes('connectionreferences?') && !init?.method) {
+						return new Response(JSON.stringify({ value: [] }), {
+							status: 200,
+							headers: { 'Content-Type': 'application/json' },
+						});
+					}
+					if (init?.method === 'POST') {
+						const headers = init.headers as Record<string, string>;
+						sawSolutionHeader = headers['MSCRM.SolutionUniqueName'] === 'DocumentRouting';
+						return new Response(null, { status: 204 });
+					}
+					return new Response('unexpected', { status: 500 });
+				},
+			},
+		);
+
+		expect(result.applied).toBe(1);
+		expect(sawSolutionHeader).toBe(true);
 	});
 });

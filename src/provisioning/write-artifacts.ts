@@ -59,8 +59,53 @@ export function emptyProvisionPlan(): DataverseProvisionPlan {
 		schema: { tables: [], environmentVariables: [] },
 		requests: [],
 		environmentVariableDefaults: {},
+		environmentVariableSchemaNames: [],
+		connectionReferences: [],
 		tableLogicalNames: [],
 	};
+}
+
+export interface ApplyPlanOptions {
+	/** When set, associate env vars / connection refs with this unmanaged solution on create. */
+	solutionUniqueName?: string;
+	fetchImpl?: typeof fetch;
+}
+
+/**
+ * Renders per-environment current-value guidance (no secrets committed).
+ */
+export function renderEnvironmentVariableValuesGuide(
+	plan: DataverseProvisionPlan,
+): string {
+	const rows = plan.environmentVariableSchemaNames.map((schemaName) => {
+		const seeded = plan.environmentVariableDefaults[schemaName] ?? '';
+		const hint = seeded
+			? `dev default seeded from profile (review before promoting): \`${seeded}\``
+			: 'no profile default — set explicitly per environment';
+		return `- \`${schemaName}\` — ${hint}`;
+	});
+	return [
+		'# Environment variable current values',
+		'',
+		'Definitions are solution components. **Current values** are environment-specific — do not commit secrets to git.',
+		'',
+		'Hosted Code Apps should read these Dataverse / Power Platform environment variables (prefix from your publisher), not hardcoded `dr_*`.',
+		'',
+		'## Definitions in this plan',
+		'',
+		...rows,
+		'',
+		'## Per environment',
+		'',
+		'1. After importing the managed solution (or ensuring defs via `--into-solution`), open **Solutions → Environment variables** (or use Web API `environmentvariablevalues`).',
+		'2. Set the **current value** for each schema name above to match that environment’s SharePoint site, API host, and Dataverse URL.',
+		'3. Prefer current value over baking production URLs into `defaultvalue` on the definition.',
+		'',
+		'## Local Vite',
+		'',
+		'Use `app.env.example` / `VITE_*` for local mock only. Runtime injection uses `window.__DOCUMENT_ROUTING_ENV__` mapped from these env vars.',
+		'',
+	].join('\n');
 }
 
 /**
@@ -112,6 +157,8 @@ export function writeProvisionArtifacts(
 		'dataverse-webapi-plan.json',
 		'dataverse-schema.json',
 		'environment-variable-defaults.json',
+		'environment-variable-values.md',
+		'connection-references.json',
 		'control-seed.json',
 		'alm-manifest.json',
 		'solution-pack.md',
@@ -130,6 +177,8 @@ export function writeProvisionArtifacts(
 					prefix: plan.prefix,
 					tableLogicalNames: plan.tableLogicalNames,
 					environmentVariableDefaults: plan.environmentVariableDefaults,
+					environmentVariableSchemaNames: plan.environmentVariableSchemaNames,
+					connectionReferences: plan.connectionReferences,
 					requests: plan.requests,
 				},
 				null,
@@ -140,6 +189,14 @@ export function writeProvisionArtifacts(
 		write(
 			'environment-variable-defaults.json',
 			`${JSON.stringify(plan.environmentVariableDefaults, null, 2)}\n`,
+		);
+		write(
+			'environment-variable-values.md',
+			renderEnvironmentVariableValuesGuide(plan),
+		);
+		write(
+			'connection-references.json',
+			`${JSON.stringify(plan.connectionReferences, null, 2)}\n`,
 		);
 		write('control-seed.json', `${JSON.stringify(seed, null, 2)}\n`);
 		write('alm-manifest.json', `${JSON.stringify(almManifest, null, 2)}\n`);
@@ -158,6 +215,9 @@ export function writeProvisionArtifacts(
 				'',
 			].join('\n'),
 		);
+		const sharePointRef = plan.connectionReferences.find(
+			(item) => item.purpose === 'sharepoint',
+		);
 		write(
 			'SUMMARY.md',
 			[
@@ -174,11 +234,25 @@ export function writeProvisionArtifacts(
 				`- Solution version: \`${profile.solution.version}\``,
 				`- Preferred path: **solution** (\`pnpm provision:solution\`)`,
 				`- Unmanaged apply allowed by profile: \`${Boolean(profile.allowUnmanagedApply)}\``,
+				`- Legacy direct pa-connect: \`${Boolean(profile.legacyDirectConnection)}\``,
 				'',
 				`Dataverse Web API root: \`${plan.apiRoot}\``,
 				'',
 				'## Tables',
 				...plan.tableLogicalNames.map((name) => `- \`${name}\``),
+				'',
+				'## Connection references',
+				'',
+				...plan.connectionReferences.map(
+					(item) =>
+						`- \`${item.logicalName}\` (${item.purpose}, \`${item.connectorId}\`)`,
+				),
+				'',
+				'## Environment variables',
+				'',
+				...plan.environmentVariableSchemaNames.map((name) => `- \`${name}\``),
+				'',
+				'See `environment-variable-values.md` for per-environment current-value guidance (do not commit secrets).',
 				'',
 				'## Control seed',
 				'',
@@ -188,16 +262,17 @@ export function writeProvisionArtifacts(
 				'## Next steps (shared environments)',
 				'',
 				'1. Run `DATAVERSE_ACCESS_TOKEN=… pnpm provision:solution` to ensure publisher ownership + unmanaged solution (prefix collisions fail closed).',
-				'2. Follow `solution-pack.md` / `solution-pack.sh` to add components, export, and import managed into shared test/prod.',
-				'3. Review and run `pa-connect.sh` (replace `CONNECTION_ID`) to attach Code App data sources (connection references arrive in Phase 19).',
-				`4. Prefer Dataverse environment variables (\`${envVarPattern}\`) in hosted apps; use \`app.env.example\` for local Vite only.`,
+				'2. Run `pnpm provision:apply -- --into-solution` (or pack/import) so tables, env var definitions, and connection references land in the solution.',
+				`3. Bind a real SharePoint connection to \`${sharePointRef?.logicalName ?? `${plan.prefix}_sharepoint`}\`, then review \`pa-connect.sh\` for Code App data sources.`,
+				`4. Set env var **current values** per environment (\`${envVarPattern}\`); use \`app.env.example\` for local Vite only.`,
 				'5. Load control seed via Admin UI (or opt-in import) then remove sample identities.',
 				'',
 				'## Scratch / unmanaged apply (avoid in shared orgs)',
 				'',
 				'Direct Web API apply creates **unmanaged metadata outside a solution**.',
 				'Only use `pnpm provision:apply --unmanaged-ok` (or set `allowUnmanagedApply: true` in the profile) for personal/dev scratch environments.',
-				'To apply metadata and add tables into the profile solution instead, use `pnpm provision:apply --into-solution`.',
+				'Set `legacyDirectConnection: true` only when you intentionally want connection-id wiring without connection references.',
+				'To apply metadata and add components into the profile solution instead, use `pnpm provision:apply --into-solution`.',
 				'',
 				validationWarnings.length
 					? `## Warnings\n\n${validationWarnings.map((item) => `- ${item}`).join('\n')}\n`
@@ -226,13 +301,20 @@ export function writeProvisionArtifacts(
 
 /**
  * Applies a Web API plan using a bearer token.
- * Existing tables are attribute-diffed; only documented duplicate conditions skip.
+ * Existing tables are attribute-diffed; env vars / connection refs use GET-before-POST.
+ * When `solutionUniqueName` is set, env var and connection reference creates include
+ * the `MSCRM.SolutionUniqueName` header.
  */
 export async function applyDataversePlan(
 	plan: DataverseProvisionPlan,
 	accessToken: string,
-	fetchImpl: typeof fetch = fetch,
+	fetchImplOrOptions: typeof fetch | ApplyPlanOptions = fetch,
 ): Promise<ApplyResult> {
+	const options: ApplyPlanOptions
+		= typeof fetchImplOrOptions === 'function'
+			? { fetchImpl: fetchImplOrOptions }
+			: fetchImplOrOptions;
+	const fetchImpl = options.fetchImpl ?? fetch;
 	const result: ApplyResult = { applied: 0, skipped: 0, failed: [] };
 	const existingEntities = new Set<string>();
 
@@ -244,6 +326,7 @@ export async function applyDataversePlan(
 				accessToken,
 				fetchImpl,
 				existingEntities,
+				options.solutionUniqueName,
 			);
 			if (outcome === 'applied') {
 				result.applied += 1;
@@ -269,8 +352,9 @@ async function executePlanRequest(
 	accessToken: string,
 	fetchImpl: typeof fetch,
 	existingEntities: Set<string>,
+	solutionUniqueName?: string,
 ): Promise<'applied' | 'skipped'> {
-	const headers = {
+	const headers: Record<string, string> = {
 		'Authorization': `Bearer ${accessToken}`,
 		'Accept': 'application/json',
 		'Content-Type': 'application/json; charset=utf-8',
@@ -333,6 +417,72 @@ async function executePlanRequest(
 		if (existing.ok) {
 			return 'skipped';
 		}
+	}
+
+	if (request.kind === 'environmentvariable' && request.skipIfExists) {
+		const schemaName
+			= request.componentSchemaName
+				?? String((request.body as { schemaname?: string }).schemaname ?? '');
+		if (schemaName) {
+			const filter = encodeURIComponent(
+				`schemaname eq '${schemaName.replace(/'/g, '\'\'')}'`,
+			);
+			const existing = await fetchImpl(
+				`${apiRoot}/environmentvariabledefinitions?$select=environmentvariabledefinitionid,schemaname&$filter=${filter}`,
+				{
+					headers: {
+						'Authorization': headers.Authorization,
+						'Accept': headers.Accept,
+						'OData-MaxVersion': '4.0',
+						'OData-Version': '4.0',
+					},
+				},
+			);
+			if (existing.ok) {
+				const payload = (await existing.json()) as { value?: unknown[] };
+				if ((payload.value?.length ?? 0) > 0) {
+					return 'skipped';
+				}
+			}
+		}
+	}
+
+	if (request.kind === 'connectionreference' && request.skipIfExists) {
+		const logicalName
+			= request.componentSchemaName
+				?? String(
+					(request.body as { connectionreferencelogicalname?: string })
+						.connectionreferencelogicalname ?? '',
+				);
+		if (logicalName) {
+			const filter = encodeURIComponent(
+				`connectionreferencelogicalname eq '${logicalName.replace(/'/g, '\'\'')}'`,
+			);
+			const existing = await fetchImpl(
+				`${apiRoot}/connectionreferences?$select=connectionreferenceid,connectionreferencelogicalname&$filter=${filter}`,
+				{
+					headers: {
+						'Authorization': headers.Authorization,
+						'Accept': headers.Accept,
+						'OData-MaxVersion': '4.0',
+						'OData-Version': '4.0',
+					},
+				},
+			);
+			if (existing.ok) {
+				const payload = (await existing.json()) as { value?: unknown[] };
+				if ((payload.value?.length ?? 0) > 0) {
+					return 'skipped';
+				}
+			}
+		}
+	}
+
+	if (
+		solutionUniqueName
+		&& (request.kind === 'environmentvariable' || request.kind === 'connectionreference')
+	) {
+		headers['MSCRM.SolutionUniqueName'] = solutionUniqueName;
 	}
 
 	const response = await fetchImpl(`${apiRoot}${request.path}`, {

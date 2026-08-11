@@ -32,6 +32,7 @@
 		"Copy this file to deploy/connections.json and replace REPLACE_ME / example hosts.",
 		"All URLs are free-form HTTPS endpoints — vanity SharePoint hosts, custom Dataverse domains, and private API hosts are supported.",
 		"Do not assume *.sharepoint.com or *.dynamics.com; use the hostnames your tenant actually serves.",
-		"Prefer pnpm provision:solution (publisher + solution ensure). Scratch unmanaged apply needs allowUnmanagedApply or --unmanaged-ok."
+		"Prefer pnpm provision:solution (publisher + solution ensure). Scratch unmanaged apply needs allowUnmanagedApply or --unmanaged-ok.",
+		"Connection references default to {prefix}_sharepoint and {prefix}_dataverse; override under connectionReferences. Use legacyDirectConnection only for scratch pa-connect wiring."
 	]
 }

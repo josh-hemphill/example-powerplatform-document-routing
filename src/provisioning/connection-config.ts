@@ -43,6 +43,18 @@ export interface ApiConnectionConfig {
 	baseUrl: string;
 }
 
+export interface ConnectionReferenceOverride {
+	logicalName?: string;
+	displayName?: string;
+	connectorId?: string;
+}
+
+export interface ConnectionReferencesConfig {
+	sharePoint?: ConnectionReferenceOverride;
+	/** Set false to omit the default Dataverse connection reference. */
+	dataverse?: ConnectionReferenceOverride | false;
+}
+
 export interface ConnectionProfile {
 	publisher: PublisherConfig;
 	solution: SolutionConfig;
@@ -51,10 +63,20 @@ export interface ConnectionProfile {
 	sharePoint: SharePointConnectionConfig;
 	api: ApiConnectionConfig;
 	/**
+	 * Optional overrides for generated connection reference logical names / connectors.
+	 * Defaults: `{prefix}_sharepoint`, `{prefix}_dataverse`.
+	 */
+	connectionReferences?: ConnectionReferencesConfig;
+	/**
 	 * When true, `pnpm provision:apply` may run without `--unmanaged-ok`.
 	 * Shared environments should leave this unset/false and use `provision:solution`.
 	 */
 	allowUnmanagedApply?: boolean;
+	/**
+	 * When true, generated `pa-connect.sh` uses legacy direct `pa connection create`
+	 * + `--connection-id` wiring instead of the connection-reference bind path.
+	 */
+	legacyDirectConnection?: boolean;
 	notes?: string[];
 }
 

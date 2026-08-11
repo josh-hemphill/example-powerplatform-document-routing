@@ -1,5 +1,10 @@
 import type { ConnectionProfile } from './connection-config.ts';
+import type { ConnectionReferencePlan } from './connection-references.ts';
 import type { DataverseColumnDefinition, DataverseSchema, DataverseTableDefinition } from './dataverse-schema.ts';
+import {
+	buildConnectionReferencePlans,
+	connectionReferenceCreateBody,
+} from './connection-references.ts';
 import { dataverseWebApiRoot } from './connection-urls.ts';
 import {
 	buildDataverseSchema,
@@ -17,7 +22,14 @@ export interface WebApiRequestPlan {
 	/** When set, apply will diff attributes on an existing table instead of skipping entirely. */
 	entityLogicalName?: string;
 	/** Kind of metadata create — drives idempotent apply behavior. */
-	kind?: 'entity' | 'attribute' | 'relationship' | 'environmentvariable';
+	kind?:
+		| 'entity'
+		| 'attribute'
+		| 'relationship'
+		| 'environmentvariable'
+		| 'connectionreference';
+	/** Schema / logical name used for GET-before-POST lookups. */
+	componentSchemaName?: string;
 }
 
 export interface DataverseProvisionPlan {
@@ -26,6 +38,8 @@ export interface DataverseProvisionPlan {
 	schema: DataverseSchema;
 	requests: WebApiRequestPlan[];
 	environmentVariableDefaults: Record<string, string>;
+	environmentVariableSchemaNames: string[];
+	connectionReferences: ConnectionReferencePlan[];
 	tableLogicalNames: string[];
 }
 
@@ -272,11 +286,13 @@ export function buildDataverseProvisionPlan(
 	}
 
 	const environmentVariableDefaults: Record<string, string> = {};
+	const environmentVariableSchemaNames: string[] = [];
 	for (const variable of schema.environmentVariables) {
 		const value = variable.defaultFrom
 			? getByPath(profile, variable.defaultFrom)
 			: '';
 		environmentVariableDefaults[variable.schemaName] = value;
+		environmentVariableSchemaNames.push(variable.schemaName);
 		requests.push({
 			method: 'POST',
 			path: '/environmentvariabledefinitions',
@@ -291,6 +307,20 @@ export function buildDataverseProvisionPlan(
 			},
 			skipIfExists: true,
 			kind: 'environmentvariable',
+			componentSchemaName: variable.schemaName,
+		});
+	}
+
+	const connectionReferences = buildConnectionReferencePlans(profile);
+	for (const reference of connectionReferences) {
+		requests.push({
+			method: 'POST',
+			path: '/connectionreferences',
+			description: `Ensure connection reference ${reference.logicalName}`,
+			body: connectionReferenceCreateBody(reference),
+			skipIfExists: true,
+			kind: 'connectionreference',
+			componentSchemaName: reference.logicalName,
 		});
 	}
 
@@ -300,6 +330,8 @@ export function buildDataverseProvisionPlan(
 		schema,
 		requests,
 		environmentVariableDefaults,
+		environmentVariableSchemaNames,
+		connectionReferences,
 		tableLogicalNames: schema.tables.map((table) =>
 			prefixedLogicalName(prefix, table.schemaName),
 		),
