@@ -1,3 +1,4 @@
+import type { InboxPersona } from '../../config/inbox-personas.ts';
 import type { MockHttpContext } from '../http.ts';
 import type { MockDocumentRecord } from '../seed-documents.ts';
 import { randomUUID } from 'node:crypto';
@@ -7,7 +8,7 @@ import {
 	validateSummary,
 	validateTitle,
 } from '../../api/form-rules.ts';
-import { matchesInboxPersona } from '../../config/inbox-personas.ts';
+import { INBOX_PERSONAS, matchesInboxPersona } from '../../config/inbox-personas.ts';
 import { resolvePrincipalRolesByEmail } from '../../config/local-personas.ts';
 import {
 	canActorAccessDocument,
@@ -21,6 +22,18 @@ import {
 import { pushHistory, toSummary } from '../document-http.ts';
 import { getDocumentStore } from '../document-store.ts';
 import { paginateItems, parseListPagination } from '../list-pagination.ts';
+
+const INBOX_PERSONA_VALUES = new Set<string>(INBOX_PERSONAS.map((item) => item.value));
+
+/**
+ * Parses an inbox persona query value; unknown values fall back to `all`.
+ */
+function parseInboxPersona(raw: string | null): InboxPersona {
+	if (raw && INBOX_PERSONA_VALUES.has(raw)) {
+		return raw as InboxPersona;
+	}
+	return 'all';
+}
 
 export async function handleDocumentRoutes(context: MockHttpContext): Promise<boolean> {
 	const {
@@ -42,7 +55,7 @@ export async function handleDocumentRoutes(context: MockHttpContext): Promise<bo
 		const status = url.searchParams.get('status');
 		const documentType = url.searchParams.get('documentType');
 		const q = url.searchParams.get('q')?.toLowerCase();
-		const persona = url.searchParams.get('persona') ?? 'all';
+		const persona = parseInboxPersona(url.searchParams.get('persona'));
 		const { offset, limit } = parseListPagination(url);
 		const roles = actorRoles.length > 0 ? actorRoles : resolvePrincipalRolesByEmail(actor);
 
@@ -64,9 +77,9 @@ export async function handleDocumentRoutes(context: MockHttpContext): Promise<bo
 				document.title.toLowerCase().includes(q)
 				|| document.freeformRequest.toLowerCase().includes(q));
 		}
-		if (persona && persona !== 'all') {
+		if (persona !== 'all') {
 			records = records.filter((document) =>
-				matchesInboxPersona(toSummary(document), persona as never, actor, roles));
+				matchesInboxPersona(toSummary(document), persona, actor, roles));
 		}
 
 		records.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
