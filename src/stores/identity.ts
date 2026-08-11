@@ -101,18 +101,22 @@ export const useIdentityStore = defineStore('identity', () => {
 	/**
 	 * Loads host context once; subsequent callers await the same promise.
 	 * Failed loads clear the in-flight promise so {@link retryLoad} can run.
+	 * Always prefer an in-flight `loadPromise` over status short-circuit so callers
+	 * never observe hosted identity before role refresh finishes.
 	 */
 	async function ensureLoaded(): Promise<void> {
+		if (loadPromise) {
+			await loadPromise;
+			return;
+		}
 		if (status.value === 'hosted' || status.value === 'standalone') {
 			return;
 		}
-		if (!loadPromise) {
-			loadPromise = loadContext().finally(() => {
-				if (status.value === 'failed') {
-					loadPromise = null;
-				}
-			});
-		}
+		loadPromise = loadContext().finally(() => {
+			if (status.value === 'failed') {
+				loadPromise = null;
+			}
+		});
 		await loadPromise;
 	}
 

@@ -17,6 +17,9 @@ const { confirm } = useConfirmDialog();
 
 const isAdmin = computed(() => identity.hasRole('admin'));
 const rolesUnresolved = computed(() => identity.rolesUnresolved);
+const rolesLoading = computed(
+	() => identity.status === 'hosted' && identity.hostedRolesStatus === 'loading',
+);
 const tab = ref('types');
 const actionError = ref<string | null>(null);
 const actionSuccess = ref<string | null>(null);
@@ -33,7 +36,12 @@ const anyDirty = computed(
 watch(
 	isAdmin,
 	(value) => {
-		if (!value && identity.isReady && !identity.rolesUnresolved) {
+		if (
+			!value
+			&& identity.isReady
+			&& !identity.rolesUnresolved
+			&& identity.hostedRolesStatus !== 'loading'
+		) {
 			void router.replace({ name: 'inbox' });
 		}
 	},
@@ -105,6 +113,15 @@ onBeforeRouteLeave(async() => {
 					Retry roles
 				</v-btn>
 			</div>
+		</v-alert>
+		<v-alert
+			v-else-if="rolesLoading"
+			type="info"
+			variant="tonal"
+			class="mb-4"
+			role="status"
+		>
+			Loading security roles…
 		</v-alert>
 		<v-alert
 			v-else-if="!isAdmin"
