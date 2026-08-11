@@ -2,6 +2,8 @@
 
 Findings from the August 2026 codebase + UI review, after Phases 0–8 of [`remediation-roadmap.md`](./remediation-roadmap.md) were implemented. This document retains **bugs**, **UI/UX gaps**, and **design rationale** so work can be sliced and tracked without losing context.
 
+> **Status:** Phases **9–13** implemented on `main`. Further findings (dirty-state, AuthZ fidelity, performance, UI polish) are tracked in [`post-phase-13-review-roadmap.md`](./post-phase-13-review-roadmap.md) (Phases 14–17).
+
 **Scope:** Mock/API correctness that still matters for hosted semantics, identity/authz hardening, controlled-document edge cases, and enterprise UI polish. Not a rewrite of the Vue shell.
 
 **Suggested order:** Phase 9 → 10 → 11 → 12 → 13. Phases 11–12 can overlap after 9–10 land enough capability flags; Phase 13 is polish and can trail.
