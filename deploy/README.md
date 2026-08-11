@@ -74,6 +74,8 @@ pnpm provision:apply
 
 Dry-run generation never calls the network.
 
+> **Shared environments:** Direct Web API apply creates unmanaged metadata outside a solution. For multi-team orgs, follow the solution-first plan in [`docs/provisioning-alm-roadmap.md`](../docs/provisioning-alm-roadmap.md) (Phases 18–22) once implemented; treat `provision:apply` as scratch/dev until then.
+
 ## Code App data sources
 
 `deploy/generated/pa-connect.sh` emits `pa connection create` / `pa app add data-source` commands. The SharePoint `--dataset` value is your `sharePoint.siteUrl` as-is.
