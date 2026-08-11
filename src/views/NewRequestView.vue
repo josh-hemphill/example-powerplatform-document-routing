@@ -97,7 +97,7 @@ async function submit(): Promise<void> {
 </script>
 
 <template>
-	<v-card class="pa-6">
+	<div>
 		<p class="text-body-2 text-medium-emphasis mb-6">
 			Capture an unstructured request. Requester is the signed-in principal
 			(<strong>{{ context.email ?? '…' }}</strong>). The document type chooses the draft
@@ -109,6 +109,7 @@ async function submit(): Promise<void> {
 			type="error"
 			variant="tonal"
 			class="mb-4"
+			role="alert"
 		>
 			{{ formError }}
 		</v-alert>
@@ -190,5 +191,5 @@ async function submit(): Promise<void> {
 				</v-btn>
 			</div>
 		</v-form>
-	</v-card>
+	</div>
 </template>

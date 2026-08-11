@@ -29,17 +29,18 @@ const emit = defineEmits<{
 			/>
 		</div>
 		<p
-			v-if="expanded"
-			class="markdown-preview mb-0"
-		>
-			{{ freeformRequest }}
-		</p>
-		<p
-			v-else
+			v-if="!expanded"
 			class="text-body-2 text-medium-emphasis mb-0 text-truncate"
 		>
 			{{ freeformRequest }}
 		</p>
+		<v-expand-transition>
+			<div v-if="expanded">
+				<p class="markdown-preview mb-0">
+					{{ freeformRequest }}
+				</p>
+			</div>
+		</v-expand-transition>
 	</v-card>
 </template>
 
@@ -52,5 +53,10 @@ const emit = defineEmits<{
 	text-align: start;
 	color: inherit;
 	font: inherit;
+}
+
+.stage-toggle:focus-visible {
+	outline: 2px solid rgb(var(--v-theme-primary));
+	outline-offset: 2px;
 }
 </style>

@@ -6,6 +6,8 @@ Findings from the August 2026 **fresh** codebase review (bugs, performance, UI/U
 
 **Suggested order:** Phase 14 → 15 → 16 → 17. Phases 16–17 can overlap after 14–15 land dirty-state and AuthZ fixes.
 
+**Status:** Phases **14–17** implemented (see stacked PRs).
+
 **Preceding roadmap:** [`post-phase-8-review-roadmap.md`](./post-phase-8-review-roadmap.md) (Phases 9–13). Historical Phases 0–8: [`remediation-roadmap.md`](./remediation-roadmap.md).
 
 ---
@@ -70,6 +72,8 @@ Findings from the August 2026 **fresh** codebase review (bugs, performance, UI/U
 
 ## Phase 14 — Form state, dirty guards & mutation races
 
+**Status:** Implemented.
+
 **Goal:** Unsaved edits never disappear silently; submit and navigate paths respect draft dirtiness; mutation cache invalidation stays tied to the document that was acted on.
 
 ### Work
@@ -113,6 +117,8 @@ Findings from the August 2026 **fresh** codebase review (bugs, performance, UI/U
 ---
 
 ## Phase 15 — AuthZ fidelity & access edges
+
+**Status:** Implemented.
 
 **Goal:** UI capability flags match server AuthZ; mock derives roles from the actor (not spoofable headers); list/persona filters do not over-expose cases.
 
@@ -159,6 +165,8 @@ Findings from the August 2026 **fresh** codebase review (bugs, performance, UI/U
 
 ## Phase 16 — List & query performance
 
+**Status:** Implemented.
+
 **Goal:** Typing and scrolling stay responsive at hundreds of documents; network and main-thread work scale with page size, not full store size.
 
 ### Work
@@ -200,6 +208,8 @@ Findings from the August 2026 **fresh** codebase review (bugs, performance, UI/U
 ---
 
 ## Phase 17 — UI hierarchy, feedback consistency & a11y
+
+**Status:** Implemented.
 
 **Goal:** Primary views meet the app’s own landmark/H1 intent; feedback channels are predictable; chrome does not compete with the user’s one job per screen.
 

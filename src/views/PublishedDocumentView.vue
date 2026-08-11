@@ -1,16 +1,18 @@
 <script setup lang="ts">
 import { useMutation, useQuery, useQueryCache } from '@pinia/colada';
 import { computed, ref } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { getApiErrorMessage } from '@/api/api-error';
 import {
 	getDocumentByNumberQuery,
 	listDocumentsQueryKey,
+	listDocumentTypesQuery,
 	listLibraryDocumentsQueryKey,
 	supersedeDocumentMutation,
 } from '@/client/@pinia/colada.gen';
 import DocumentStatusChip from '@/components/DocumentStatusChip.vue';
 import { useConfirmDialog } from '@/composables/use-confirm-dialog';
+import { useDocumentTypeLabel } from '@/composables/use-document-type-label';
 import { usePowerAppsContext } from '@/composables/use-power-apps-context';
 import { useToast } from '@/composables/use-toast';
 import { canActorSupersedeDocument } from '@/domain/document-access';
@@ -26,6 +28,9 @@ const toast = useToast();
 
 const documentNumber = computed(() => String(route.params.documentNumber));
 const actionError = ref<string | null>(null);
+
+const { data: typesData } = useQuery(() => listDocumentTypesQuery());
+const { typeLabel } = useDocumentTypeLabel(() => typesData.value?.items);
 
 const { data: document, isPending, error, refetch } = useQuery(() =>
 	getDocumentByNumberQuery({
@@ -119,17 +124,17 @@ async function onSupersede(): Promise<void> {
 		<v-skeleton-loader v-if="isPending" type="article, actions" />
 
 		<template v-else-if="document">
-			<v-card class="pa-4 mb-4">
+			<header class="published-header mb-4">
 				<div class="d-flex align-center justify-space-between flex-wrap ga-3 mb-2">
 					<div>
 						<div class="text-overline text-medium-emphasis">
 							{{ document.documentNumber }} · v{{ document.documentVersion }}
 						</div>
-						<div class="text-h5 font-weight-bold">
+						<h1 class="text-h5 font-weight-bold">
 							{{ document.title }}
-						</div>
+						</h1>
 						<div class="text-body-2 text-medium-emphasis">
-							{{ document.documentType }} · Published
+							{{ typeLabel(document.documentType) }} · Published
 							{{ document.publishedAt ? new Date(document.publishedAt).toLocaleString() : '—' }}
 						</div>
 					</div>
@@ -161,12 +166,13 @@ async function onSupersede(): Promise<void> {
 				<p class="text-body-1 mb-0">
 					{{ document.draftSummary || 'Controlled published final — content is read-only.' }}
 				</p>
-			</v-card>
+			</header>
 
-			<v-card
+			<v-alert
 				v-if="document.supersedesDocumentId"
-				class="pa-4 mb-4"
+				type="info"
 				variant="tonal"
+				class="mb-4"
 			>
 				<div class="text-subtitle-2 mb-1">
 					Supersession trail
@@ -180,14 +186,9 @@ async function onSupersede(): Promise<void> {
 					</RouterLink>
 					).
 				</p>
-			</v-card>
+			</v-alert>
 
-			<v-card class="pa-4 mb-4">
-				<div class="text-subtitle-2 mb-2">
-					Published content
-				</div>
-				<pre class="published-body text-body-2">{{ document.draftBodyMarkdown || '—' }}</pre>
-			</v-card>
+			<pre class="markdown-preview text-body-2 mb-4">{{ document.draftBodyMarkdown || '—' }}</pre>
 
 			<div class="d-flex flex-wrap ga-2">
 				<v-btn variant="text" :to="{ name: 'library' }">
@@ -205,9 +206,8 @@ async function onSupersede(): Promise<void> {
 </template>
 
 <style scoped>
-.published-body {
-	white-space: pre-wrap;
-	font-family: inherit;
-	margin: 0;
+.published-header {
+	padding-bottom: 1rem;
+	border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.12);
 }
 </style>

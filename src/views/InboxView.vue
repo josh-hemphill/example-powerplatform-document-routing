@@ -10,6 +10,7 @@ import { listDocumentsQuery, listDocumentTypesQuery } from '@/client/@pinia/cola
 import DocumentStatusChip from '@/components/DocumentStatusChip.vue';
 import { useDocumentTypeLabel } from '@/composables/use-document-type-label';
 import { usePowerAppsContext } from '@/composables/use-power-apps-context';
+import { appConfig } from '@/config/app.config';
 import {
 	INBOX_PERSONAS,
 	matchesInboxPersona,
@@ -133,6 +134,22 @@ const items = computed(() =>
 const showInitialLoader = computed(() => isPending.value && accumulated.value.length === 0);
 const loadingMore = computed(() => isPending.value && Boolean(cursor.value));
 
+const filtersActive = computed(
+	() =>
+		persona.value !== 'all'
+		|| statusFilter.value !== null
+		|| typeFilter.value !== null
+		|| search.value.trim() !== '',
+);
+
+function clearFilters(): void {
+	persona.value = 'all';
+	statusFilter.value = null;
+	typeFilter.value = null;
+	search.value = '';
+	debouncedQ.value = '';
+}
+
 function loadMore(): void {
 	if (!nextCursor.value || isPending.value) {
 		return;
@@ -177,6 +194,12 @@ watch(
 	<div>
 		<p class="text-body-2 text-medium-emphasis mb-2">
 			{{ INBOX_PERSONAS.find((option) => option.value === persona)?.description }}
+		</p>
+		<p
+			v-if="persona === 'all'"
+			class="text-caption text-medium-emphasis mb-2"
+		>
+			{{ appConfig.brand.tagline }}
 		</p>
 		<v-chip-group
 			v-model="persona"
@@ -324,7 +347,24 @@ watch(
 							</tr>
 							<tr v-if="items.length === 0">
 								<td colspan="5" class="text-medium-emphasis py-8 text-center">
-									No documents match this view. Create a request or switch persona filters.
+									<p class="mb-4">
+										No documents match this view. Create a request or switch persona filters.
+									</p>
+									<div class="d-flex flex-wrap justify-center ga-2">
+										<v-btn
+											color="primary"
+											:to="{ name: 'new-request' }"
+										>
+											New request
+										</v-btn>
+										<v-btn
+											v-if="filtersActive"
+											variant="tonal"
+											@click="clearFilters"
+										>
+											Clear filters
+										</v-btn>
+									</div>
 								</td>
 							</tr>
 						</tbody>
@@ -424,12 +464,29 @@ watch(
 							Waiting on {{ item.currentApproverEmail }}
 						</div>
 					</v-card>
-					<p
+					<div
 						v-if="items.length === 0"
 						class="text-medium-emphasis py-8 text-center"
 					>
-						No documents match this view. Create a request or switch persona filters.
-					</p>
+						<p class="mb-4">
+							No documents match this view. Create a request or switch persona filters.
+						</p>
+						<div class="d-flex flex-wrap justify-center ga-2">
+							<v-btn
+								color="primary"
+								:to="{ name: 'new-request' }"
+							>
+								New request
+							</v-btn>
+							<v-btn
+								v-if="filtersActive"
+								variant="tonal"
+								@click="clearFilters"
+							>
+								Clear filters
+							</v-btn>
+						</div>
+					</div>
 				</template>
 			</template>
 

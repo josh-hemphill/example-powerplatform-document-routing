@@ -119,18 +119,20 @@ watch(
 			<div class="pa-4 text-subtitle-1 font-weight-bold text-primary">
 				{{ appConfig.brand.name }}
 			</div>
-			<v-list nav>
-				<v-list-item
-					v-for="item in navItems"
-					:key="item.name"
-					:prepend-icon="item.icon"
-					:title="item.title"
-					:active="isNavActive(item)"
-					:aria-current="isNavActive(item) ? 'page' : undefined"
-					rounded="lg"
-					@click="goTo(item.name)"
-				/>
-			</v-list>
+			<nav aria-label="Primary">
+				<v-list nav>
+					<v-list-item
+						v-for="item in navItems"
+						:key="item.name"
+						:prepend-icon="item.icon"
+						:title="item.title"
+						:active="isNavActive(item)"
+						:aria-current="isNavActive(item) ? 'page' : undefined"
+						rounded="lg"
+						@click="goTo(item.name)"
+					/>
+				</v-list>
+			</nav>
 			<div class="px-4 pt-2">
 				<v-btn
 					block
@@ -141,6 +143,21 @@ watch(
 				>
 					New request
 				</v-btn>
+			</div>
+			<div
+				v-if="showPersonaSwitcher"
+				class="px-4 pt-3"
+			>
+				<v-select
+					:model-value="context.email"
+					:items="LOCAL_DEMO_PERSONAS"
+					item-title="label"
+					item-value="email"
+					density="compact"
+					hide-details
+					label="Acting as"
+					@update:model-value="identityStore.switchLocalPersona"
+				/>
 			</div>
 		</v-navigation-drawer>
 
@@ -160,7 +177,11 @@ watch(
 			</v-app-bar-title>
 			<v-spacer />
 
-			<template v-if="mdAndUp">
+			<nav
+				v-if="mdAndUp"
+				aria-label="Primary"
+				class="d-flex align-center"
+			>
 				<v-btn
 					v-for="item in navItems"
 					:key="item.name"
@@ -173,16 +194,24 @@ watch(
 				>
 					{{ item.title }}
 				</v-btn>
-			</template>
+			</nav>
 
-			<v-chip
+			<v-btn
+				v-if="status === 'failed'"
 				class="me-2 ms-1"
 				size="small"
-				:color="status === 'hosted' ? 'success' : status === 'failed' ? 'error' : 'default'"
+				color="error"
 				variant="tonal"
-				:style="status === 'failed' ? 'cursor: pointer' : undefined"
-				:title="status === 'failed' ? 'Retry identity load' : undefined"
-				@click="status === 'failed' ? identityStore.retryLoad() : undefined"
+				@click="identityStore.retryLoad()"
+			>
+				Retry sign-in
+			</v-btn>
+			<v-chip
+				v-else
+				class="me-2 ms-1"
+				size="small"
+				:color="status === 'hosted' ? 'success' : 'default'"
+				variant="tonal"
 			>
 				{{ hostChipLabel }}
 			</v-chip>

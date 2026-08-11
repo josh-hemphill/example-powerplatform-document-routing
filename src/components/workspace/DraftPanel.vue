@@ -67,82 +67,84 @@ const draftBodyRules = bodyMarkdownRules();
 		>
 			{{ title || 'Untitled draft' }}
 		</p>
-		<template v-else>
-			<v-alert
-				v-if="hasRevisionConflict"
-				type="warning"
-				variant="tonal"
-				class="mb-3"
-				density="comfortable"
-			>
-				<div class="d-flex flex-wrap align-center justify-space-between ga-2">
-					<span>
-						Someone else saved a newer draft revision. Reload the server version before saving again.
-					</span>
+		<v-expand-transition>
+			<div v-if="expanded">
+				<v-alert
+					v-if="hasRevisionConflict"
+					type="warning"
+					variant="tonal"
+					class="mb-3"
+					density="comfortable"
+				>
+					<div class="d-flex flex-wrap align-center justify-space-between ga-2">
+						<span>
+							Someone else saved a newer draft revision. Reload the server version before saving again.
+						</span>
+						<v-btn
+							size="small"
+							variant="tonal"
+							@click="emit('reload')"
+						>
+							Reload draft
+						</v-btn>
+					</div>
+				</v-alert>
+				<p class="text-body-2 text-medium-emphasis mb-2">
+					Signed in as {{ actorEmail }}. Collaborative authors on this type can co-edit before submit.
+				</p>
+				<v-text-field
+					v-model="title"
+					label="Document title"
+					:rules="draftTitleRules"
+					:disabled="!canDraft"
+					class="mb-2"
+					:counter="TITLE_MAX_LENGTH"
+					:maxlength="TITLE_MAX_LENGTH"
+				/>
+				<v-text-field
+					:model-value="authorEmail ?? '—'"
+					label="Author (from principal on first save)"
+					readonly
+					disabled
+					class="mb-2"
+				/>
+				<v-text-field
+					v-model="summary"
+					label="Short summary"
+					:rules="draftSummaryRules"
+					:disabled="!canDraft"
+					class="mb-2"
+					:counter="SUMMARY_MAX_LENGTH"
+					:maxlength="SUMMARY_MAX_LENGTH"
+				/>
+				<v-textarea
+					v-model="bodyMarkdown"
+					label="Draft (Markdown)"
+					rows="12"
+					:rules="draftBodyRules"
+					:disabled="!canDraft"
+					class="mb-3"
+				/>
+				<div class="d-flex flex-wrap justify-end ga-2">
 					<v-btn
-						size="small"
-						variant="tonal"
-						@click="emit('reload')"
+						v-if="isDirty"
+						variant="text"
+						:disabled="!canDraft || isSaving"
+						@click="emit('discard')"
 					>
-						Reload draft
+						Discard changes
+					</v-btn>
+					<v-btn
+						color="secondary"
+						:disabled="!canDraft || hasRevisionConflict || isSaving"
+						:loading="isSaving"
+						@click="emit('save')"
+					>
+						Save draft
 					</v-btn>
 				</div>
-			</v-alert>
-			<p class="text-body-2 text-medium-emphasis mb-2">
-				Signed in as {{ actorEmail }}. Collaborative authors on this type can co-edit before submit.
-			</p>
-			<v-text-field
-				v-model="title"
-				label="Document title"
-				:rules="draftTitleRules"
-				:disabled="!canDraft"
-				class="mb-2"
-				:counter="TITLE_MAX_LENGTH"
-				:maxlength="TITLE_MAX_LENGTH"
-			/>
-			<v-text-field
-				:model-value="authorEmail ?? '—'"
-				label="Author (from principal on first save)"
-				readonly
-				disabled
-				class="mb-2"
-			/>
-			<v-text-field
-				v-model="summary"
-				label="Short summary"
-				:rules="draftSummaryRules"
-				:disabled="!canDraft"
-				class="mb-2"
-				:counter="SUMMARY_MAX_LENGTH"
-				:maxlength="SUMMARY_MAX_LENGTH"
-			/>
-			<v-textarea
-				v-model="bodyMarkdown"
-				label="Draft (Markdown)"
-				rows="12"
-				:rules="draftBodyRules"
-				:disabled="!canDraft"
-				class="mb-3"
-			/>
-			<div class="d-flex flex-wrap justify-end ga-2">
-				<v-btn
-					v-if="isDirty"
-					variant="text"
-					:disabled="!canDraft || isSaving"
-					@click="emit('discard')"
-				>
-					Discard changes
-				</v-btn>
-				<v-btn
-					color="secondary"
-					:disabled="!canDraft || hasRevisionConflict || isSaving"
-					:loading="isSaving"
-					@click="emit('save')"
-				>
-					Save draft
-				</v-btn>
 			</div>
-		</template>
+		</v-expand-transition>
 	</v-card>
 </template>
 
@@ -155,5 +157,10 @@ const draftBodyRules = bodyMarkdownRules();
 	text-align: start;
 	color: inherit;
 	font: inherit;
+}
+
+.stage-toggle:focus-visible {
+	outline: 2px solid rgb(var(--v-theme-primary));
+	outline-offset: 2px;
 }
 </style>

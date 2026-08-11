@@ -44,50 +44,52 @@ const folderPathOverride = defineModel<string>('folderPathOverride', { required:
 		>
 			{{ publishedPdfUrl ? 'Published' : canPublish ? 'Ready to publish' : 'Waiting for approval' }}
 		</p>
-		<template v-else>
-			<p class="text-body-2 text-medium-emphasis mb-3">
-				Publish runs server-side / via Flow against an allowlisted destination.
-				The browser never uploads PDF bytes.
-			</p>
-			<v-select
-				v-model="publishDestinationId"
-				:items="destinationItems"
-				item-title="title"
-				item-value="value"
-				label="Publish destination"
-				:rules="[destinationRequiredRule()]"
-				class="mb-2"
-			/>
-			<v-text-field
-				v-model="folderPathOverride"
-				label="Folder override (optional, under destination root)"
-				:hint="destinationRoot ? `Root: ${destinationRoot}` : undefined"
-				persistent-hint
-				class="mb-2"
-			/>
-			<v-text-field
-				:model-value="previewFileName"
-				label="PDF file name (id + revision)"
-				readonly
-				disabled
-				class="mb-3"
-			/>
-			<div class="d-flex justify-end">
-				<v-btn
-					color="primary"
-					:disabled="!canPublish"
-					:loading="isPublishing"
-					@click="emit('publish')"
-				>
-					Publish PDF
-				</v-btn>
+		<v-expand-transition>
+			<div v-if="expanded">
+				<p class="text-body-2 text-medium-emphasis mb-3">
+					Publish runs server-side / via Flow against an allowlisted destination.
+					The browser never uploads PDF bytes.
+				</p>
+				<v-select
+					v-model="publishDestinationId"
+					:items="destinationItems"
+					item-title="title"
+					item-value="value"
+					label="Publish destination"
+					:rules="[destinationRequiredRule()]"
+					class="mb-2"
+				/>
+				<v-text-field
+					v-model="folderPathOverride"
+					label="Folder override (optional, under destination root)"
+					:hint="destinationRoot ? `Root: ${destinationRoot}` : undefined"
+					persistent-hint
+					class="mb-2"
+				/>
+				<v-text-field
+					:model-value="previewFileName"
+					label="PDF file name (id + revision)"
+					readonly
+					disabled
+					class="mb-3"
+				/>
+				<div class="d-flex justify-end">
+					<v-btn
+						color="primary"
+						:disabled="!canPublish"
+						:loading="isPublishing"
+						@click="emit('publish')"
+					>
+						Publish PDF
+					</v-btn>
+				</div>
+				<div v-if="publishedPdfUrl" class="mt-3">
+					<a :href="publishedPdfUrl" target="_blank" rel="noreferrer">
+						{{ publishedPdfUrl }}
+					</a>
+				</div>
 			</div>
-			<div v-if="publishedPdfUrl" class="mt-3">
-				<a :href="publishedPdfUrl" target="_blank" rel="noreferrer">
-					{{ publishedPdfUrl }}
-				</a>
-			</div>
-		</template>
+		</v-expand-transition>
 	</v-card>
 </template>
 
@@ -100,5 +102,10 @@ const folderPathOverride = defineModel<string>('folderPathOverride', { required:
 	text-align: start;
 	color: inherit;
 	font: inherit;
+}
+
+.stage-toggle:focus-visible {
+	outline: 2px solid rgb(var(--v-theme-primary));
+	outline-offset: 2px;
 }
 </style>

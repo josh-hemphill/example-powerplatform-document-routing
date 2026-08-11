@@ -17,9 +17,9 @@ const emit = defineEmits<{
 	<v-card class="pa-4 mb-4">
 		<div class="d-flex align-center justify-space-between flex-wrap ga-3 mb-2">
 			<div>
-				<div class="text-h6 font-weight-bold">
+				<h1 class="text-h6 font-weight-bold">
 					{{ document.title }}
-				</div>
+				</h1>
 				<div class="text-body-2 text-medium-emphasis">
 					<template v-if="document.documentNumber">
 						{{ document.documentNumber }}

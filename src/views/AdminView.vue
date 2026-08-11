@@ -8,18 +8,19 @@ import AdminSettingsPanel from '@/components/admin/AdminSettingsPanel.vue';
 import AdminTypesPanel from '@/components/admin/AdminTypesPanel.vue';
 import { useConfirmDialog } from '@/composables/use-confirm-dialog';
 import { usePowerAppsContext } from '@/composables/use-power-apps-context';
+import { useToast } from '@/composables/use-toast';
 import { useIdentityStore } from '@/stores/identity';
 
 const router = useRouter();
 const identity = useIdentityStore();
 const { canAct } = usePowerAppsContext();
 const { confirm } = useConfirmDialog();
+const toast = useToast();
 
 const isAdmin = computed(() => identity.hasRole('admin'));
 const rolesUnresolved = computed(() => identity.rolesUnresolved);
 const tab = ref('types');
 const actionError = ref<string | null>(null);
-const actionSuccess = ref<string | null>(null);
 
 const typeDirty = ref(false);
 const poolDirty = ref(false);
@@ -42,15 +43,12 @@ watch(
 
 function onError(message: string | null): void {
 	actionError.value = message;
-	if (message) {
-		actionSuccess.value = null;
-	}
 }
 
 function onSuccess(message: string | null): void {
-	actionSuccess.value = message;
 	if (message) {
 		actionError.value = null;
+		toast.success(message);
 	}
 }
 
@@ -125,15 +123,6 @@ onBeforeRouteLeave(async() => {
 				role="alert"
 			>
 				{{ actionError }}
-			</v-alert>
-			<v-alert
-				v-if="actionSuccess"
-				type="success"
-				variant="tonal"
-				class="mb-4"
-				role="status"
-			>
-				{{ actionSuccess }}
 			</v-alert>
 
 			<p class="text-body-2 text-medium-emphasis mb-4">
