@@ -3,14 +3,18 @@ import { describe, expect, it, vi } from 'vitest';
 import { buildDataverseProvisionPlan } from './dataverse-provision-plan.ts';
 import {
 	addEntityToSolution,
+	assertSolutionOwnedByPublisher,
 	buildAlmManifest,
 	ensurePublisher,
 	ensurePublisherAndSolution,
+	ensureSolution,
 	findPublishersByPrefix,
+	isAlreadySolutionComponent,
 	isUnmanagedApplyAllowed,
 	PublisherCollisionError,
 	renderSolutionPackMarkdown,
 	renderSolutionPackScript,
+	SolutionOwnershipError,
 } from './solution-alm.ts';
 
 function sampleProfile(
@@ -221,6 +225,8 @@ describe('ensurePublisherAndSolution', () => {
 						uniquename: 'DocumentRouting',
 						friendlyname: 'Document Routing',
 						version: '1.0.0.0',
+						_publisherid_value: 'pub-1',
+						ismanaged: false,
 					}),
 					{ status: 201, headers: { 'Content-Type': 'application/json' } },
 				);
@@ -237,10 +243,90 @@ describe('ensurePublisherAndSolution', () => {
 		expect(result.solutionCreated).toBe(true);
 		expect(result.solution.solutionid).toBe('sol-1');
 	});
+
+	it('fails when an existing solution belongs to another publisher', async() => {
+		const fetchImpl = asFetch(async(url) => {
+			const href = String(url);
+			if (href.includes('/publishers?')) {
+				return new Response(
+					JSON.stringify({
+						value: [
+							{
+								publisherid: 'pub-1',
+								uniquename: 'docrouting',
+								friendlyname: 'Document Routing',
+								customizationprefix: 'dr',
+							},
+						],
+					}),
+					{ status: 200, headers: { 'Content-Type': 'application/json' } },
+				);
+			}
+			if (href.includes('/solutions?')) {
+				return new Response(
+					JSON.stringify({
+						value: [
+							{
+								solutionid: 'sol-other',
+								uniquename: 'DocumentRouting',
+								friendlyname: 'Someone Else',
+								version: '1.0.0.0',
+								ismanaged: false,
+								_publisherid_value: 'other-pub',
+							},
+						],
+					}),
+					{ status: 200, headers: { 'Content-Type': 'application/json' } },
+				);
+			}
+			return new Response('unexpected', { status: 500 });
+		});
+		await expect(
+			ensureSolution(
+				'https://data.fabrikam.internal/api/data/v9.2',
+				sampleProfile(),
+				'pub-1',
+				'token',
+				fetchImpl,
+			),
+		).rejects.toBeInstanceOf(SolutionOwnershipError);
+	});
+});
+
+describe('assertSolutionOwnedByPublisher', () => {
+	it('rejects managed solutions and missing publisher lookup', () => {
+		expect(() =>
+			assertSolutionOwnedByPublisher(
+				{
+					solutionid: 's1',
+					uniquename: 'DocumentRouting',
+					friendlyname: 'X',
+					version: '1.0.0.0',
+					ismanaged: true,
+					_publisherid_value: 'pub-1',
+				},
+				'pub-1',
+				'DocumentRouting',
+			),
+		).toThrow(/managed/);
+		expect(() =>
+			assertSolutionOwnedByPublisher(
+				{
+					solutionid: 's1',
+					uniquename: 'DocumentRouting',
+					friendlyname: 'X',
+					version: '1.0.0.0',
+					ismanaged: false,
+				},
+				'pub-1',
+				'DocumentRouting',
+			),
+		).toThrow(/could not be verified/);
+	});
 });
 
 describe('addEntityToSolution', () => {
-	it('treats already-present components as success', async() => {
+	it('treats documented already-present components as success', async() => {
 		const fetchImpl = asFetch(
 			vi.fn(async() =>
 				new Response('Component is already in the solution', { status: 400 }),
@@ -255,6 +341,32 @@ describe('addEntityToSolution', () => {
 				fetchImpl,
 			),
 		).resolves.toBeUndefined();
+	});
+
+	it('does not treat unrelated errors containing "already" as success', async() => {
+		const fetchImpl = asFetch(
+			vi.fn(async() =>
+				new Response('The user already lacks privilege Foo', { status: 403 }),
+			),
+		);
+		await expect(
+			addEntityToSolution(
+				'https://data.fabrikam.internal/api/data/v9.2',
+				'DocumentRouting',
+				'meta-1',
+				'token',
+				fetchImpl,
+			),
+		).rejects.toThrow(/AddSolutionComponent failed/);
+	});
+});
+
+describe('isAlreadySolutionComponent', () => {
+	it('matches only documented duplicate conditions', () => {
+		expect(isAlreadySolutionComponent(409, 'conflict')).toBe(true);
+		expect(isAlreadySolutionComponent(400, '0x80043b0b')).toBe(true);
+		expect(isAlreadySolutionComponent(400, 'already in the solution')).toBe(true);
+		expect(isAlreadySolutionComponent(400, 'already lacks privilege')).toBe(false);
 	});
 });
 

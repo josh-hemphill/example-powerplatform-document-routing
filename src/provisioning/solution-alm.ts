@@ -46,6 +46,9 @@ export interface SolutionRecord {
 	uniquename: string;
 	friendlyname: string;
 	version: string;
+	ismanaged?: boolean;
+	/** Lookup GUID of the solution's publisher. */
+	_publisherid_value?: string;
 }
 
 export class PublisherCollisionError extends Error {
@@ -68,6 +71,15 @@ export class PublisherCollisionError extends Error {
 		this.prefix = prefix;
 		this.existingUniqueName = existingUniqueName;
 		this.expectedUniqueName = expectedUniqueName;
+	}
+}
+
+export class SolutionOwnershipError extends Error {
+	readonly code = 'solution_ownership_mismatch';
+
+	constructor(message: string) {
+		super(message);
+		this.name = 'SolutionOwnershipError';
 	}
 }
 
@@ -281,7 +293,7 @@ export async function ensurePublisher(
 }
 
 /**
- * Finds a solution by unique name.
+ * Finds a solution by unique name (includes publisher lookup + managed flag).
  */
 export async function findSolutionByUniqueName(
 	apiRoot: string,
@@ -291,7 +303,8 @@ export async function findSolutionByUniqueName(
 ): Promise<SolutionRecord | null> {
 	const filter = encodeURIComponent(`uniquename eq '${uniqueName.replace(/'/g, '\'\'')}'`);
 	const url
-		= `${apiRoot}/solutions?$select=solutionid,uniquename,friendlyname,version&$filter=${filter}`;
+		= `${apiRoot}/solutions?$select=solutionid,uniquename,friendlyname,version,ismanaged,_publisherid_value`
+			+ `&$filter=${filter}`;
 	const response = await fetchImpl(url, { headers: odataHeaders(accessToken) });
 	if (!response.ok) {
 		const text = await response.text();
@@ -302,7 +315,8 @@ export async function findSolutionByUniqueName(
 }
 
 /**
- * Ensures the unmanaged solution exists and is bound to the publisher.
+ * Ensures the unmanaged solution exists and is bound to the profile publisher.
+ * Fails closed when the unique name is owned by another publisher or is managed.
  */
 export async function ensureSolution(
 	apiRoot: string,
@@ -318,6 +332,7 @@ export async function ensureSolution(
 		fetchImpl,
 	);
 	if (existing) {
+		assertSolutionOwnedByPublisher(existing, publisherId, profile.solution.uniqueName);
 		return { solution: existing, created: false };
 	}
 
@@ -343,6 +358,36 @@ export async function ensureSolution(
 	}
 	const solution = (await response.json()) as SolutionRecord;
 	return { solution, created: true };
+}
+
+/**
+ * Verifies an existing solution belongs to the expected publisher and is unmanaged.
+ */
+export function assertSolutionOwnedByPublisher(
+	solution: SolutionRecord,
+	publisherId: string,
+	expectedUniqueName: string,
+): void {
+	if (solution.ismanaged === true) {
+		throw new SolutionOwnershipError(
+			`Solution "${expectedUniqueName}" exists but is managed. `
+			+ 'Use an unmanaged solution uniqueName for provision:solution / --into-solution.',
+		);
+	}
+	const owner = solution._publisherid_value?.trim();
+	if (!owner) {
+		throw new SolutionOwnershipError(
+			`Solution "${expectedUniqueName}" exists but its publisher could not be verified `
+			+ '(_publisherid_value missing). Refusing to attach components.',
+		);
+	}
+	if (owner.toLowerCase() !== publisherId.toLowerCase()) {
+		throw new SolutionOwnershipError(
+			`Solution "${expectedUniqueName}" is owned by publisher ${owner}, `
+			+ `not the profile publisher ${publisherId}. Choose a different solution.uniqueName `
+			+ 'or reuse that publisher in deploy/connections.json.',
+		);
+	}
 }
 
 /**
@@ -401,6 +446,26 @@ export async function fetchEntityMetadataId(
 }
 
 /**
+ * True for documented AddSolutionComponent duplicate / already-present conditions.
+ */
+export function isAlreadySolutionComponent(status: number, body: string): boolean {
+	if (status === 409) {
+		return true;
+	}
+	const lower = body.toLowerCase();
+	if (lower.includes('0x80043b0b')) {
+		return true;
+	}
+	return (
+		lower.includes('already in the solution')
+		|| lower.includes('already a component')
+		|| lower.includes('already exists')
+		|| lower.includes('already present')
+		|| lower.includes('is already added')
+	);
+}
+
+/**
  * Adds an entity component to the named unmanaged solution.
  */
 export async function addEntityToSolution(
@@ -423,13 +488,7 @@ export async function addEntityToSolution(
 	});
 	if (!response.ok) {
 		const text = await response.text();
-		const lower = text.toLowerCase();
-		// Idempotent when the component is already in the solution.
-		if (
-			response.status === 409
-			|| lower.includes('already')
-			|| lower.includes('0x80043b0b')
-		) {
+		if (isAlreadySolutionComponent(response.status, text)) {
 			return;
 		}
 		throw new Error(
@@ -470,12 +529,10 @@ export async function addPlanEntitiesToSolution(
 			added.push(table);
 		}
 		catch(error) {
-			const message = error instanceof Error ? error.message : String(error);
-			if (/already/i.test(message)) {
-				skipped.push(table);
-				continue;
-			}
-			failed.push({ table, error: message });
+			failed.push({
+				table,
+				error: error instanceof Error ? error.message : String(error),
+			});
 		}
 	}
 

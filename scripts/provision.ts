@@ -19,6 +19,7 @@ import {
 	ensurePublisherAndSolution,
 	isUnmanagedApplyAllowed,
 	PublisherCollisionError,
+	SolutionOwnershipError,
 } from '../src/provisioning/solution-alm.ts';
 import {
 	applyDataversePlan,
@@ -100,7 +101,18 @@ export async function runProvision(argv: string[]): Promise<number> {
 	const token = process.env.DATAVERSE_ACCESS_TOKEN?.trim();
 	const shouldEnsureSolution = flags.solution || flags.intoSolution;
 
-	if (shouldEnsureSolution && !token) {
+	if (flags.solution && !token) {
+		console.error(
+			'DATAVERSE_ACCESS_TOKEN is required for `pnpm provision:solution` '
+			+ '(live publisher + solution ensure).',
+		);
+		console.error(
+			`Artifacts were written under ${outputDir}; review solution-pack.md, then retry with a token.`,
+		);
+		return 1;
+	}
+
+	if (flags.intoSolution && !flags.apply && !token) {
 		console.log(
 			'Solution ensure skipped (set DATAVERSE_ACCESS_TOKEN for live publisher/solution ensure).',
 		);
@@ -126,7 +138,10 @@ export async function runProvision(argv: string[]): Promise<number> {
 			);
 		}
 		catch(error) {
-			if (error instanceof PublisherCollisionError) {
+			if (
+				error instanceof PublisherCollisionError
+				|| error instanceof SolutionOwnershipError
+			) {
 				console.error(error.message);
 				return 1;
 			}
@@ -181,7 +196,10 @@ export async function runProvision(argv: string[]): Promise<number> {
 			);
 		}
 		catch(error) {
-			if (error instanceof PublisherCollisionError) {
+			if (
+				error instanceof PublisherCollisionError
+				|| error instanceof SolutionOwnershipError
+			) {
 				console.error(error.message);
 				return 1;
 			}
