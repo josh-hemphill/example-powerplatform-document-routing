@@ -12,30 +12,51 @@ export interface ConfirmDialogOptions {
 	color?: string;
 }
 
+interface QueuedConfirm {
+	options: ConfirmDialogOptions;
+	resolve: (confirmed: boolean) => void;
+}
+
 const open = ref(false);
 const options = shallowRef<ConfirmDialogOptions | null>(null);
 let resolver: ((confirmed: boolean) => void) | null = null;
+const queue: QueuedConfirm[] = [];
+
+function showNext(): void {
+	const next = queue.shift();
+	if (!next) {
+		options.value = null;
+		open.value = false;
+		resolver = null;
+		return;
+	}
+	options.value = next.options;
+	open.value = true;
+	resolver = next.resolve;
+}
 
 /**
  * App-wide confirm API (module singleton; mount dialog in AppShell).
  */
 export function useConfirmDialog() {
 	async function confirm(next: ConfirmDialogOptions): Promise<boolean> {
-		if (resolver) {
-			resolver(false);
-			resolver = null;
-		}
-		options.value = next;
-		open.value = true;
 		return new Promise((resolve) => {
+			if (resolver || open.value) {
+				queue.push({ options: next, resolve });
+				return;
+			}
+			options.value = next;
+			open.value = true;
 			resolver = resolve;
 		});
 	}
 
 	function resolve(confirmed: boolean): void {
-		open.value = false;
-		resolver?.(confirmed);
+		const current = resolver;
 		resolver = null;
+		open.value = false;
+		current?.(confirmed);
+		showNext();
 	}
 
 	return {

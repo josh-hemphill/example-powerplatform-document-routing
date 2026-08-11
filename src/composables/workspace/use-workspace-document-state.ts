@@ -104,10 +104,11 @@ export function useWorkspaceDocumentState(documentId: Ref<string>) {
 		return { name: 'library-document' as const, params: { documentNumber: number } };
 	});
 
-	async function invalidateDocumentQueries(): Promise<void> {
+	async function invalidateDocumentQueries(forDocumentId?: string): Promise<void> {
+		const id = forDocumentId ?? documentId.value;
 		await Promise.all([
 			queryCache.invalidateQueries({
-				key: getDocumentQueryKey({ path: { documentId: documentId.value } }),
+				key: getDocumentQueryKey({ path: { documentId: id } }),
 			}),
 			queryCache.invalidateQueries({ key: listDocumentsQueryKey() }),
 		]);

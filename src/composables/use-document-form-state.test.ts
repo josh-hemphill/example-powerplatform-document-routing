@@ -86,4 +86,20 @@ describe('useDocumentFormState', () => {
 		state.markDraftClean();
 		expect(state.isDraftDirty.value).toBe(false);
 	});
+
+	it('preserves approval comments across soft refetch of the same document', async() => {
+		const document = ref<Document | undefined>(makeDocument());
+		const state = useDocumentFormState({
+			document,
+			documentId: ref(document.value!.id),
+			types: ref(undefined),
+			activeDestinationIds: ref([]),
+			fallbackType: getDocumentType,
+		});
+		state.approvalForm.comment = 'Please review';
+		document.value = makeDocument({ title: 'Refetched title' });
+		await nextTick();
+		expect(state.approvalForm.comment).toBe('Please review');
+		expect(state.draftForm.title).toBe('Refetched title');
+	});
 });

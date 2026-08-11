@@ -181,7 +181,7 @@ async function submit(): Promise<void> {
 					color="primary"
 					type="submit"
 					:loading="isLoading || identityLoading"
-					:disabled="!canAct || !formValid"
+					:disabled="!canAct || !formValid || isLoading || identityLoading"
 				>
 					Submit request
 				</v-btn>

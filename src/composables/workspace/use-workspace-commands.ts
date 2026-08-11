@@ -44,85 +44,65 @@ export function useWorkspaceCommands(options: {
 	const actionError = ref<string | null>(null);
 	const hasDraftRevisionConflict = ref(false);
 
-	const { mutateAsync: saveDraftAsync, isLoading: isSavingDraft } = useMutation({
-		...updateDocumentDraftMutation(),
-		async onSettled() {
-			await invalidateDocumentQueries();
-		},
-	});
+	function settledInvalidator(forDocumentId: string) {
+		return async() => {
+			await invalidateDocumentQueries(forDocumentId);
+		};
+	}
+
+	const { mutateAsync: saveDraftAsync, isLoading: isSavingDraft } = useMutation(
+		updateDocumentDraftMutation(),
+	);
 
 	const { mutateAsync: submitApprovalAsync, isLoading: isSubmittingApproval }
-		= useMutation({
-			...submitForApprovalMutation(),
-			async onSettled() {
-				await invalidateDocumentQueries();
-			},
-		});
+		= useMutation(submitForApprovalMutation());
 
-	const { mutateAsync: decideStepAsync, isLoading: isDecidingStep } = useMutation({
-		...decideApprovalStepMutation(),
-		async onSettled() {
-			await invalidateDocumentQueries();
-		},
-	});
+	const { mutateAsync: decideStepAsync, isLoading: isDecidingStep } = useMutation(
+		decideApprovalStepMutation(),
+	);
 
-	const { mutateAsync: claimStepAsync, isLoading: isClaiming } = useMutation({
-		...claimApprovalStepMutation(),
-		async onSettled() {
-			await invalidateDocumentQueries();
-		},
-	});
+	const { mutateAsync: claimStepAsync, isLoading: isClaiming } = useMutation(
+		claimApprovalStepMutation(),
+	);
 
-	const { mutateAsync: releaseStepAsync, isLoading: isReleasing } = useMutation({
-		...releaseApprovalStepMutation(),
-		async onSettled() {
-			await invalidateDocumentQueries();
-		},
-	});
+	const { mutateAsync: releaseStepAsync, isLoading: isReleasing } = useMutation(
+		releaseApprovalStepMutation(),
+	);
 
-	const { mutateAsync: processSlaAsync, isLoading: isProcessingSla } = useMutation({
-		...processApprovalSlaMutation(),
-		async onSettled() {
-			await invalidateDocumentQueries();
-		},
-	});
+	const { mutateAsync: processSlaAsync, isLoading: isProcessingSla } = useMutation(
+		processApprovalSlaMutation(),
+	);
 
-	const { mutateAsync: withdrawAsync, isLoading: isWithdrawing } = useMutation({
-		...withdrawAndReviseMutation(),
-		async onSettled() {
-			await invalidateDocumentQueries();
-		},
-	});
+	const { mutateAsync: withdrawAsync, isLoading: isWithdrawing } = useMutation(
+		withdrawAndReviseMutation(),
+	);
 
-	const { mutateAsync: supersedeAsync, isLoading: isSuperseding } = useMutation({
-		...supersedeDocumentMutation(),
-		async onSettled() {
-			await Promise.all([
-				invalidateDocumentQueries(),
-				queryCache.invalidateQueries({ key: listLibraryDocumentsQueryKey() }),
-			]);
-		},
-	});
+	const { mutateAsync: supersedeAsync, isLoading: isSuperseding } = useMutation(
+		supersedeDocumentMutation(),
+	);
 
-	const { mutateAsync: abandonSupersedeAsync, isLoading: isAbandoningSupersede } = useMutation({
-		...abandonSupersedeMutation(),
-		async onSettled() {
-			await Promise.all([
-				invalidateDocumentQueries(),
-				queryCache.invalidateQueries({ key: listLibraryDocumentsQueryKey() }),
-			]);
-		},
-	});
+	const { mutateAsync: abandonSupersedeAsync, isLoading: isAbandoningSupersede }
+		= useMutation(abandonSupersedeMutation());
 
-	const { mutateAsync: publishPdfAsync, isLoading: isPublishingPdf } = useMutation({
-		...publishDocumentPdfMutation(),
-		async onSettled() {
-			await Promise.all([
-				invalidateDocumentQueries(),
-				queryCache.invalidateQueries({ key: listLibraryDocumentsQueryKey() }),
-			]);
-		},
-	});
+	const { mutateAsync: publishPdfAsync, isLoading: isPublishingPdf } = useMutation(
+		publishDocumentPdfMutation(),
+	);
+
+	async function runDocumentMutation<T>(
+		forDocumentId: string,
+		action: () => Promise<T>,
+		alsoInvalidateLibrary = false,
+	): Promise<T> {
+		try {
+			return await action();
+		}
+		finally {
+			await settledInvalidator(forDocumentId)();
+			if (alsoInvalidateLibrary) {
+				await queryCache.invalidateQueries({ key: listLibraryDocumentsQueryKey() });
+			}
+		}
+	}
 
 	function clearActionFeedback(): void {
 		actionError.value = null;
@@ -142,16 +122,18 @@ export function useWorkspaceCommands(options: {
 		if (!document.value) {
 			return;
 		}
+		const id = documentId.value;
 		try {
-			await saveDraftAsync({
-				path: { documentId: documentId.value },
-				body: {
-					title: forms.draftForm.title,
-					bodyMarkdown: forms.draftForm.bodyMarkdown,
-					summary: forms.draftForm.summary || undefined,
-					expectedContentRevision: document.value.contentRevision,
-				},
-			});
+			await runDocumentMutation(id, () =>
+				saveDraftAsync({
+					path: { documentId: id },
+					body: {
+						title: forms.draftForm.title,
+						bodyMarkdown: forms.draftForm.bodyMarkdown,
+						summary: forms.draftForm.summary || undefined,
+						expectedContentRevision: document.value!.contentRevision,
+					},
+				}));
 			forms.markDraftClean();
 			showSuccess('Draft saved. Ready for the approval chain when content is complete.');
 		}
@@ -178,13 +160,20 @@ export function useWorkspaceCommands(options: {
 
 	async function onSubmitForApproval(): Promise<void> {
 		clearActionFeedback();
+		if (forms.isDraftDirty.value) {
+			actionError.value = 'Save your draft before submitting for approval.';
+			return;
+		}
+		const id = documentId.value;
 		try {
-			await submitApprovalAsync({
-				path: { documentId: documentId.value },
-				body: {
-					comment: forms.approvalForm.comment || undefined,
-				},
-			});
+			await runDocumentMutation(id, () =>
+				submitApprovalAsync({
+					path: { documentId: id },
+					body: {
+						comment: forms.approvalForm.comment || undefined,
+					},
+				}));
+			forms.clearActionComments();
 			showSuccess('Submitted to the approval chain.');
 		}
 		catch(submitError) {
@@ -199,11 +188,13 @@ export function useWorkspaceCommands(options: {
 			actionError.value = 'No queued pool step to claim.';
 			return;
 		}
+		const id = documentId.value;
 		try {
-			await claimStepAsync({
-				path: { documentId: documentId.value, stepId: step.id },
-				body: {},
-			});
+			await runDocumentMutation(id, () =>
+				claimStepAsync({
+					path: { documentId: id, stepId: step.id },
+					body: {},
+				}));
 			showSuccess('Step claimed. You can approve or reject.');
 		}
 		catch(claimError) {
@@ -218,11 +209,13 @@ export function useWorkspaceCommands(options: {
 			actionError.value = 'No claimed pool step to release.';
 			return;
 		}
+		const id = documentId.value;
 		try {
-			await releaseStepAsync({
-				path: { documentId: documentId.value, stepId: step.id },
-				body: {},
-			});
+			await runDocumentMutation(id, () =>
+				releaseStepAsync({
+					path: { documentId: id, stepId: step.id },
+					body: {},
+				}));
 			showSuccess('Returned to the pool queue.');
 		}
 		catch(releaseError) {
@@ -232,11 +225,13 @@ export function useWorkspaceCommands(options: {
 
 	async function onProcessSla(): Promise<void> {
 		clearActionFeedback();
+		const id = documentId.value;
 		try {
-			await processSlaAsync({
-				path: { documentId: documentId.value },
-				body: {},
-			});
+			await runDocumentMutation(id, () =>
+				processSlaAsync({
+					path: { documentId: id },
+					body: {},
+				}));
 			showSuccess('SLA processor ran (elevates overdue steps when due).');
 		}
 		catch(slaError) {
@@ -246,11 +241,13 @@ export function useWorkspaceCommands(options: {
 
 	async function onWithdrawAndRevise(): Promise<void> {
 		clearActionFeedback();
+		const id = documentId.value;
 		try {
-			await withdrawAsync({
-				path: { documentId: documentId.value },
-				body: {},
-			});
+			await runDocumentMutation(id, () =>
+				withdrawAsync({
+					path: { documentId: id },
+					body: {},
+				}));
 			showSuccess('Withdrawn for revision. Draft editing is available again.');
 		}
 		catch(withdrawError) {
@@ -260,11 +257,17 @@ export function useWorkspaceCommands(options: {
 
 	async function onSupersede(): Promise<string | null> {
 		clearActionFeedback();
+		const id = documentId.value;
 		try {
-			const successor = await supersedeAsync({
-				path: { documentId: documentId.value },
-				body: {},
-			});
+			const successor = await runDocumentMutation(
+				id,
+				() =>
+					supersedeAsync({
+						path: { documentId: id },
+						body: {},
+					}),
+				true,
+			);
 			showSuccess('Successor draft opened for supersession.');
 			return successor.id;
 		}
@@ -276,11 +279,17 @@ export function useWorkspaceCommands(options: {
 
 	async function onAbandonSupersede(): Promise<void> {
 		clearActionFeedback();
+		const id = documentId.value;
 		try {
-			await abandonSupersedeAsync({
-				path: { documentId: documentId.value },
-				body: {},
-			});
+			await runDocumentMutation(
+				id,
+				() =>
+					abandonSupersedeAsync({
+						path: { documentId: id },
+						body: {},
+					}),
+				true,
+			);
 			showSuccess('Supersede successor abandoned. A new supersede can be opened on the prior published document.');
 		}
 		catch(abandonError) {
@@ -295,17 +304,20 @@ export function useWorkspaceCommands(options: {
 			actionError.value = 'No pending approval step. Claim a pool step first if needed.';
 			return;
 		}
+		const id = documentId.value;
 		try {
-			await decideStepAsync({
-				path: {
-					documentId: documentId.value,
-					stepId: step.id,
-				},
-				body: {
-					decision,
-					comment: forms.decisionForm.comment || undefined,
-				},
-			});
+			await runDocumentMutation(id, () =>
+				decideStepAsync({
+					path: {
+						documentId: id,
+						stepId: step.id,
+					},
+					body: {
+						decision,
+						comment: forms.decisionForm.comment || undefined,
+					},
+				}));
+			forms.clearActionComments();
 			showSuccess(decision === 'approve' ? 'Approval recorded.' : 'Document rejected.');
 		}
 		catch(decisionError) {
@@ -318,28 +330,34 @@ export function useWorkspaceCommands(options: {
 		if (!document.value) {
 			return;
 		}
+		const id = documentId.value;
 		try {
 			const body: PublishRequest = {
 				publishDestinationId: forms.publishForm.publishDestinationId ?? undefined,
 				folderPathOverride: forms.publishForm.folderPathOverride || undefined,
 			};
-			const result = await publishApprovedDocument({
-				document: document.value,
-				publishDestinationId: body.publishDestinationId,
-				folderPathOverride: body.folderPathOverride,
-				publishApi: async(publishBody) => {
-					const published = await publishPdfAsync({
-						path: { documentId: documentId.value },
-						body: publishBody,
-					});
-					return {
-						sharePointUrl: published.sharePointUrl,
-						pdfFileName: published.pdfFileName,
-						sharePointItemId: published.sharePointItemId,
-						idempotent: published.idempotent,
-					};
-				},
-			});
+			const result = await runDocumentMutation(
+				id,
+				() =>
+					publishApprovedDocument({
+						document: document.value!,
+						publishDestinationId: body.publishDestinationId,
+						folderPathOverride: body.folderPathOverride,
+						publishApi: async(publishBody) => {
+							const published = await publishPdfAsync({
+								path: { documentId: id },
+								body: publishBody,
+							});
+							return {
+								sharePointUrl: published.sharePointUrl,
+								pdfFileName: published.pdfFileName,
+								sharePointItemId: published.sharePointItemId,
+								idempotent: published.idempotent,
+							};
+						},
+					}),
+				true,
+			);
 			forms.markPublishClean();
 			showSuccess(
 				result.idempotent

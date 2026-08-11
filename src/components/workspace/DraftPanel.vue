@@ -131,7 +131,7 @@ const bodyMarkdown = defineModel<string>('bodyMarkdown', { required: true });
 				</v-btn>
 				<v-btn
 					color="secondary"
-					:disabled="!canDraft || hasRevisionConflict"
+					:disabled="!canDraft || hasRevisionConflict || isSaving"
 					:loading="isSaving"
 					@click="emit('save')"
 				>

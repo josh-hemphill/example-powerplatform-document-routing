@@ -99,7 +99,7 @@ function hasSteps(steps: ApprovalStep[]): boolean {
 			<v-text-field v-model="approvalComment" label="Submission comment" class="mb-3" />
 			<v-btn
 				color="warning"
-				:disabled="!canSubmitApproval"
+				:disabled="!canSubmitApproval || isSubmittingApproval"
 				:loading="isSubmittingApproval"
 				@click="emit('submit')"
 			>

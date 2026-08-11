@@ -57,6 +57,10 @@ export function useAdminSelectionGuard<T>(input: {
 					return;
 				}
 			}
+			// List refetch with the same selection must not wipe unsaved edits.
+			if (previousId && nextId === previousId && readDirty(input.isDirty)) {
+				return;
+			}
 			const entity = input.items.value.find((item) => input.getId(item) === nextId);
 			if (!entity) {
 				return;

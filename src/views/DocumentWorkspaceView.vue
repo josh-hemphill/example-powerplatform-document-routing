@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { WorkspaceStageId } from '@/domain/workspace-stages';
-import { computed, ref, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import { getApiErrorMessage } from '@/api/api-error';
 import ApprovalPanel from '@/components/workspace/ApprovalPanel.vue';
 import DraftPanel from '@/components/workspace/DraftPanel.vue';
@@ -35,6 +35,7 @@ const {
 	approvalForm,
 	decisionForm,
 	isDraftDirty,
+	isDirty,
 	hydrateFromDocument,
 	isSavingDraft,
 	isSubmittingApproval,
@@ -70,6 +71,38 @@ const {
 	canAbandonSupersede,
 	publishedLibraryPath,
 } = useDocumentWorkspace(documentId);
+
+const canSubmitCleanApproval = computed(
+	() => canSubmitApproval.value && !isDraftDirty.value,
+);
+
+function onBeforeUnload(event: BeforeUnloadEvent): void {
+	if (!isDirty.value) {
+		return;
+	}
+	event.preventDefault();
+	event.returnValue = '';
+}
+
+onMounted(() => {
+	window.addEventListener('beforeunload', onBeforeUnload);
+});
+
+onUnmounted(() => {
+	window.removeEventListener('beforeunload', onBeforeUnload);
+});
+
+onBeforeRouteLeave(async() => {
+	if (!isDirty.value) {
+		return true;
+	}
+	return await confirm({
+		title: 'Leave with unsaved changes?',
+		message: 'Draft or publish fields have not been saved.',
+		confirmText: 'Leave',
+		color: 'warning',
+	});
+});
 
 const typeLabel = computed(() => documentType.value.label);
 
@@ -304,7 +337,7 @@ async function handleAbandonSupersede(): Promise<void> {
 						:type-label="typeLabel"
 						:approval-chain-preview="approvalChainPreview"
 						:actor-email="context.email"
-						:can-submit-approval="Boolean(canSubmitApproval)"
+						:can-submit-approval="Boolean(canSubmitCleanApproval)"
 						:can-claim="Boolean(canClaim)"
 						:can-release="Boolean(canRelease)"
 						:can-decide="Boolean(canDecide)"
