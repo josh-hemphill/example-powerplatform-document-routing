@@ -50,15 +50,22 @@ type HostContextResult
 		};
 		app?: { environmentId?: string };
 	}; }
-	| { kind: 'timeout' };
+	| { kind: 'timeout' }
+	| { kind: 'error'; error: unknown };
+
+export type HostedRolesStatus = 'idle' | 'loading' | 'resolved' | 'failed';
 
 /**
  * Loads host context, distinguishing timeout from plugin failure.
+ * Always settles the host promise so a late rejection cannot be unhandled.
  */
 async function raceHostContext(): Promise<HostContextResult> {
 	const { getContext } = await import('@microsoft/power-apps/app');
+	const hostPromise = getContext()
+		.then((context) => ({ kind: 'context' as const, context }))
+		.catch((error: unknown) => ({ kind: 'error' as const, error }));
 	return Promise.race([
-		getContext().then((context) => ({ kind: 'context' as const, context })),
+		hostPromise,
 		new Promise<HostContextResult>((resolve) => {
 			window.setTimeout(resolve, HOST_CONTEXT_TIMEOUT_MS, { kind: 'timeout' });
 		}),
@@ -68,6 +75,7 @@ async function raceHostContext(): Promise<HostContextResult> {
 export const useIdentityStore = defineStore('identity', () => {
 	const status = ref<IdentityStatus>('loading');
 	const error = ref<string | null>(null);
+	const hostedRolesStatus = ref<HostedRolesStatus>('idle');
 	const identity = ref<IdentityState>({
 		roles: ['user'],
 	});
@@ -80,6 +88,15 @@ export const useIdentityStore = defineStore('identity', () => {
 	const email = computed(() => identity.value.email);
 	const userName = computed(() => identity.value.userName);
 	const canAct = computed(() => isReady.value && Boolean(identity.value.email));
+	/** True when hosted role lookup finished successfully (or standalone demo). */
+	const rolesResolved = computed(
+		() =>
+			status.value === 'standalone'
+			|| hostedRolesStatus.value === 'resolved',
+	);
+	const rolesUnresolved = computed(
+		() => status.value === 'hosted' && hostedRolesStatus.value === 'failed',
+	);
 
 	/**
 	 * Loads host context once; subsequent callers await the same promise.
@@ -121,6 +138,7 @@ export const useIdentityStore = defineStore('identity', () => {
 			...identity.value,
 			roles: resolveHostedRoles(roleNames),
 		};
+		hostedRolesStatus.value = 'resolved';
 	}
 
 	/**
@@ -131,6 +149,7 @@ export const useIdentityStore = defineStore('identity', () => {
 		if (status.value !== 'hosted' || !actorEmail) {
 			return;
 		}
+		hostedRolesStatus.value = 'loading';
 		try {
 			const principal = await fetchPrincipal(actorEmail);
 			if (principal.securityRoleNames?.length) {
@@ -142,16 +161,26 @@ export const useIdentityStore = defineStore('identity', () => {
 					...identity.value,
 					roles: resolveHostedRoles(principal.roles),
 				};
+				hostedRolesStatus.value = 'resolved';
+				return;
 			}
+			// Explicit empty mapping still counts as resolved (least-privilege user).
+			identity.value = {
+				...identity.value,
+				roles: resolveHostedRoles(null),
+			};
+			hostedRolesStatus.value = 'resolved';
 		}
 		catch {
-			// Keep least-privilege user-only defaults when principal lookup is unavailable.
+			hostedRolesStatus.value = 'failed';
+			error.value = 'Could not load security roles from the API';
 		}
 	}
 
 	async function loadContext(): Promise<void> {
 		status.value = 'loading';
 		error.value = null;
+		hostedRolesStatus.value = 'idle';
 
 		try {
 			const result = await raceHostContext();
@@ -162,6 +191,12 @@ export const useIdentityStore = defineStore('identity', () => {
 				error.value = 'Power Apps host context timed out';
 				identity.value = { roles: [] };
 				return;
+			}
+
+			if (result.kind === 'error') {
+				throw result.error instanceof Error
+					? result.error
+					: new Error('Failed to load Power Apps context');
 			}
 
 			const hostContext = result.context;
@@ -203,6 +238,7 @@ export const useIdentityStore = defineStore('identity', () => {
 			roles: [...persona.roles],
 		};
 		status.value = 'standalone';
+		hostedRolesStatus.value = 'resolved';
 		error.value = null;
 	}
 
@@ -230,12 +266,15 @@ export const useIdentityStore = defineStore('identity', () => {
 		status,
 		error,
 		identity,
+		hostedRolesStatus,
 		isLoading,
 		isReady,
 		isHosted,
 		email,
 		userName,
 		canAct,
+		rolesResolved,
+		rolesUnresolved,
 		ensureLoaded,
 		retryLoad,
 		switchLocalPersona,

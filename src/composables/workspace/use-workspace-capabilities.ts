@@ -11,6 +11,7 @@ import {
 	canActorMutateDraft,
 	canActorSupersedeDocument,
 } from '@/domain/document-access';
+import { canActorPublishDocument } from '@/domain/document-authz';
 
 /**
  * Computes which workspace actions the current actor may perform.
@@ -97,13 +98,30 @@ export function useWorkspaceCapabilities(options: {
 			=== (actorEmail.value || '').toLowerCase(),
 	);
 
-	const canPublish = computed(
-		() =>
-			Boolean(canAct.value)
-			&& (document.value?.status === 'approved' || document.value?.status === 'published')
-			&& (hasPublisherRole() || isAdmin())
-			&& Boolean(publishDestinationId.value),
-	);
+	const canPublish = computed(() => {
+		const doc = document.value;
+		const actor = actorEmail.value;
+		if (!canAct.value || !doc || !actor || !publishDestinationId.value) {
+			return false;
+		}
+		if (doc.status !== 'approved' && doc.status !== 'published') {
+			return false;
+		}
+		const roles = [
+			...(hasPublisherRole() ? (['publisher'] as const) : []),
+			...(isAdmin() ? (['admin'] as const) : []),
+		];
+		return canActorPublishDocument(
+			{
+				...doc,
+				collaboratorEmails: doc.collaboratorEmails ?? [],
+				currentPoolEmails: doc.currentPoolEmails ?? [],
+				approvalSteps: doc.approvalSteps ?? [],
+			},
+			actor,
+			roles,
+		);
+	});
 
 	const canProcessSla = computed(
 		() =>

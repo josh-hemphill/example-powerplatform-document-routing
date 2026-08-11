@@ -16,6 +16,7 @@ const { canAct } = usePowerAppsContext();
 const { confirm } = useConfirmDialog();
 
 const isAdmin = computed(() => identity.hasRole('admin'));
+const rolesUnresolved = computed(() => identity.rolesUnresolved);
 const tab = ref('types');
 const actionError = ref<string | null>(null);
 const actionSuccess = ref<string | null>(null);
@@ -32,7 +33,7 @@ const anyDirty = computed(
 watch(
 	isAdmin,
 	(value) => {
-		if (!value && identity.isReady) {
+		if (!value && identity.isReady && !identity.rolesUnresolved) {
 			void router.replace({ name: 'inbox' });
 		}
 	},
@@ -85,7 +86,28 @@ onBeforeRouteLeave(async() => {
 <template>
 	<div>
 		<v-alert
-			v-if="!isAdmin"
+			v-if="rolesUnresolved"
+			type="warning"
+			variant="tonal"
+			class="mb-4"
+			role="alert"
+		>
+			<div class="d-flex flex-wrap align-center justify-space-between ga-2">
+				<span>
+					Security roles could not be loaded. Admin access cannot be confirmed yet.
+				</span>
+				<v-btn
+					color="warning"
+					variant="flat"
+					size="small"
+					@click="identity.refreshHostedRoles()"
+				>
+					Retry roles
+				</v-btn>
+			</div>
+		</v-alert>
+		<v-alert
+			v-else-if="!isAdmin"
 			type="warning"
 			variant="tonal"
 			class="mb-4"

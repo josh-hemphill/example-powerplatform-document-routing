@@ -35,11 +35,11 @@ export async function handleApprovalRoutes(context: MockHttpContext): Promise<bo
 		method,
 		path,
 		actor,
+		actorRoles,
 		isAdmin,
 		req,
 		res,
 		readJson,
-		readActorRoles,
 		sendJson,
 		matchRoute,
 	} = context;
@@ -198,7 +198,7 @@ export async function handleApprovalRoutes(context: MockHttpContext): Promise<bo
 			sendJson(res, 404, { message: 'Document not found', code: 'not_found' });
 			return true;
 		}
-		const roles = readActorRoles(req);
+		const roles = actorRoles;
 		if (!canActorProcessSla(roles, actor)) {
 			sendJson(res, 403, {
 				message:
@@ -297,11 +297,26 @@ export async function handleApprovalRoutes(context: MockHttpContext): Promise<bo
 			sendJson(res, 404, { message: 'Document not found', code: 'not_found' });
 			return true;
 		}
+		if (document.status !== 'in_review') {
+			sendJson(res, 409, {
+				message: 'Document is not in review',
+				code: 'invalid_state',
+			});
+			return true;
+		}
 		const step = document.approvalSteps.find(
 			(item) => item.id === releaseMatch[2],
 		);
 		if (!step) {
 			sendJson(res, 404, { message: 'Approval step not found', code: 'not_found' });
+			return true;
+		}
+		const active = activeStep(document);
+		if (!active || active.id !== step.id) {
+			sendJson(res, 409, {
+				message: 'Only the current active step can be released',
+				code: 'invalid_state',
+			});
 			return true;
 		}
 		const body = await readJson<{ comment?: string }>(req);

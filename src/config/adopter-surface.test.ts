@@ -117,7 +117,7 @@ describe('inbox personas', () => {
 		).toBe(false);
 	});
 
-	it('matches ready_to_publish for approved docs', () => {
+	it('matches ready_to_publish for approved docs when actor can publish', () => {
 		expect(
 			matchesInboxPersona(
 				{
@@ -126,6 +126,7 @@ describe('inbox personas', () => {
 				},
 				'ready_to_publish',
 				'anyone@contoso.com',
+				['admin'],
 			),
 		).toBe(true);
 	});

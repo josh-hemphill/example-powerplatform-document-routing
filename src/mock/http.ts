@@ -79,12 +79,13 @@ export interface MockHttpContext {
 	path: string;
 	url: URL;
 	actor: string;
+	/** Roles derived from actor email (never from client headers). */
+	actorRoles: string[];
 	isAdmin: boolean;
 	req: IncomingMessage;
 	res: ServerResponse;
 	readJson: typeof readJson;
 	sendJson: typeof sendJson;
-	readActorRoles: typeof readActorRoles;
 	matchRoute: typeof matchRoute;
 	stamp: typeof stamp;
 	uniqueEmails: typeof uniqueEmails;

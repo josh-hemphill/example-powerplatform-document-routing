@@ -15,8 +15,10 @@ import {
 	suggestInboxPersona,
 } from '@/config/inbox-personas';
 import { DOCUMENT_STATUS_LABELS } from '@/domain/document-status';
+import { useIdentityStore } from '@/stores/identity';
 
 const { context } = usePowerAppsContext();
+const identity = useIdentityStore();
 const statusFilter = ref<DocumentStatus | null>(null);
 const typeFilter = ref<string | null>(null);
 const search = ref('');
@@ -55,7 +57,12 @@ const { data, isPending, error, refetch } = useQuery(() =>
 const items = computed(() => {
 	const list = data.value?.items ?? [];
 	return list.filter((item) =>
-		matchesInboxPersona(item, persona.value, context.value.email),
+		matchesInboxPersona(
+			item,
+			persona.value,
+			context.value.email,
+			identity.identity.roles,
+		),
 	);
 });
 

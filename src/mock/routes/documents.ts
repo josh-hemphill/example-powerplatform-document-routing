@@ -39,6 +39,8 @@ export async function handleDocumentRoutes(context: MockHttpContext): Promise<bo
 		const documentType = url.searchParams.get('documentType');
 		const q = url.searchParams.get('q')?.toLowerCase();
 		let items = [...getDocumentStore().values()]
+			.filter((document) =>
+				document.status !== 'published' && document.status !== 'superseded')
 			.filter((document) => canActorAccessDocument(document, actor))
 			.map(toSummary);
 
