@@ -16,6 +16,8 @@ export interface AccessibleDocument {
 		approverEmail?: string | null;
 		pool: Array<{ email: string }>;
 		elevationPool?: Array<{ email: string }> | null;
+		/** Elevation-pool members only gain access after SLA elevation. */
+		elevated?: boolean | null;
 	}>;
 }
 
@@ -70,10 +72,15 @@ export function canActorAccessDocument(
 		if (step.approverEmail?.toLowerCase() === email) {
 			return true;
 		}
-		return step.pool.some((member) => member.email.toLowerCase() === email)
-			|| (step.elevationPool ?? []).some(
-				(member) => member.email.toLowerCase() === email,
-			);
+		if (step.pool.some((member) => member.email.toLowerCase() === email)) {
+			return true;
+		}
+		if (!step.elevated) {
+			return false;
+		}
+		return (step.elevationPool ?? []).some(
+			(member) => member.email.toLowerCase() === email,
+		);
 	});
 }
 

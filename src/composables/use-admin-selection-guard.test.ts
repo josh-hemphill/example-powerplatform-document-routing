@@ -85,4 +85,30 @@ describe('useAdminSelectionGuard', () => {
 		expect(guard.selectedId.value).toBe('second');
 		expect(hydrated).toEqual(['first', 'second']);
 	});
+
+	it('does not re-hydrate the same selection while dirty when items refetch', async() => {
+		const hydrated: string[] = [];
+		const items = ref<Item[]>([
+			{ id: 'first', label: 'First' },
+			{ id: 'second', label: 'Second' },
+		]);
+		const dirty = ref(false);
+		useAdminSelectionGuard({
+			items,
+			getId: (item) => item.id,
+			hydrate: (item) => hydrated.push(`${item.id}:${item.label}`),
+			isDirty: dirty,
+			confirmTitle: 'Discard changes?',
+			confirmMessage: 'Switching will discard edits.',
+		});
+
+		expect(hydrated).toEqual(['first:First']);
+		dirty.value = true;
+		items.value = [
+			{ id: 'first', label: 'First updated' },
+			{ id: 'second', label: 'Second' },
+		];
+		await flushWatchers();
+		expect(hydrated).toEqual(['first:First']);
+	});
 });

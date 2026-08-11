@@ -1,9 +1,9 @@
 import type { Plugin } from 'vite';
+import { resolvePrincipalRolesByEmail } from '../config/local-personas.ts';
 import { handleControlApiRequest } from './control-api.ts';
 import { getDocumentStore } from './document-store.ts';
 import {
 	matchRoute,
-	readActorRoles,
 	readJson,
 	requireActor,
 	sendJson,
@@ -40,18 +40,19 @@ export function documentRoutingMockPlugin(): Plugin {
 					if (!actor) {
 						return;
 					}
-					const isAdmin = readActorRoles(req).includes('admin');
+					const actorRoles = resolvePrincipalRolesByEmail(actor);
+					const isAdmin = actorRoles.includes('admin');
 					const context = {
 						method,
 						path,
 						url,
 						actor,
+						actorRoles,
 						isAdmin,
 						req,
 						res,
 						readJson,
 						sendJson,
-						readActorRoles,
 						matchRoute,
 						stamp,
 						uniqueEmails,

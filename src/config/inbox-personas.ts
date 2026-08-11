@@ -1,5 +1,5 @@
-import type { ApprovalStepStatus } from '../domain/approval-queue';
-import type { DocumentStatus } from '../domain/document-status';
+import type { ApprovalStepStatus } from '../domain/approval-queue.ts';
+import type { DocumentStatus } from '../domain/document-status.ts';
 
 export type InboxPersona
 	= | 'all'
@@ -98,6 +98,7 @@ export function matchesInboxPersona(
 	document: PersonaFilterableDocument,
 	persona: InboxPersona,
 	userEmail: string | undefined,
+	roles: readonly string[] = [],
 ): boolean {
 	const email = userEmail?.toLowerCase();
 
@@ -138,8 +139,13 @@ export function matchesInboxPersona(
 				|| document.authorEmail?.toLowerCase() === email,
 			);
 		}
-		case 'ready_to_publish':
-			return document.status === 'approved';
+		case 'ready_to_publish': {
+			if (document.status !== 'approved') {
+				return false;
+			}
+			const normalized = roles.map((role) => role.trim().toLowerCase());
+			return normalized.includes('publisher') || normalized.includes('admin');
+		}
 		default:
 			return true;
 	}

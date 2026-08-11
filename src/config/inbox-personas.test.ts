@@ -52,13 +52,22 @@ describe('suggestInboxPersona', () => {
 });
 
 describe('matchesInboxPersona', () => {
-	it('matches ready_to_publish for approved cases', () => {
+	it('matches ready_to_publish for approved cases when actor can publish', () => {
 		expect(
 			matchesInboxPersona(
 				{ status: 'approved', requesterEmail: 'a@example.com' },
 				'ready_to_publish',
 				'me@example.com',
+				['publisher'],
 			),
 		).toBe(true);
+		expect(
+			matchesInboxPersona(
+				{ status: 'approved', requesterEmail: 'a@example.com' },
+				'ready_to_publish',
+				'me@example.com',
+				['user'],
+			),
+		).toBe(false);
 	});
 });

@@ -8,17 +8,22 @@ import AdminSettingsPanel from '@/components/admin/AdminSettingsPanel.vue';
 import AdminTypesPanel from '@/components/admin/AdminTypesPanel.vue';
 import { useConfirmDialog } from '@/composables/use-confirm-dialog';
 import { usePowerAppsContext } from '@/composables/use-power-apps-context';
+import { useToast } from '@/composables/use-toast';
 import { useIdentityStore } from '@/stores/identity';
 
 const router = useRouter();
 const identity = useIdentityStore();
 const { canAct } = usePowerAppsContext();
 const { confirm } = useConfirmDialog();
+const toast = useToast();
 
 const isAdmin = computed(() => identity.hasRole('admin'));
+const rolesUnresolved = computed(() => identity.rolesUnresolved);
+const rolesLoading = computed(
+	() => identity.status === 'hosted' && identity.hostedRolesStatus === 'loading',
+);
 const tab = ref('types');
 const actionError = ref<string | null>(null);
-const actionSuccess = ref<string | null>(null);
 
 const typeDirty = ref(false);
 const poolDirty = ref(false);
@@ -32,7 +37,12 @@ const anyDirty = computed(
 watch(
 	isAdmin,
 	(value) => {
-		if (!value && identity.isReady) {
+		if (
+			!value
+			&& identity.isReady
+			&& !identity.rolesUnresolved
+			&& identity.hostedRolesStatus !== 'loading'
+		) {
 			void router.replace({ name: 'inbox' });
 		}
 	},
@@ -41,15 +51,12 @@ watch(
 
 function onError(message: string | null): void {
 	actionError.value = message;
-	if (message) {
-		actionSuccess.value = null;
-	}
 }
 
 function onSuccess(message: string | null): void {
-	actionSuccess.value = message;
 	if (message) {
 		actionError.value = null;
+		toast.success(message);
 	}
 }
 
@@ -85,7 +92,37 @@ onBeforeRouteLeave(async() => {
 <template>
 	<div>
 		<v-alert
-			v-if="!isAdmin"
+			v-if="rolesUnresolved"
+			type="warning"
+			variant="tonal"
+			class="mb-4"
+			role="alert"
+		>
+			<div class="d-flex flex-wrap align-center justify-space-between ga-2">
+				<span>
+					Security roles could not be loaded. Admin access cannot be confirmed yet.
+				</span>
+				<v-btn
+					color="warning"
+					variant="flat"
+					size="small"
+					@click="identity.refreshHostedRoles()"
+				>
+					Retry roles
+				</v-btn>
+			</div>
+		</v-alert>
+		<v-alert
+			v-else-if="rolesLoading"
+			type="info"
+			variant="tonal"
+			class="mb-4"
+			role="status"
+		>
+			Loading security roles…
+		</v-alert>
+		<v-alert
+			v-else-if="!isAdmin"
 			type="warning"
 			variant="tonal"
 			class="mb-4"
@@ -103,15 +140,6 @@ onBeforeRouteLeave(async() => {
 				role="alert"
 			>
 				{{ actionError }}
-			</v-alert>
-			<v-alert
-				v-if="actionSuccess"
-				type="success"
-				variant="tonal"
-				class="mb-4"
-				role="status"
-			>
-				{{ actionSuccess }}
 			</v-alert>
 
 			<p class="text-body-2 text-medium-emphasis mb-4">

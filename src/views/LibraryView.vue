@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import type { DocumentSummary } from '@/client/types.gen';
 import { useQuery } from '@pinia/colada';
-import { computed, ref, watch } from 'vue';
+import { computed, onUnmounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
+import { useDisplay } from 'vuetify';
 import { getApiErrorMessage } from '@/api/api-error';
 import {
 	listDocumentTypesQuery,
@@ -10,10 +12,27 @@ import {
 import DocumentStatusChip from '@/components/DocumentStatusChip.vue';
 import { useDocumentTypeLabel } from '@/composables/use-document-type-label';
 
+const { mdAndUp } = useDisplay();
 const search = ref('');
 const typeFilter = ref<string | null>(null);
 const includeSuperseded = ref(false);
 const debouncedQ = ref('');
+
+const cursor = ref<string | undefined>(undefined);
+const accumulated = ref<DocumentSummary[]>([]);
+const nextCursor = ref<string | null>(null);
+
+const dateTime = new Intl.DateTimeFormat(undefined, {
+	dateStyle: 'short',
+	timeStyle: 'short',
+});
+
+function formatDate(value: string | null | undefined): string {
+	if (!value) {
+		return '—';
+	}
+	return dateTime.format(new Date(value));
+}
 
 let searchTimer: ReturnType<typeof setTimeout> | undefined;
 watch(search, (value) => {
@@ -22,28 +41,87 @@ watch(search, (value) => {
 		debouncedQ.value = value.trim();
 	}, 200);
 });
-
-const { data, isPending, error, refetch } = useQuery(() =>
-	listLibraryDocumentsQuery({
-		query: {
-			q: debouncedQ.value || undefined,
-			documentType: typeFilter.value ?? undefined,
-			includeSuperseded: includeSuperseded.value || undefined,
-		},
-	}),
-);
+onUnmounted(() => {
+	clearTimeout(searchTimer);
+});
 
 const { data: typesData } = useQuery(() => listDocumentTypesQuery());
 
-const typeSelectItems = computed(() =>
-	(typesData.value?.items ?? []).map((item) => ({
+const typeFilterItems = computed(() => [
+	{ title: 'All types', value: null as string | null },
+	...(typesData.value?.items ?? []).map((item) => ({
 		title: item.label,
 		value: item.id,
 	})),
-);
+]);
 const { typeLabel } = useDocumentTypeLabel(() => typesData.value?.items);
 
-const items = computed(() => data.value?.items ?? []);
+const queryInput = computed(() => ({
+	query: {
+		q: debouncedQ.value || undefined,
+		documentType: typeFilter.value ?? undefined,
+		includeSuperseded: includeSuperseded.value || undefined,
+		limit: 50,
+		cursor: cursor.value,
+	},
+}));
+
+const { data, isPending, error, refetch } = useQuery(() =>
+	listLibraryDocumentsQuery(queryInput.value),
+);
+
+watch(
+	[typeFilter, debouncedQ, includeSuperseded],
+	() => {
+		cursor.value = undefined;
+		accumulated.value = [];
+		nextCursor.value = null;
+	},
+);
+
+watch(
+	[data, isPending],
+	([page, pending]) => {
+		if (pending || !page) {
+			return;
+		}
+		const pageItems = page.items ?? [];
+		if (cursor.value) {
+			const existing = new Set(accumulated.value.map((item) => item.id));
+			accumulated.value = [
+				...accumulated.value,
+				...pageItems.filter((item) => !existing.has(item.id)),
+			];
+		}
+		else {
+			accumulated.value = pageItems;
+		}
+		nextCursor.value = page.nextCursor ?? null;
+	},
+	{ immediate: true },
+);
+
+const items = computed(() => accumulated.value);
+
+const showInitialLoader = computed(() => isPending.value && accumulated.value.length === 0);
+const loadingMore = computed(() => isPending.value && Boolean(cursor.value));
+
+function loadMore(): void {
+	if (!nextCursor.value || isPending.value) {
+		return;
+	}
+	cursor.value = nextCursor.value;
+}
+
+function refreshList(): void {
+	const hadCursor = cursor.value !== undefined;
+	cursor.value = undefined;
+	accumulated.value = [];
+	nextCursor.value = null;
+	if (!hadCursor) {
+		void refetch();
+	}
+}
 
 function isOpenable(item: { documentNumber?: string | null; status: string }): boolean {
 	return Boolean(item.documentNumber && item.status === 'published');
@@ -65,7 +143,7 @@ function isOpenable(item: { documentNumber?: string | null; status: string }): b
 			<v-col cols="12" md="3">
 				<v-select
 					v-model="typeFilter"
-					:items="[{ title: 'All types', value: null }, ...typeSelectItems]"
+					:items="typeFilterItems"
 					item-title="title"
 					item-value="value"
 					label="Type"
@@ -82,7 +160,7 @@ function isOpenable(item: { documentNumber?: string | null; status: string }): b
 				/>
 			</v-col>
 			<v-col cols="12" md="2" class="d-flex">
-				<v-btn class="flex-grow-1" variant="tonal" @click="() => refetch()">
+				<v-btn class="flex-grow-1" variant="tonal" @click="refreshList">
 					Refresh
 				</v-btn>
 			</v-col>
@@ -102,124 +180,189 @@ function isOpenable(item: { documentNumber?: string | null; status: string }): b
 				<v-btn
 					size="small"
 					variant="tonal"
-					@click="() => refetch()"
+					@click="refreshList"
 				>
 					Retry
 				</v-btn>
 			</div>
 		</v-alert>
 
-		<v-skeleton-loader v-if="isPending" type="table" />
+		<v-skeleton-loader v-if="showInitialLoader" type="table" />
 
 		<template v-else>
-			<div class="d-md-none">
-				<v-card
-					v-for="item in items"
-					:key="item.id"
-					class="mb-3 pa-3"
-					:class="{ 'library-card--clickable': isOpenable(item) }"
-					variant="outlined"
-				>
-					<template v-if="isOpenable(item) && item.documentNumber">
-						<RouterLink
-							class="library-stretched-link"
-							:to="{ name: 'library-document', params: { documentNumber: item.documentNumber } }"
-						>
-							<span class="font-weight-medium d-block mb-1">
-								{{ item.documentNumber }}
-							</span>
-						</RouterLink>
-					</template>
-					<div
-						v-else
-						class="font-weight-medium mb-1"
-					>
-						{{ item.documentNumber ?? '—' }}
-					</div>
-					<div class="text-body-2 mb-2">
-						{{ item.title }}
-					</div>
-					<div class="d-flex flex-wrap align-center ga-2 mb-1">
-						<DocumentStatusChip :status="item.status" />
-						<span class="text-caption text-medium-emphasis">
-							{{ typeLabel(item.documentType) }}
-							· v{{ item.documentVersion ?? '—' }}
-						</span>
-					</div>
-					<div class="text-caption text-medium-emphasis">
-						{{ item.publishedAt ? new Date(item.publishedAt).toLocaleString() : '—' }}
-					</div>
-				</v-card>
-				<p
-					v-if="items.length === 0"
-					class="text-medium-emphasis text-center py-8"
-				>
-					No controlled documents in the library yet.
-				</p>
-			</div>
-
-			<div class="d-none d-md-block table-scroll">
-				<v-table>
-					<thead>
-						<tr>
-							<th
-								scope="col"
-								class="table-scroll__sticky"
+			<template v-if="mdAndUp">
+				<div class="table-scroll">
+					<v-table>
+						<caption class="visually-hidden">
+							Library documents
+						</caption>
+						<thead>
+							<tr>
+								<th
+									scope="col"
+									class="table-scroll__sticky"
+								>
+									Number
+								</th>
+								<th scope="col">
+									Title
+								</th>
+								<th scope="col">
+									Type
+								</th>
+								<th scope="col">
+									Version
+								</th>
+								<th scope="col">
+									Status
+								</th>
+								<th scope="col">
+									Published
+								</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr
+								v-for="item in items"
+								:key="item.id"
+								:class="{ 'library-row--clickable': isOpenable(item) }"
 							>
-								Number
-							</th>
-							<th scope="col">
-								Title
-							</th>
-							<th scope="col">
-								Type
-							</th>
-							<th scope="col">
-								Version
-							</th>
-							<th scope="col">
-								Status
-							</th>
-							<th scope="col">
-								Published
-							</th>
-						</tr>
-					</thead>
-					<tbody>
-						<tr
-							v-for="item in items"
-							:key="item.id"
-							:class="{ 'library-row--clickable': isOpenable(item) }"
+								<td class="table-scroll__sticky font-weight-medium">
+									<RouterLink
+										v-if="isOpenable(item) && item.documentNumber"
+										class="library-stretched-link"
+										:to="{ name: 'library-document', params: { documentNumber: item.documentNumber } }"
+									>
+										{{ item.documentNumber }}
+									</RouterLink>
+									<template v-else>
+										{{ item.documentNumber ?? '—' }}
+									</template>
+								</td>
+								<td>{{ item.title }}</td>
+								<td>{{ typeLabel(item.documentType) }}</td>
+								<td>{{ item.documentVersion ?? '—' }}</td>
+								<td>
+									<DocumentStatusChip :status="item.status" />
+								</td>
+								<td class="text-body-2 text-medium-emphasis">
+									{{ formatDate(item.publishedAt) }}
+								</td>
+							</tr>
+							<tr v-if="items.length === 0">
+								<td colspan="6" class="text-medium-emphasis text-center py-8">
+									No controlled documents in the library yet.
+								</td>
+							</tr>
+						</tbody>
+					</v-table>
+				</div>
+			</template>
+
+			<template v-else>
+				<v-virtual-scroll
+					v-if="items.length > 20"
+					:items="items"
+					:item-height="120"
+					height="70vh"
+					item-key="id"
+				>
+					<template #default="{ item }">
+						<v-card
+							class="mb-3 pa-3"
+							:class="{ 'library-card--clickable': isOpenable(item) }"
+							variant="outlined"
 						>
-							<td class="table-scroll__sticky font-weight-medium">
+							<template v-if="isOpenable(item) && item.documentNumber">
 								<RouterLink
-									v-if="isOpenable(item) && item.documentNumber"
 									class="library-stretched-link"
 									:to="{ name: 'library-document', params: { documentNumber: item.documentNumber } }"
 								>
-									{{ item.documentNumber }}
+									<span class="font-weight-medium d-block mb-1">
+										{{ item.documentNumber }}
+									</span>
 								</RouterLink>
-								<template v-else>
-									{{ item.documentNumber ?? '—' }}
-								</template>
-							</td>
-							<td>{{ item.title }}</td>
-							<td>{{ typeLabel(item.documentType) }}</td>
-							<td>{{ item.documentVersion ?? '—' }}</td>
-							<td>
+							</template>
+							<div
+								v-else
+								class="font-weight-medium mb-1"
+							>
+								{{ item.documentNumber ?? '—' }}
+							</div>
+							<div class="text-body-2 mb-2">
+								{{ item.title }}
+							</div>
+							<div class="d-flex flex-wrap align-center ga-2 mb-1">
 								<DocumentStatusChip :status="item.status" />
-							</td>
-							<td class="text-body-2 text-medium-emphasis">
-								{{ item.publishedAt ? new Date(item.publishedAt).toLocaleString() : '—' }}
-							</td>
-						</tr>
-						<tr v-if="items.length === 0">
-							<td colspan="6" class="text-medium-emphasis text-center py-8">
-								No controlled documents in the library yet.
-							</td>
-						</tr>
-					</tbody>
-				</v-table>
+								<span class="text-caption text-medium-emphasis">
+									{{ typeLabel(item.documentType) }}
+									· v{{ item.documentVersion ?? '—' }}
+								</span>
+							</div>
+							<div class="text-caption text-medium-emphasis">
+								{{ formatDate(item.publishedAt) }}
+							</div>
+						</v-card>
+					</template>
+				</v-virtual-scroll>
+				<template v-else>
+					<v-card
+						v-for="item in items"
+						:key="item.id"
+						class="mb-3 pa-3"
+						:class="{ 'library-card--clickable': isOpenable(item) }"
+						variant="outlined"
+					>
+						<template v-if="isOpenable(item) && item.documentNumber">
+							<RouterLink
+								class="library-stretched-link"
+								:to="{ name: 'library-document', params: { documentNumber: item.documentNumber } }"
+							>
+								<span class="font-weight-medium d-block mb-1">
+									{{ item.documentNumber }}
+								</span>
+							</RouterLink>
+						</template>
+						<div
+							v-else
+							class="font-weight-medium mb-1"
+						>
+							{{ item.documentNumber ?? '—' }}
+						</div>
+						<div class="text-body-2 mb-2">
+							{{ item.title }}
+						</div>
+						<div class="d-flex flex-wrap align-center ga-2 mb-1">
+							<DocumentStatusChip :status="item.status" />
+							<span class="text-caption text-medium-emphasis">
+								{{ typeLabel(item.documentType) }}
+								· v{{ item.documentVersion ?? '—' }}
+							</span>
+						</div>
+						<div class="text-caption text-medium-emphasis">
+							{{ formatDate(item.publishedAt) }}
+						</div>
+					</v-card>
+					<p
+						v-if="items.length === 0"
+						class="text-medium-emphasis text-center py-8"
+					>
+						No controlled documents in the library yet.
+					</p>
+				</template>
+			</template>
+
+			<div
+				v-if="nextCursor"
+				class="d-flex justify-center mt-4"
+			>
+				<v-btn
+					variant="tonal"
+					:loading="loadingMore"
+					@click="loadMore"
+				>
+					Load more
+				</v-btn>
 			</div>
 		</template>
 	</div>
@@ -270,5 +413,17 @@ function isOpenable(item: { documentNumber?: string | null; status: string }): b
 	z-index: 1;
 	background: rgb(var(--v-theme-surface));
 	min-width: 8rem;
+}
+
+.visually-hidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
 }
 </style>

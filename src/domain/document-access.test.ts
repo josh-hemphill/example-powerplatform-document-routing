@@ -46,6 +46,24 @@ describe('document access', () => {
 		expect(canActorAccessDocument(doc, 'casey.author@contoso.com')).toBe(true);
 	});
 
+	it('does not grant access via elevation pool until the step is elevated', () => {
+		const doc = baseDoc({
+			status: 'in_review',
+			approvalSteps: [
+				{
+					status: 'pending',
+					approverEmail: 'named@contoso.com',
+					pool: [],
+					elevationPool: [{ email: 'elevated.member@contoso.com' }],
+					elevated: false,
+				},
+			],
+		});
+		expect(canActorAccessDocument(doc, 'elevated.member@contoso.com')).toBe(false);
+		doc.approvalSteps[0].elevated = true;
+		expect(canActorAccessDocument(doc, 'elevated.member@contoso.com')).toBe(true);
+	});
+
 	it('allows any authenticated user to read published and superseded library docs', () => {
 		expect(
 			canActorAccessDocument(baseDoc({ status: 'published' }), 'stranger@contoso.com'),

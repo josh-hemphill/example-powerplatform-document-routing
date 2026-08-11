@@ -126,7 +126,16 @@ export function useDocumentFormState(input: {
 	}
 
 	/**
+	 * Clears approval/decision comments after a successful submit or decide.
+	 */
+	function clearActionComments(): void {
+		approvalForm.comment = '';
+		decisionForm.comment = '';
+	}
+
+	/**
 	 * Hydrates forms from the server document (load, document switch, or discard).
+	 * Soft refetch of the same document never clears in-progress action comments.
 	 */
 	function hydrateFromDocument(force = false): void {
 		const document = input.document.value;
@@ -143,8 +152,10 @@ export function useDocumentFormState(input: {
 		};
 		applySnapshot(next);
 		hydratedDocumentId.value = document.id;
-		approvalForm.comment = '';
-		decisionForm.comment = '';
+		// Only clear comments when switching documents (or forced discard/reload).
+		if (!sameDocument || force) {
+			clearActionComments();
+		}
 	}
 
 	/**
@@ -200,5 +211,6 @@ export function useDocumentFormState(input: {
 		hydrateFromDocument,
 		markDraftClean,
 		markPublishClean,
+		clearActionComments,
 	};
 }

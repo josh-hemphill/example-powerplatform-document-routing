@@ -11,6 +11,7 @@ import {
 	abandonSupersedeMutation,
 	claimApprovalStepMutation,
 	decideApprovalStepMutation,
+	getDocumentQueryKey,
 	listLibraryDocumentsQueryKey,
 	processApprovalSlaMutation,
 	publishDocumentPdfMutation,
@@ -44,85 +45,74 @@ export function useWorkspaceCommands(options: {
 	const actionError = ref<string | null>(null);
 	const hasDraftRevisionConflict = ref(false);
 
-	const { mutateAsync: saveDraftAsync, isLoading: isSavingDraft } = useMutation({
-		...updateDocumentDraftMutation(),
-		async onSettled() {
-			await invalidateDocumentQueries();
-		},
-	});
+	function settledInvalidator(forDocumentId: string, invalidateList = true) {
+		return async() => {
+			if (invalidateList) {
+				await invalidateDocumentQueries(forDocumentId);
+				return;
+			}
+			await queryCache.invalidateQueries({
+				key: getDocumentQueryKey({ path: { documentId: forDocumentId } }),
+			});
+		};
+	}
+
+	const { mutateAsync: saveDraftAsync, isLoading: isSavingDraft } = useMutation(
+		updateDocumentDraftMutation(),
+	);
 
 	const { mutateAsync: submitApprovalAsync, isLoading: isSubmittingApproval }
-		= useMutation({
-			...submitForApprovalMutation(),
-			async onSettled() {
-				await invalidateDocumentQueries();
-			},
-		});
+		= useMutation(submitForApprovalMutation());
 
-	const { mutateAsync: decideStepAsync, isLoading: isDecidingStep } = useMutation({
-		...decideApprovalStepMutation(),
-		async onSettled() {
-			await invalidateDocumentQueries();
-		},
-	});
+	const { mutateAsync: decideStepAsync, isLoading: isDecidingStep } = useMutation(
+		decideApprovalStepMutation(),
+	);
 
-	const { mutateAsync: claimStepAsync, isLoading: isClaiming } = useMutation({
-		...claimApprovalStepMutation(),
-		async onSettled() {
-			await invalidateDocumentQueries();
-		},
-	});
+	const { mutateAsync: claimStepAsync, isLoading: isClaiming } = useMutation(
+		claimApprovalStepMutation(),
+	);
 
-	const { mutateAsync: releaseStepAsync, isLoading: isReleasing } = useMutation({
-		...releaseApprovalStepMutation(),
-		async onSettled() {
-			await invalidateDocumentQueries();
-		},
-	});
+	const { mutateAsync: releaseStepAsync, isLoading: isReleasing } = useMutation(
+		releaseApprovalStepMutation(),
+	);
 
-	const { mutateAsync: processSlaAsync, isLoading: isProcessingSla } = useMutation({
-		...processApprovalSlaMutation(),
-		async onSettled() {
-			await invalidateDocumentQueries();
-		},
-	});
+	const { mutateAsync: processSlaAsync, isLoading: isProcessingSla } = useMutation(
+		processApprovalSlaMutation(),
+	);
 
-	const { mutateAsync: withdrawAsync, isLoading: isWithdrawing } = useMutation({
-		...withdrawAndReviseMutation(),
-		async onSettled() {
-			await invalidateDocumentQueries();
-		},
-	});
+	const { mutateAsync: withdrawAsync, isLoading: isWithdrawing } = useMutation(
+		withdrawAndReviseMutation(),
+	);
 
-	const { mutateAsync: supersedeAsync, isLoading: isSuperseding } = useMutation({
-		...supersedeDocumentMutation(),
-		async onSettled() {
-			await Promise.all([
-				invalidateDocumentQueries(),
-				queryCache.invalidateQueries({ key: listLibraryDocumentsQueryKey() }),
-			]);
-		},
-	});
+	const { mutateAsync: supersedeAsync, isLoading: isSuperseding } = useMutation(
+		supersedeDocumentMutation(),
+	);
 
-	const { mutateAsync: abandonSupersedeAsync, isLoading: isAbandoningSupersede } = useMutation({
-		...abandonSupersedeMutation(),
-		async onSettled() {
-			await Promise.all([
-				invalidateDocumentQueries(),
-				queryCache.invalidateQueries({ key: listLibraryDocumentsQueryKey() }),
-			]);
-		},
-	});
+	const { mutateAsync: abandonSupersedeAsync, isLoading: isAbandoningSupersede }
+		= useMutation(abandonSupersedeMutation());
 
-	const { mutateAsync: publishPdfAsync, isLoading: isPublishingPdf } = useMutation({
-		...publishDocumentPdfMutation(),
-		async onSettled() {
-			await Promise.all([
-				invalidateDocumentQueries(),
-				queryCache.invalidateQueries({ key: listLibraryDocumentsQueryKey() }),
-			]);
-		},
-	});
+	const { mutateAsync: publishPdfAsync, isLoading: isPublishingPdf } = useMutation(
+		publishDocumentPdfMutation(),
+	);
+
+	async function runDocumentMutation<T>(
+		forDocumentId: string,
+		action: () => Promise<T>,
+		options: { alsoInvalidateLibrary?: boolean; invalidateList?: boolean } = {},
+	): Promise<T> {
+		try {
+			return await action();
+		}
+		finally {
+			await settledInvalidator(
+				forDocumentId,
+				options.invalidateList !== false,
+			)();
+			if (options.alsoInvalidateLibrary) {
+				await queryCache.invalidateQueries({ key: listLibraryDocumentsQueryKey() });
+			}
+		}
+	}
 
 	function clearActionFeedback(): void {
 		actionError.value = null;
@@ -131,6 +121,11 @@ export function useWorkspaceCommands(options: {
 
 	function showSuccess(message: string): void {
 		toast.success(message);
+	}
+
+	/** True when the workspace is still on the document this mutation targeted. */
+	function isCurrentDocument(id: string): boolean {
+		return documentId.value === id;
 	}
 
 	async function onSaveDraft(): Promise<void> {
@@ -142,20 +137,28 @@ export function useWorkspaceCommands(options: {
 		if (!document.value) {
 			return;
 		}
+		const id = documentId.value;
 		try {
-			await saveDraftAsync({
-				path: { documentId: documentId.value },
-				body: {
-					title: forms.draftForm.title,
-					bodyMarkdown: forms.draftForm.bodyMarkdown,
-					summary: forms.draftForm.summary || undefined,
-					expectedContentRevision: document.value.contentRevision,
-				},
-			});
+			await runDocumentMutation(id, async() =>
+				saveDraftAsync({
+					path: { documentId: id },
+					body: {
+						title: forms.draftForm.title,
+						bodyMarkdown: forms.draftForm.bodyMarkdown,
+						summary: forms.draftForm.summary || undefined,
+						expectedContentRevision: document.value!.contentRevision,
+					},
+				}), { invalidateList: false });
+			if (!isCurrentDocument(id)) {
+				return;
+			}
 			forms.markDraftClean();
 			showSuccess('Draft saved. Ready for the approval chain when content is complete.');
 		}
 		catch(saveError) {
+			if (!isCurrentDocument(id)) {
+				return;
+			}
 			if (getApiErrorCode(saveError) === 'revision_conflict') {
 				hasDraftRevisionConflict.value = true;
 				actionError.value = getApiErrorMessage(
@@ -169,25 +172,42 @@ export function useWorkspaceCommands(options: {
 	}
 
 	async function onReloadDraftAfterConflict(): Promise<void> {
+		const id = documentId.value;
 		hasDraftRevisionConflict.value = false;
 		actionError.value = null;
 		await refetch();
+		if (!isCurrentDocument(id)) {
+			return;
+		}
 		forms.hydrateFromDocument(true);
 		showSuccess('Draft reloaded from the server.');
 	}
 
 	async function onSubmitForApproval(): Promise<void> {
 		clearActionFeedback();
+		if (forms.isDraftDirty.value) {
+			actionError.value = 'Save your draft before submitting for approval.';
+			return;
+		}
+		const id = documentId.value;
 		try {
-			await submitApprovalAsync({
-				path: { documentId: documentId.value },
-				body: {
-					comment: forms.approvalForm.comment || undefined,
-				},
-			});
+			await runDocumentMutation(id, async() =>
+				submitApprovalAsync({
+					path: { documentId: id },
+					body: {
+						comment: forms.approvalForm.comment || undefined,
+					},
+				}));
+			if (!isCurrentDocument(id)) {
+				return;
+			}
+			forms.clearActionComments();
 			showSuccess('Submitted to the approval chain.');
 		}
 		catch(submitError) {
+			if (!isCurrentDocument(id)) {
+				return;
+			}
 			actionError.value = getApiErrorMessage(submitError, 'Failed to submit for approval');
 		}
 	}
@@ -199,14 +219,22 @@ export function useWorkspaceCommands(options: {
 			actionError.value = 'No queued pool step to claim.';
 			return;
 		}
+		const id = documentId.value;
 		try {
-			await claimStepAsync({
-				path: { documentId: documentId.value, stepId: step.id },
-				body: {},
-			});
+			await runDocumentMutation(id, async() =>
+				claimStepAsync({
+					path: { documentId: id, stepId: step.id },
+					body: {},
+				}));
+			if (!isCurrentDocument(id)) {
+				return;
+			}
 			showSuccess('Step claimed. You can approve or reject.');
 		}
 		catch(claimError) {
+			if (!isCurrentDocument(id)) {
+				return;
+			}
 			actionError.value = getApiErrorMessage(claimError, 'Failed to claim step');
 		}
 	}
@@ -218,57 +246,92 @@ export function useWorkspaceCommands(options: {
 			actionError.value = 'No claimed pool step to release.';
 			return;
 		}
+		const id = documentId.value;
 		try {
-			await releaseStepAsync({
-				path: { documentId: documentId.value, stepId: step.id },
-				body: {},
-			});
+			await runDocumentMutation(id, async() =>
+				releaseStepAsync({
+					path: { documentId: id, stepId: step.id },
+					body: {},
+				}));
+			if (!isCurrentDocument(id)) {
+				return;
+			}
 			showSuccess('Returned to the pool queue.');
 		}
 		catch(releaseError) {
+			if (!isCurrentDocument(id)) {
+				return;
+			}
 			actionError.value = getApiErrorMessage(releaseError, 'Failed to release step');
 		}
 	}
 
 	async function onProcessSla(): Promise<void> {
 		clearActionFeedback();
+		const id = documentId.value;
 		try {
-			await processSlaAsync({
-				path: { documentId: documentId.value },
-				body: {},
-			});
+			await runDocumentMutation(id, async() =>
+				processSlaAsync({
+					path: { documentId: id },
+					body: {},
+				}));
+			if (!isCurrentDocument(id)) {
+				return;
+			}
 			showSuccess('SLA processor ran (elevates overdue steps when due).');
 		}
 		catch(slaError) {
+			if (!isCurrentDocument(id)) {
+				return;
+			}
 			actionError.value = getApiErrorMessage(slaError, 'Failed to process SLA');
 		}
 	}
 
 	async function onWithdrawAndRevise(): Promise<void> {
 		clearActionFeedback();
+		const id = documentId.value;
 		try {
-			await withdrawAsync({
-				path: { documentId: documentId.value },
-				body: {},
-			});
+			await runDocumentMutation(id, async() =>
+				withdrawAsync({
+					path: { documentId: id },
+					body: {},
+				}));
+			if (!isCurrentDocument(id)) {
+				return;
+			}
 			showSuccess('Withdrawn for revision. Draft editing is available again.');
 		}
 		catch(withdrawError) {
+			if (!isCurrentDocument(id)) {
+				return;
+			}
 			actionError.value = getApiErrorMessage(withdrawError, 'Failed to withdraw and revise');
 		}
 	}
 
 	async function onSupersede(): Promise<string | null> {
 		clearActionFeedback();
+		const id = documentId.value;
 		try {
-			const successor = await supersedeAsync({
-				path: { documentId: documentId.value },
-				body: {},
-			});
-			showSuccess('Successor draft opened for supersession.');
+			const successor = await runDocumentMutation(
+				id,
+				async() =>
+					supersedeAsync({
+						path: { documentId: id },
+						body: {},
+					}),
+				{ alsoInvalidateLibrary: true },
+			);
+			if (isCurrentDocument(id)) {
+				showSuccess('Successor draft opened for supersession.');
+			}
 			return successor.id;
 		}
 		catch(supersedeError) {
+			if (!isCurrentDocument(id)) {
+				return null;
+			}
 			actionError.value = getApiErrorMessage(supersedeError, 'Failed to supersede');
 			return null;
 		}
@@ -276,14 +339,26 @@ export function useWorkspaceCommands(options: {
 
 	async function onAbandonSupersede(): Promise<void> {
 		clearActionFeedback();
+		const id = documentId.value;
 		try {
-			await abandonSupersedeAsync({
-				path: { documentId: documentId.value },
-				body: {},
-			});
+			await runDocumentMutation(
+				id,
+				async() =>
+					abandonSupersedeAsync({
+						path: { documentId: id },
+						body: {},
+					}),
+				{ alsoInvalidateLibrary: true },
+			);
+			if (!isCurrentDocument(id)) {
+				return;
+			}
 			showSuccess('Supersede successor abandoned. A new supersede can be opened on the prior published document.');
 		}
 		catch(abandonError) {
+			if (!isCurrentDocument(id)) {
+				return;
+			}
 			actionError.value = getApiErrorMessage(abandonError, 'Failed to abandon successor');
 		}
 	}
@@ -295,20 +370,29 @@ export function useWorkspaceCommands(options: {
 			actionError.value = 'No pending approval step. Claim a pool step first if needed.';
 			return;
 		}
+		const id = documentId.value;
 		try {
-			await decideStepAsync({
-				path: {
-					documentId: documentId.value,
-					stepId: step.id,
-				},
-				body: {
-					decision,
-					comment: forms.decisionForm.comment || undefined,
-				},
-			});
+			await runDocumentMutation(id, async() =>
+				decideStepAsync({
+					path: {
+						documentId: id,
+						stepId: step.id,
+					},
+					body: {
+						decision,
+						comment: forms.decisionForm.comment || undefined,
+					},
+				}));
+			if (!isCurrentDocument(id)) {
+				return;
+			}
+			forms.clearActionComments();
 			showSuccess(decision === 'approve' ? 'Approval recorded.' : 'Document rejected.');
 		}
 		catch(decisionError) {
+			if (!isCurrentDocument(id)) {
+				return;
+			}
 			actionError.value = getApiErrorMessage(decisionError, 'Failed to record decision');
 		}
 	}
@@ -318,28 +402,37 @@ export function useWorkspaceCommands(options: {
 		if (!document.value) {
 			return;
 		}
+		const id = documentId.value;
 		try {
 			const body: PublishRequest = {
 				publishDestinationId: forms.publishForm.publishDestinationId ?? undefined,
 				folderPathOverride: forms.publishForm.folderPathOverride || undefined,
 			};
-			const result = await publishApprovedDocument({
-				document: document.value,
-				publishDestinationId: body.publishDestinationId,
-				folderPathOverride: body.folderPathOverride,
-				publishApi: async(publishBody) => {
-					const published = await publishPdfAsync({
-						path: { documentId: documentId.value },
-						body: publishBody,
-					});
-					return {
-						sharePointUrl: published.sharePointUrl,
-						pdfFileName: published.pdfFileName,
-						sharePointItemId: published.sharePointItemId,
-						idempotent: published.idempotent,
-					};
-				},
-			});
+			const result = await runDocumentMutation(
+				id,
+				async() =>
+					publishApprovedDocument({
+						document: document.value!,
+						publishDestinationId: body.publishDestinationId,
+						folderPathOverride: body.folderPathOverride,
+						publishApi: async(publishBody) => {
+							const published = await publishPdfAsync({
+								path: { documentId: id },
+								body: publishBody,
+							});
+							return {
+								sharePointUrl: published.sharePointUrl,
+								pdfFileName: published.pdfFileName,
+								sharePointItemId: published.sharePointItemId,
+								idempotent: published.idempotent,
+							};
+						},
+					}),
+				{ alsoInvalidateLibrary: true },
+			);
+			if (!isCurrentDocument(id)) {
+				return;
+			}
 			forms.markPublishClean();
 			showSuccess(
 				result.idempotent
@@ -348,6 +441,9 @@ export function useWorkspaceCommands(options: {
 			);
 		}
 		catch(publishError) {
+			if (!isCurrentDocument(id)) {
+				return;
+			}
 			actionError.value = getApiErrorMessage(publishError, 'Failed to publish PDF');
 		}
 	}

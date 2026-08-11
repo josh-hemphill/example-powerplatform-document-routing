@@ -21,10 +21,10 @@ export async function handlePublishRoutes(context: MockHttpContext): Promise<boo
 		method,
 		path,
 		actor,
+		actorRoles,
 		req,
 		res,
 		readJson,
-		readActorRoles,
 		sendJson,
 		matchRoute,
 		stamp,
@@ -44,8 +44,7 @@ export async function handlePublishRoutes(context: MockHttpContext): Promise<boo
 		return true;
 	}
 
-	const roles = readActorRoles(req);
-	if (!canActorPublishDocument(document, actor, roles)) {
+	if (!canActorPublishDocument(document, actor, actorRoles)) {
 		sendJson(res, 403, {
 			message:
 				'Publisher or Admin role and document access required to publish',

@@ -83,6 +83,10 @@ router.beforeEach(async(to) => {
 	}
 	const identity = useIdentityStore();
 	await identity.ensureLoaded();
+	// Do not hard-redirect when hosted role lookup failed — Admin view shows retry.
+	if (identity.rolesUnresolved) {
+		return true;
+	}
 	if (!identity.hasRole('admin')) {
 		return { name: 'inbox' };
 	}

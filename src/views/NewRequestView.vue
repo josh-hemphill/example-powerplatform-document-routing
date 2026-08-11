@@ -42,6 +42,9 @@ const form = reactive({
 	priority: 'normal' as 'low' | 'normal' | 'high',
 });
 
+const requestTitleRules = titleRules('Request title');
+const requestFreeformRules = freeformRequestRules();
+
 watch(
 	typeItems,
 	(items) => {
@@ -94,7 +97,7 @@ async function submit(): Promise<void> {
 </script>
 
 <template>
-	<v-card class="pa-6">
+	<div>
 		<p class="text-body-2 text-medium-emphasis mb-6">
 			Capture an unstructured request. Requester is the signed-in principal
 			(<strong>{{ context.email ?? '…' }}</strong>). The document type chooses the draft
@@ -106,6 +109,7 @@ async function submit(): Promise<void> {
 			type="error"
 			variant="tonal"
 			class="mb-4"
+			role="alert"
 		>
 			{{ formError }}
 		</v-alert>
@@ -116,7 +120,7 @@ async function submit(): Promise<void> {
 					<v-text-field
 						v-model="form.title"
 						label="Request title"
-						:rules="titleRules('Request title')"
+						:rules="requestTitleRules"
 						:counter="TITLE_MAX_LENGTH"
 						:maxlength="TITLE_MAX_LENGTH"
 						required
@@ -152,7 +156,7 @@ async function submit(): Promise<void> {
 						v-model="form.freeformRequest"
 						label="Freeform request"
 						rows="8"
-						:rules="freeformRequestRules()"
+						:rules="requestFreeformRules"
 						:hint="selectedType?.requestHint"
 						persistent-hint
 					/>
@@ -181,11 +185,11 @@ async function submit(): Promise<void> {
 					color="primary"
 					type="submit"
 					:loading="isLoading || identityLoading"
-					:disabled="!canAct || !formValid"
+					:disabled="!canAct || !formValid || isLoading || identityLoading"
 				>
 					Submit request
 				</v-btn>
 			</div>
 		</v-form>
-	</v-card>
+	</div>
 </template>

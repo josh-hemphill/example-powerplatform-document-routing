@@ -46,6 +46,7 @@ describe('identity store', () => {
 		expect(store.status).toBe('hosted');
 		expect(store.email).toBe('pat@contoso.com');
 		expect(store.identity.roles).toEqual(['user']);
+		expect(store.rolesUnresolved).toBe(true);
 		expect(store.hasRole('publisher')).toBe(false);
 		expect(store.hasRole('admin')).toBe(false);
 		expect(fetchPrincipal).toHaveBeenCalledWith('pat@contoso.com');
