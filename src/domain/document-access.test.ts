@@ -60,7 +60,7 @@ describe('document access', () => {
 			],
 		});
 		expect(canActorAccessDocument(doc, 'elevated.member@contoso.com')).toBe(false);
-		doc.approvalSteps[0]!.elevated = true;
+		doc.approvalSteps[0].elevated = true;
 		expect(canActorAccessDocument(doc, 'elevated.member@contoso.com')).toBe(true);
 	});
 

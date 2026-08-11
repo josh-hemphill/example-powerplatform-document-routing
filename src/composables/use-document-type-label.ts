@@ -11,10 +11,16 @@ import { findDocumentType } from '@/config/document-types';
 export function useDocumentTypeLabel(
 	types: MaybeRefOrGetter<Array<{ id: string; label: string }> | null | undefined>,
 ) {
-	const items = computed(() => toValue(types) ?? []);
+	const labelById = computed(() => {
+		const map = new Map<string, string>();
+		for (const item of toValue(types) ?? []) {
+			map.set(item.id, item.label);
+		}
+		return map;
+	});
 
 	function typeLabel(id: string): string {
-		return items.value.find((item) => item.id === id)?.label
+		return labelById.value.get(id)
 			?? findDocumentType(id)?.label
 			?? id;
 	}

@@ -23,8 +23,8 @@ const pinia = createPinia();
 app.use(pinia);
 app.use(PiniaColada, {
 	queryOptions: {
-		// Keep inbox fresh while authors and approvers collaborate.
-		staleTime: 10_000,
+		// Collaborative lists stay reasonably fresh without refetch storms.
+		staleTime: 30_000,
 	},
 });
 app.use(router);

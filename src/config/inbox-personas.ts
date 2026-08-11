@@ -1,5 +1,5 @@
-import type { ApprovalStepStatus } from '../domain/approval-queue';
-import type { DocumentStatus } from '../domain/document-status';
+import type { ApprovalStepStatus } from '../domain/approval-queue.ts';
+import type { DocumentStatus } from '../domain/document-status.ts';
 
 export type InboxPersona
 	= | 'all'

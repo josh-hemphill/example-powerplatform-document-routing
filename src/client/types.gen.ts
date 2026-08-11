@@ -461,6 +461,18 @@ export type ListDocumentsData = {
          * Free-text search across title and request body
          */
         q?: string;
+        /**
+         * Inbox persona filter (server-side; mirrors client personas)
+         */
+        persona?: 'all' | 'waiting_on_me' | 'available_in_pool' | 'my_requests' | 'needs_draft' | 'ready_to_publish';
+        /**
+         * Max items to return (default 50, max 200)
+         */
+        limit?: number;
+        /**
+         * Opaque pagination cursor from a prior nextCursor
+         */
+        cursor?: string;
     };
     url: '/documents';
 };
@@ -484,6 +496,10 @@ export type ListDocumentsResponses = {
      */
     200: {
         items: Array<DocumentSummary>;
+        /**
+         * Pass as cursor on the next request; null when no more pages
+         */
+        nextCursor?: string;
     };
 };
 
@@ -976,6 +992,14 @@ export type ListLibraryDocumentsData = {
         q?: string;
         documentType?: string;
         includeSuperseded?: boolean;
+        /**
+         * Max items to return (default 50, max 200)
+         */
+        limit?: number;
+        /**
+         * Opaque pagination cursor from a prior nextCursor
+         */
+        cursor?: string;
     };
     url: '/library';
 };
@@ -995,6 +1019,10 @@ export type ListLibraryDocumentsResponses = {
      */
     200: {
         items: Array<DocumentSummary>;
+        /**
+         * Pass as cursor on the next request; null when no more pages
+         */
+        nextCursor?: string;
     };
 };
 

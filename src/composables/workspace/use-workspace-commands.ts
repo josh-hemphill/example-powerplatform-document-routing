@@ -11,6 +11,7 @@ import {
 	abandonSupersedeMutation,
 	claimApprovalStepMutation,
 	decideApprovalStepMutation,
+	getDocumentQueryKey,
 	listLibraryDocumentsQueryKey,
 	processApprovalSlaMutation,
 	publishDocumentPdfMutation,
@@ -44,9 +45,15 @@ export function useWorkspaceCommands(options: {
 	const actionError = ref<string | null>(null);
 	const hasDraftRevisionConflict = ref(false);
 
-	function settledInvalidator(forDocumentId: string) {
+	function settledInvalidator(forDocumentId: string, invalidateList = true) {
 		return async() => {
-			await invalidateDocumentQueries(forDocumentId);
+			if (invalidateList) {
+				await invalidateDocumentQueries(forDocumentId);
+				return;
+			}
+			await queryCache.invalidateQueries({
+				key: getDocumentQueryKey({ path: { documentId: forDocumentId } }),
+			});
 		};
 	}
 
@@ -91,14 +98,17 @@ export function useWorkspaceCommands(options: {
 	async function runDocumentMutation<T>(
 		forDocumentId: string,
 		action: () => Promise<T>,
-		alsoInvalidateLibrary = false,
+		options: { alsoInvalidateLibrary?: boolean; invalidateList?: boolean } = {},
 	): Promise<T> {
 		try {
 			return await action();
 		}
 		finally {
-			await settledInvalidator(forDocumentId)();
-			if (alsoInvalidateLibrary) {
+			await settledInvalidator(
+				forDocumentId,
+				options.invalidateList !== false,
+			)();
+			if (options.alsoInvalidateLibrary) {
 				await queryCache.invalidateQueries({ key: listLibraryDocumentsQueryKey() });
 			}
 		}
@@ -124,7 +134,7 @@ export function useWorkspaceCommands(options: {
 		}
 		const id = documentId.value;
 		try {
-			await runDocumentMutation(id, () =>
+			await runDocumentMutation(id, async() =>
 				saveDraftAsync({
 					path: { documentId: id },
 					body: {
@@ -133,7 +143,7 @@ export function useWorkspaceCommands(options: {
 						summary: forms.draftForm.summary || undefined,
 						expectedContentRevision: document.value!.contentRevision,
 					},
-				}));
+				}), { invalidateList: false });
 			forms.markDraftClean();
 			showSuccess('Draft saved. Ready for the approval chain when content is complete.');
 		}
@@ -166,7 +176,7 @@ export function useWorkspaceCommands(options: {
 		}
 		const id = documentId.value;
 		try {
-			await runDocumentMutation(id, () =>
+			await runDocumentMutation(id, async() =>
 				submitApprovalAsync({
 					path: { documentId: id },
 					body: {
@@ -190,7 +200,7 @@ export function useWorkspaceCommands(options: {
 		}
 		const id = documentId.value;
 		try {
-			await runDocumentMutation(id, () =>
+			await runDocumentMutation(id, async() =>
 				claimStepAsync({
 					path: { documentId: id, stepId: step.id },
 					body: {},
@@ -211,7 +221,7 @@ export function useWorkspaceCommands(options: {
 		}
 		const id = documentId.value;
 		try {
-			await runDocumentMutation(id, () =>
+			await runDocumentMutation(id, async() =>
 				releaseStepAsync({
 					path: { documentId: id, stepId: step.id },
 					body: {},
@@ -227,7 +237,7 @@ export function useWorkspaceCommands(options: {
 		clearActionFeedback();
 		const id = documentId.value;
 		try {
-			await runDocumentMutation(id, () =>
+			await runDocumentMutation(id, async() =>
 				processSlaAsync({
 					path: { documentId: id },
 					body: {},
@@ -243,7 +253,7 @@ export function useWorkspaceCommands(options: {
 		clearActionFeedback();
 		const id = documentId.value;
 		try {
-			await runDocumentMutation(id, () =>
+			await runDocumentMutation(id, async() =>
 				withdrawAsync({
 					path: { documentId: id },
 					body: {},
@@ -261,12 +271,12 @@ export function useWorkspaceCommands(options: {
 		try {
 			const successor = await runDocumentMutation(
 				id,
-				() =>
+				async() =>
 					supersedeAsync({
 						path: { documentId: id },
 						body: {},
 					}),
-				true,
+				{ alsoInvalidateLibrary: true },
 			);
 			showSuccess('Successor draft opened for supersession.');
 			return successor.id;
@@ -283,12 +293,12 @@ export function useWorkspaceCommands(options: {
 		try {
 			await runDocumentMutation(
 				id,
-				() =>
+				async() =>
 					abandonSupersedeAsync({
 						path: { documentId: id },
 						body: {},
 					}),
-				true,
+				{ alsoInvalidateLibrary: true },
 			);
 			showSuccess('Supersede successor abandoned. A new supersede can be opened on the prior published document.');
 		}
@@ -306,7 +316,7 @@ export function useWorkspaceCommands(options: {
 		}
 		const id = documentId.value;
 		try {
-			await runDocumentMutation(id, () =>
+			await runDocumentMutation(id, async() =>
 				decideStepAsync({
 					path: {
 						documentId: id,
@@ -338,7 +348,7 @@ export function useWorkspaceCommands(options: {
 			};
 			const result = await runDocumentMutation(
 				id,
-				() =>
+				async() =>
 					publishApprovedDocument({
 						document: document.value!,
 						publishDestinationId: body.publishDestinationId,
@@ -356,7 +366,7 @@ export function useWorkspaceCommands(options: {
 							};
 						},
 					}),
-				true,
+				{ alsoInvalidateLibrary: true },
 			);
 			forms.markPublishClean();
 			showSuccess(

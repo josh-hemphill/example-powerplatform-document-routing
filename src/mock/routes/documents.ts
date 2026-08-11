@@ -7,6 +7,8 @@ import {
 	validateSummary,
 	validateTitle,
 } from '../../api/form-rules.ts';
+import { matchesInboxPersona } from '../../config/inbox-personas.ts';
+import { resolvePrincipalRolesByEmail } from '../../config/local-personas.ts';
 import {
 	canActorAccessDocument,
 	canActorMutateDraft,
@@ -18,6 +20,7 @@ import {
 } from '../control-store.ts';
 import { pushHistory, toSummary } from '../document-http.ts';
 import { getDocumentStore } from '../document-store.ts';
+import { paginateItems, parseListPagination } from '../list-pagination.ts';
 
 export async function handleDocumentRoutes(context: MockHttpContext): Promise<boolean> {
 	const {
@@ -25,6 +28,7 @@ export async function handleDocumentRoutes(context: MockHttpContext): Promise<bo
 		path,
 		url,
 		actor,
+		actorRoles,
 		req,
 		res,
 		readJson,
@@ -38,30 +42,36 @@ export async function handleDocumentRoutes(context: MockHttpContext): Promise<bo
 		const status = url.searchParams.get('status');
 		const documentType = url.searchParams.get('documentType');
 		const q = url.searchParams.get('q')?.toLowerCase();
-		let items = [...getDocumentStore().values()]
-			.filter((document) =>
-				document.status !== 'published' && document.status !== 'superseded')
-			.filter((document) => canActorAccessDocument(document, actor))
-			.map(toSummary);
+		const persona = url.searchParams.get('persona') ?? 'all';
+		const { offset, limit } = parseListPagination(url);
+		const roles = actorRoles.length > 0 ? actorRoles : resolvePrincipalRolesByEmail(actor);
+
+		let records = [...getDocumentStore().values()].filter(
+			(document) =>
+				document.status !== 'published'
+				&& document.status !== 'superseded'
+				&& canActorAccessDocument(document, actor),
+		);
 
 		if (status) {
-			items = items.filter((item) => item.status === status);
+			records = records.filter((document) => document.status === status);
 		}
 		if (documentType) {
-			items = items.filter((item) => item.documentType === documentType);
+			records = records.filter((document) => document.documentType === documentType);
 		}
 		if (q) {
-			items = items.filter((item) => {
-				const full = getDocumentStore().get(item.id);
-				return (
-					item.title.toLowerCase().includes(q)
-					|| Boolean(full?.freeformRequest.toLowerCase().includes(q))
-				);
-			});
+			records = records.filter((document) =>
+				document.title.toLowerCase().includes(q)
+				|| document.freeformRequest.toLowerCase().includes(q));
+		}
+		if (persona && persona !== 'all') {
+			records = records.filter((document) =>
+				matchesInboxPersona(toSummary(document), persona as never, actor, roles));
 		}
 
-		items.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-		sendJson(res, 200, { items });
+		records.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+		const page = paginateItems(records.map(toSummary), offset, limit);
+		sendJson(res, 200, page);
 		return true;
 	}
 

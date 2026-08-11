@@ -42,6 +42,9 @@ const form = reactive({
 	priority: 'normal' as 'low' | 'normal' | 'high',
 });
 
+const requestTitleRules = titleRules('Request title');
+const requestFreeformRules = freeformRequestRules();
+
 watch(
 	typeItems,
 	(items) => {
@@ -116,7 +119,7 @@ async function submit(): Promise<void> {
 					<v-text-field
 						v-model="form.title"
 						label="Request title"
-						:rules="titleRules('Request title')"
+						:rules="requestTitleRules"
 						:counter="TITLE_MAX_LENGTH"
 						:maxlength="TITLE_MAX_LENGTH"
 						required
@@ -152,7 +155,7 @@ async function submit(): Promise<void> {
 						v-model="form.freeformRequest"
 						label="Freeform request"
 						rows="8"
-						:rules="freeformRequestRules()"
+						:rules="requestFreeformRules"
 						:hint="selectedType?.requestHint"
 						persistent-hint
 					/>

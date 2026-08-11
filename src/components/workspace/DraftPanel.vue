@@ -25,6 +25,10 @@ const emit = defineEmits<{
 const title = defineModel<string>('title', { required: true });
 const summary = defineModel<string>('summary', { required: true });
 const bodyMarkdown = defineModel<string>('bodyMarkdown', { required: true });
+
+const draftTitleRules = titleRules();
+const draftSummaryRules = summaryRules();
+const draftBodyRules = bodyMarkdownRules();
 </script>
 
 <template>
@@ -90,7 +94,7 @@ const bodyMarkdown = defineModel<string>('bodyMarkdown', { required: true });
 			<v-text-field
 				v-model="title"
 				label="Document title"
-				:rules="titleRules()"
+				:rules="draftTitleRules"
 				:disabled="!canDraft"
 				class="mb-2"
 				:counter="TITLE_MAX_LENGTH"
@@ -106,7 +110,7 @@ const bodyMarkdown = defineModel<string>('bodyMarkdown', { required: true });
 			<v-text-field
 				v-model="summary"
 				label="Short summary"
-				:rules="summaryRules()"
+				:rules="draftSummaryRules"
 				:disabled="!canDraft"
 				class="mb-2"
 				:counter="SUMMARY_MAX_LENGTH"
@@ -116,7 +120,7 @@ const bodyMarkdown = defineModel<string>('bodyMarkdown', { required: true });
 				v-model="bodyMarkdown"
 				label="Draft (Markdown)"
 				rows="12"
-				:rules="bodyMarkdownRules()"
+				:rules="draftBodyRules"
 				:disabled="!canDraft"
 				class="mb-3"
 			/>

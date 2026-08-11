@@ -1,6 +1,7 @@
 import type { MockHttpContext } from '../http.ts';
 import { toSummary } from '../document-http.ts';
 import { getDocumentStore } from '../document-store.ts';
+import { paginateItems, parseListPagination } from '../list-pagination.ts';
 
 export function handleLibraryRoutes(context: MockHttpContext): boolean {
 	const { method, path, url, res, sendJson, matchRoute } = context;
@@ -10,37 +11,33 @@ export function handleLibraryRoutes(context: MockHttpContext): boolean {
 		const q = url.searchParams.get('q')?.toLowerCase();
 		const includeSuperseded
 			= url.searchParams.get('includeSuperseded') === 'true';
-		let items = [...getDocumentStore().values()]
-			.filter((document) => {
-				if (document.status === 'published') {
-					return Boolean(document.documentNumber);
-				}
-				if (includeSuperseded && document.status === 'superseded') {
-					return Boolean(document.documentNumber);
-				}
-				return false;
-			})
-			.map(toSummary);
+		const { offset, limit } = parseListPagination(url);
+		let records = [...getDocumentStore().values()].filter((document) => {
+			if (document.status === 'published') {
+				return Boolean(document.documentNumber);
+			}
+			if (includeSuperseded && document.status === 'superseded') {
+				return Boolean(document.documentNumber);
+			}
+			return false;
+		});
 
 		if (documentType) {
-			items = items.filter((item) => item.documentType === documentType);
+			records = records.filter((document) => document.documentType === documentType);
 		}
 		if (q) {
-			items = items.filter((item) => {
-				const full = getDocumentStore().get(item.id);
-				return (
-					item.title.toLowerCase().includes(q)
-					|| Boolean(item.documentNumber?.toLowerCase().includes(q))
-					|| item.documentType.toLowerCase().includes(q)
-					|| Boolean(full?.draftSummary?.toLowerCase().includes(q))
-				);
-			});
+			records = records.filter((document) =>
+				document.title.toLowerCase().includes(q)
+				|| Boolean(document.documentNumber?.toLowerCase().includes(q))
+				|| document.documentType.toLowerCase().includes(q)
+				|| Boolean(document.draftSummary?.toLowerCase().includes(q)));
 		}
 
-		items.sort((a, b) =>
+		records.sort((a, b) =>
 			(b.publishedAt ?? b.updatedAt).localeCompare(a.publishedAt ?? a.updatedAt),
 		);
-		sendJson(res, 200, { items });
+		const page = paginateItems(records.map(toSummary), offset, limit);
+		sendJson(res, 200, page);
 		return true;
 	}
 

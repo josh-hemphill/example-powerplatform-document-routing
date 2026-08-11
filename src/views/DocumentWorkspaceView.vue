@@ -5,6 +5,7 @@ import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import { getApiErrorMessage } from '@/api/api-error';
 import ApprovalPanel from '@/components/workspace/ApprovalPanel.vue';
 import DraftPanel from '@/components/workspace/DraftPanel.vue';
+import DraftPreviewPanel from '@/components/workspace/DraftPreviewPanel.vue';
 import FreeformRequestPanel from '@/components/workspace/FreeformRequestPanel.vue';
 import HistoryPanel from '@/components/workspace/HistoryPanel.vue';
 import PublishPanel from '@/components/workspace/PublishPanel.vue';
@@ -376,10 +377,8 @@ async function handleAbandonSupersede(): Promise<void> {
 				</v-col>
 
 				<v-col cols="12" md="5">
-					<HistoryPanel
-						:history="document.history"
-						:draft-preview="draftForm.bodyMarkdown"
-					/>
+					<HistoryPanel :history="document.history" />
+					<DraftPreviewPanel :draft-preview="draftForm.bodyMarkdown" />
 				</v-col>
 			</v-row>
 		</template>

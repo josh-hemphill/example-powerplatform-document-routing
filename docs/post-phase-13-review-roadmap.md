@@ -12,59 +12,59 @@ Findings from the August 2026 **fresh** codebase review (bugs, performance, UI/U
 
 ## Finding → phase map
 
-| Finding (summary)                                                        | Severity     | Phase |
-| ------------------------------------------------------------------------ | ------------ | ----- |
-| Admin selection guard re-hydrates on list refetch and wipes dirty edits  | Critical     | 14    |
-| Document workspace has no leave/unload guard; dirty drafts lost          | High         | 14    |
-| Submit-for-approval ignores unsaved draft edits                          | High         | 14    |
-| Approval/decision comments cleared on every clean hydrate                | High         | 14    |
-| Mutation `onSettled` invalidates using live `documentId` (stale-nav)     | Medium       | 14    |
-| Confirm-dialog singleton cancels in-flight confirms                      | Medium       | 14    |
-| Draft Save / New request double-submit while loading                     | High         | 14    |
-| `canPublish` UI omits case-access check required by server               | High         | 15    |
-| Mock AuthZ trusts client `X-Document-Routing-Roles` header               | High         | 15    |
-| Elevation-pool members get case access before SLA elevation              | Medium       | 15    |
-| Inbox list includes published/superseded for every authenticated user    | Medium       | 15    |
-| `ready_to_publish` persona not filtered by publish AuthZ                 | Medium       | 15    |
-| Hosted roles fail closed silently → false “not admin”                    | Medium       | 15    |
-| Identity `Promise.race` can leave unhandled `getContext` rejections      | Medium       | 15    |
-| Release route does not assert active step / `in_review`                  | Medium       | 15    |
-| Inbox search refetches on every keystroke (Library is debounced)         | High (perf)  | 16    |
-| Inbox/Library dual-mount mobile+desktop lists; no virtualization         | High (perf)  | 16    |
-| List APIs return unbounded result sets                                   | High (perf)  | 16    |
-| Draft typing re-renders full history timeline via `draft-preview`        | High (perf)  | 16    |
-| Aggressive Colada `staleTime` + broad list invalidation on every mutate  | Medium (perf)| 16    |
-| Persona filter is client-only after downloading full inbox               | Medium (perf)| 16    |
-| Admin dirty detection `JSON.stringify`s whole form each edit             | Medium (perf)| 16    |
-| Validation rule factories allocate new arrays in templates               | Medium (perf)| 16    |
-| Document workspace keeps all stage panels mounted when collapsed         | Medium (perf)| 16    |
-| Per-row type-label `find` + `toLocaleString` in list templates           | Medium (perf)| 16    |
-| Document / published views lack page-level H1                            | High (UX)    | 17    |
-| Primary nav not a labeled landmark; skip-link target weak vs fixtures    | High (UX)    | 17    |
-| Failed identity chip is a non-button interactive control                 | High (UX)    | 17    |
-| Inconsistent success/error feedback (toast vs alert vs missing role)     | High (UX)    | 17    |
-| Workspace first viewport is multi-job clutter                            | Medium (UX)  | 17    |
-| Inbox chrome before the work list; dual filter systems                   | Medium (UX)  | 17    |
-| Empty states are passive (no recovery CTA)                               | Medium (UX)  | 17    |
-| Confirm dialog missing `aria-labelledby` / `aria-describedby`            | Medium (UX)  | 17    |
-| Tables lack captions; some headers missing `scope`                       | Medium (UX)  | 17    |
-| Almost no expand/collapse motion on stage panels                         | Medium (UX)  | 17    |
-| Published reader shows raw type id; weak reading structure               | Medium (UX)  | 17    |
-| Brand tagline unused; outer cards on simple forms                        | Low (UX)     | 17    |
+| Finding (summary)                                                       | Severity      | Phase |
+| ----------------------------------------------------------------------- | ------------- | ----- |
+| Admin selection guard re-hydrates on list refetch and wipes dirty edits | Critical      | 14    |
+| Document workspace has no leave/unload guard; dirty drafts lost         | High          | 14    |
+| Submit-for-approval ignores unsaved draft edits                         | High          | 14    |
+| Approval/decision comments cleared on every clean hydrate               | High          | 14    |
+| Mutation `onSettled` invalidates using live `documentId` (stale-nav)    | Medium        | 14    |
+| Confirm-dialog singleton cancels in-flight confirms                     | Medium        | 14    |
+| Draft Save / New request double-submit while loading                    | High          | 14    |
+| `canPublish` UI omits case-access check required by server              | High          | 15    |
+| Mock AuthZ trusts client `X-Document-Routing-Roles` header              | High          | 15    |
+| Elevation-pool members get case access before SLA elevation             | Medium        | 15    |
+| Inbox list includes published/superseded for every authenticated user   | Medium        | 15    |
+| `ready_to_publish` persona not filtered by publish AuthZ                | Medium        | 15    |
+| Hosted roles fail closed silently → false “not admin”                   | Medium        | 15    |
+| Identity `Promise.race` can leave unhandled `getContext` rejections     | Medium        | 15    |
+| Release route does not assert active step / `in_review`                 | Medium        | 15    |
+| Inbox search refetches on every keystroke (Library is debounced)        | High (perf)   | 16    |
+| Inbox/Library dual-mount mobile+desktop lists; no virtualization        | High (perf)   | 16    |
+| List APIs return unbounded result sets                                  | High (perf)   | 16    |
+| Draft typing re-renders full history timeline via `draft-preview`       | High (perf)   | 16    |
+| Aggressive Colada `staleTime` + broad list invalidation on every mutate | Medium (perf) | 16    |
+| Persona filter is client-only after downloading full inbox              | Medium (perf) | 16    |
+| Admin dirty detection `JSON.stringify`s whole form each edit            | Medium (perf) | 16    |
+| Validation rule factories allocate new arrays in templates              | Medium (perf) | 16    |
+| Document workspace keeps all stage panels mounted when collapsed        | Medium (perf) | 16    |
+| Per-row type-label `find` + `toLocaleString` in list templates          | Medium (perf) | 16    |
+| Document / published views lack page-level H1                           | High (UX)     | 17    |
+| Primary nav not a labeled landmark; skip-link target weak vs fixtures   | High (UX)     | 17    |
+| Failed identity chip is a non-button interactive control                | High (UX)     | 17    |
+| Inconsistent success/error feedback (toast vs alert vs missing role)    | High (UX)     | 17    |
+| Workspace first viewport is multi-job clutter                           | Medium (UX)   | 17    |
+| Inbox chrome before the work list; dual filter systems                  | Medium (UX)   | 17    |
+| Empty states are passive (no recovery CTA)                              | Medium (UX)   | 17    |
+| Confirm dialog missing `aria-labelledby` / `aria-describedby`           | Medium (UX)   | 17    |
+| Tables lack captions; some headers missing `scope`                      | Medium (UX)   | 17    |
+| Almost no expand/collapse motion on stage panels                        | Medium (UX)   | 17    |
+| Published reader shows raw type id; weak reading structure              | Medium (UX)   | 17    |
+| Brand tagline unused; outer cards on simple forms                       | Low (UX)      | 17    |
 
 ---
 
 ## Design references (for UI / perf phases)
 
-| Principle                                                  | Source                                                              | Application here                                                      |
-| ---------------------------------------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| Visibility of system status; error prevention; consistency | Nielsen, _10 Usability Heuristics_                                  | Dirty guards, submit-after-save, unified toast/alert channels         |
-| Affordances & feedback                                     | Norman, _The Design of Everyday Things_                             | Identity retry as a real button; empty-state CTAs                     |
-| Progressive disclosure                                     | Nielsen Norman Group                                                | One primary workspace stage; demote secondary chrome                  |
-| Consistency; reduce short-term memory load                 | Shneiderman, _Eight Golden Rules_                                   | Same feedback pattern across workspace/admin/new request              |
-| Status messages; name/role/value; landmarks                | WCAG 2.2 (1.3.1, 2.4.1, 2.4.6, 4.1.2, 4.1.3)                       | H1 per view, labeled `nav`, captioned tables, dialog labeling         |
-| Perceived performance                                      | RAIL / Chrome performance guidance                                  | Debounce search; virtualize lists; isolate draft preview from history |
-| Adaptive density                                           | Microsoft Fluent                                                    | Collapse inbox filters; expansion transitions                         |
+| Principle                                                  | Source                                       | Application here                                                      |
+| ---------------------------------------------------------- | -------------------------------------------- | --------------------------------------------------------------------- |
+| Visibility of system status; error prevention; consistency | Nielsen, _10 Usability Heuristics_           | Dirty guards, submit-after-save, unified toast/alert channels         |
+| Affordances & feedback                                     | Norman, _The Design of Everyday Things_      | Identity retry as a real button; empty-state CTAs                     |
+| Progressive disclosure                                     | Nielsen Norman Group                         | One primary workspace stage; demote secondary chrome                  |
+| Consistency; reduce short-term memory load                 | Shneiderman, _Eight Golden Rules_            | Same feedback pattern across workspace/admin/new request              |
+| Status messages; name/role/value; landmarks                | WCAG 2.2 (1.3.1, 2.4.1, 2.4.6, 4.1.2, 4.1.3) | H1 per view, labeled `nav`, captioned tables, dialog labeling         |
+| Perceived performance                                      | RAIL / Chrome performance guidance           | Debounce search; virtualize lists; isolate draft preview from history |
+| Adaptive density                                           | Microsoft Fluent                             | Collapse inbox filters; expansion transitions                         |
 
 ---
 
@@ -271,20 +271,20 @@ Phases 16 and 17 may proceed in parallel after Phase 14’s dirty guards land (s
 
 ## PR / delivery slicing
 
-| PR  | Title focus                                                              |
-| --- | ------------------------------------------------------------------------ |
-| 14a | Admin selection-guard hydrate skip; confirm-dialog overlap policy        |
-| 14b | Workspace leave/switch dirty guards; preserve approval comments          |
-| 14c | Submit-when-dirty; in-flight button disables; mutation invalidate-by-id  |
-| 15a | `canPublish` + mock roles-from-actor; elevation access gate              |
-| 15b | Inbox excludes published; persona publish AuthZ; identity retry/race     |
-| 15c | Release active-step checks                                               |
-| 16a | Debounce inbox search; dual-layout → single + virtualize                 |
-| 16b | List pagination OpenAPI → mock → UI; Colada invalidation/`staleTime`     |
-| 16c | Draft preview isolation; rules hoist; type-label map; lazy stage bodies  |
-| 17a | H1 + landmarks + identity retry button + feedback channel unify          |
-| 17b | Workspace/inbox composition; empty CTAs; confirm a11y; tables/captions   |
-| 17c | Published reader structure; light brand/card polish                      |
+| PR  | Title focus                                                             |
+| --- | ----------------------------------------------------------------------- |
+| 14a | Admin selection-guard hydrate skip; confirm-dialog overlap policy       |
+| 14b | Workspace leave/switch dirty guards; preserve approval comments         |
+| 14c | Submit-when-dirty; in-flight button disables; mutation invalidate-by-id |
+| 15a | `canPublish` + mock roles-from-actor; elevation access gate             |
+| 15b | Inbox excludes published; persona publish AuthZ; identity retry/race    |
+| 15c | Release active-step checks                                              |
+| 16a | Debounce inbox search; dual-layout → single + virtualize                |
+| 16b | List pagination OpenAPI → mock → UI; Colada invalidation/`staleTime`    |
+| 16c | Draft preview isolation; rules hoist; type-label map; lazy stage bodies |
+| 17a | H1 + landmarks + identity retry button + feedback channel unify         |
+| 17b | Workspace/inbox composition; empty CTAs; confirm a11y; tables/captions  |
+| 17c | Published reader structure; light brand/card polish                     |
 
 ---
 
