@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	DEFAULT_LIST_LIMIT,
+	MAX_LIST_LIMIT,
 	paginateItems,
 	parseListPagination,
 } from './list-pagination.ts';
@@ -16,7 +17,7 @@ describe('list pagination', () => {
 
 	it('clamps limit and parses numeric cursor', () => {
 		const url = new URL('http://localhost/api/documents?limit=999&cursor=50');
-		expect(parseListPagination(url)).toEqual({ offset: 50, limit: 200 });
+		expect(parseListPagination(url)).toEqual({ offset: 50, limit: MAX_LIST_LIMIT });
 	});
 
 	it('returns nextCursor when more items remain', () => {

@@ -210,4 +210,10 @@ async function onSupersede(): Promise<void> {
 	padding-bottom: 1rem;
 	border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.12);
 }
+
+.markdown-preview {
+	white-space: pre-wrap;
+	font-family: inherit;
+	margin: 0;
+}
 </style>
