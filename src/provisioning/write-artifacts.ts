@@ -1,6 +1,7 @@
 import type { ConnectionProfile } from './connection-config.ts';
 import type { DataverseProvisionPlan, WebApiRequestPlan } from './dataverse-provision-plan.ts';
 import type { ExistingAttributeMetadata } from './schema-drift.ts';
+import type { AlmManifest } from './solution-alm.ts';
 import { mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -18,9 +19,15 @@ import {
 
 	plannedTypeFromAttributeBody,
 } from './schema-drift.ts';
+import {
+	buildAlmManifest,
+	renderSolutionPackMarkdown,
+	renderSolutionPackScript,
+} from './solution-alm.ts';
 
 export interface ProvisionArtifacts {
 	plan: DataverseProvisionPlan;
+	almManifest: AlmManifest | null;
 	outputDir: string;
 	files: string[];
 	validationErrors: string[];
@@ -57,7 +64,7 @@ export function emptyProvisionPlan(): DataverseProvisionPlan {
 }
 
 /**
- * Writes provision plan JSON, env defaults, and pa connect script under deploy/generated.
+ * Writes provision plan JSON, env defaults, ALM guides, and pa connect script under deploy/generated.
  * On validation errors, no executable artifacts are written (atomic replace only on success).
  */
 export function writeProvisionArtifacts(
@@ -78,6 +85,7 @@ export function writeProvisionArtifacts(
 	if (validationErrors.length > 0) {
 		return {
 			plan: emptyProvisionPlan(),
+			almManifest: null,
 			outputDir,
 			files: [],
 			validationErrors,
@@ -86,8 +94,10 @@ export function writeProvisionArtifacts(
 	}
 
 	const plan = buildDataverseProvisionPlan(profile);
+	const almManifest = buildAlmManifest(profile, plan);
 	const commands = buildPaConnectCommands(profile, plan);
 	const seed = buildControlSeedBundle(profile.publisher.prefix);
+	const envVarPattern = `${plan.prefix}_*`;
 
 	const staging = mkdtempSync(join(tmpdir(), 'doc-routing-provision-'));
 	const files: string[] = [];
@@ -97,6 +107,19 @@ export function writeProvisionArtifacts(
 		writeFileSync(target, contents, 'utf8');
 		files.push(join(outputDir, name));
 	};
+
+	const artifactNames = [
+		'dataverse-webapi-plan.json',
+		'dataverse-schema.json',
+		'environment-variable-defaults.json',
+		'control-seed.json',
+		'alm-manifest.json',
+		'solution-pack.md',
+		'solution-pack.sh',
+		'pa-connect.sh',
+		'app.env.example',
+		'SUMMARY.md',
+	];
 
 	try {
 		write(
@@ -119,11 +142,14 @@ export function writeProvisionArtifacts(
 			`${JSON.stringify(plan.environmentVariableDefaults, null, 2)}\n`,
 		);
 		write('control-seed.json', `${JSON.stringify(seed, null, 2)}\n`);
+		write('alm-manifest.json', `${JSON.stringify(almManifest, null, 2)}\n`);
+		write('solution-pack.md', renderSolutionPackMarkdown(almManifest));
+		write('solution-pack.sh', renderSolutionPackScript(almManifest));
 		write('pa-connect.sh', renderPaCommandsScript(commands));
 		write(
 			'app.env.example',
 			[
-				'# Local Vite only — hosted Code Apps should use Power Platform / Dataverse env vars (dr_*).',
+				`# Local Vite only — hosted Code Apps should use Power Platform / Dataverse env vars (${envVarPattern}).`,
 				`VITE_DOCUMENT_API_BASE_URL=${profile.api.baseUrl}`,
 				`VITE_SHAREPOINT_SITE_URL=${profile.sharePoint.siteUrl}`,
 				`VITE_SHAREPOINT_LIBRARY_NAME=${profile.sharePoint.libraryName}`,
@@ -137,7 +163,18 @@ export function writeProvisionArtifacts(
 			[
 				'# Provision summary',
 				'',
-				`Publisher prefix: \`${plan.prefix}\``,
+				'## Publisher & solution',
+				'',
+				`- Publisher unique name: \`${profile.publisher.uniqueName}\``,
+				`- Publisher friendly name: \`${profile.publisher.friendlyName}\``,
+				`- Publisher prefix: \`${plan.prefix}\``,
+				`- Option value prefix: \`${almManifest.publisher.optionValuePrefix}\``,
+				`- Solution unique name: \`${profile.solution.uniqueName}\``,
+				`- Solution friendly name: \`${profile.solution.friendlyName}\``,
+				`- Solution version: \`${profile.solution.version}\``,
+				`- Preferred path: **solution** (\`pnpm provision:solution\`)`,
+				`- Unmanaged apply allowed by profile: \`${Boolean(profile.allowUnmanagedApply)}\``,
+				'',
 				`Dataverse Web API root: \`${plan.apiRoot}\``,
 				'',
 				'## Tables',
@@ -148,12 +185,19 @@ export function writeProvisionArtifacts(
 				'Sample document types / pools from `src/config/document-types.ts` are mirrored in `control-seed.json` for Admin / import.',
 				'Replace Contoso sample emails before production.',
 				'',
-				'## Next steps',
+				'## Next steps (shared environments)',
 				'',
-				'1. Set `DATAVERSE_ACCESS_TOKEN` and run `pnpm provision:apply` to create tables via Web API, **or** import a solution built from this schema.',
-				'2. Review and run `pa-connect.sh` (replace `CONNECTION_ID`) to attach Code App data sources.',
-				'3. Prefer Dataverse environment variables (`dr_*`) in hosted apps; use `app.env.example` for local Vite only.',
-				'4. Load control seed (Admin UI in Phase 4, or manual Dataverse import) then remove sample identities.',
+				'1. Run `DATAVERSE_ACCESS_TOKEN=… pnpm provision:solution` to ensure publisher ownership + unmanaged solution (prefix collisions fail closed).',
+				'2. Follow `solution-pack.md` / `solution-pack.sh` to add components, export, and import managed into shared test/prod.',
+				'3. Review and run `pa-connect.sh` (replace `CONNECTION_ID`) to attach Code App data sources (connection references arrive in Phase 19).',
+				`4. Prefer Dataverse environment variables (\`${envVarPattern}\`) in hosted apps; use \`app.env.example\` for local Vite only.`,
+				'5. Load control seed via Admin UI (or opt-in import) then remove sample identities.',
+				'',
+				'## Scratch / unmanaged apply (avoid in shared orgs)',
+				'',
+				'Direct Web API apply creates **unmanaged metadata outside a solution**.',
+				'Only use `pnpm provision:apply --unmanaged-ok` (or set `allowUnmanagedApply: true` in the profile) for personal/dev scratch environments.',
+				'To apply metadata and add tables into the profile solution instead, use `pnpm provision:apply --into-solution`.',
 				'',
 				validationWarnings.length
 					? `## Warnings\n\n${validationWarnings.map((item) => `- ${item}`).join('\n')}\n`
@@ -162,15 +206,7 @@ export function writeProvisionArtifacts(
 		);
 
 		mkdirSync(outputDir, { recursive: true });
-		for (const name of [
-			'dataverse-webapi-plan.json',
-			'dataverse-schema.json',
-			'environment-variable-defaults.json',
-			'control-seed.json',
-			'pa-connect.sh',
-			'app.env.example',
-			'SUMMARY.md',
-		]) {
+		for (const name of artifactNames) {
 			renameSync(join(staging, name), join(outputDir, name));
 		}
 	}
@@ -180,6 +216,7 @@ export function writeProvisionArtifacts(
 
 	return {
 		plan,
+		almManifest,
 		outputDir,
 		files,
 		validationErrors,

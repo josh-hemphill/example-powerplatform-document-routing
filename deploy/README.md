@@ -7,9 +7,12 @@ This folder makes it straightforward to stand up **Dataverse tables** for the do
 ```bash
 cp deploy/connections.example.json deploy/connections.json
 # Edit hosts: dataverse.environmentUrl, sharePoint.siteUrl, api.baseUrl, environmentId
+# Confirm publisher.uniqueName / solution.* match the org you will own
 
-pnpm provision                 # generate deploy/generated/*
-pnpm provision:apply           # optional: create tables via Web API (needs DATAVERSE_ACCESS_TOKEN)
+pnpm provision                 # generate deploy/generated/* (includes ALM manifest + pack guides)
+pnpm provision:solution        # preferred: ensure publisher + unmanaged solution (needs token)
+pnpm provision:apply -- --into-solution   # optional: Web API apply then AddSolutionComponent
+# Scratch only: pnpm provision:apply -- --unmanaged-ok
 bash deploy/generated/pa-connect.sh   # after replacing CONNECTION_ID
 ```
 
@@ -59,7 +62,19 @@ Security role sketch: [`SECURITY_ROLES.md`](./SECURITY_ROLES.md).
 
 Power Automate stubs (SLA, notify, publish, submit guard): [`flows/`](./flows/).
 
-## Auth for `provision:apply`
+## Solution-first vs unmanaged apply
+
+| Command                                   | Use when                                                                           |
+| ----------------------------------------- | ---------------------------------------------------------------------------------- |
+| `pnpm provision`                          | Generate plans, `alm-manifest.json`, `solution-pack.md` / `.sh`, `pa-connect.sh`   |
+| `pnpm provision:solution`                 | Shared/dev org: ensure publisher owns the prefix and create the unmanaged solution |
+| `pnpm provision:apply -- --into-solution` | Apply Web API plan then add table entities to `solution.uniqueName`                |
+| `pnpm provision:apply -- --unmanaged-ok`  | **Scratch only** — unmanaged metadata outside a solution                           |
+| Profile `allowUnmanagedApply: true`       | Same as `--unmanaged-ok` without the CLI flag (local profiles only)                |
+
+Prefix collision (prefix already owned by another `publisher.uniqueName`) **fails closed** on solution ensure and apply.
+
+## Auth for live ensure / apply
 
 Requires **Node.js 22+** (`engines.node`) for `node --experimental-strip-types`.
 
@@ -69,12 +84,14 @@ Obtain a Dataverse Web API bearer token for your org URL (custom domain OK), the
 
 ```bash
 export DATAVERSE_ACCESS_TOKEN='…'
-pnpm provision:apply
+pnpm provision:solution
+# or
+pnpm provision:apply -- --into-solution
 ```
 
-Dry-run generation never calls the network.
+Dry-run generation never calls the network. Publisher create needs System Customizer / System Administrator (or equivalent).
 
-> **Shared environments:** Direct Web API apply creates unmanaged metadata outside a solution. For multi-team orgs, follow the solution-first plan in [`docs/provisioning-alm-roadmap.md`](../docs/provisioning-alm-roadmap.md) (Phases 18–22) once implemented; treat `provision:apply` as scratch/dev until then.
+> **Shared environments:** Prefer `provision:solution` + pack/import (`solution-pack.md`). Unmanaged `provision:apply` without `--into-solution` is gated behind `--unmanaged-ok` / `allowUnmanagedApply`. See [`docs/provisioning-alm-roadmap.md`](../docs/provisioning-alm-roadmap.md).
 
 ## Code App data sources
 
