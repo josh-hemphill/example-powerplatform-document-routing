@@ -10,6 +10,7 @@ describe('parseProvisionArgs', () => {
 			intoSolution: false,
 			unmanagedOk: false,
 			strict: false,
+			demoSeed: false,
 		});
 	});
 
@@ -22,6 +23,7 @@ describe('parseProvisionArgs', () => {
 				'--solution',
 				'--example',
 				'--strict',
+				'--demo-seed',
 			]),
 		).toEqual({
 			useExample: true,
@@ -30,6 +32,7 @@ describe('parseProvisionArgs', () => {
 			intoSolution: true,
 			unmanagedOk: true,
 			strict: true,
+			demoSeed: true,
 		});
 	});
 });

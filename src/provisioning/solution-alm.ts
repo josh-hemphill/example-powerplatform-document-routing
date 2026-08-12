@@ -4,6 +4,7 @@
 import type { ConnectionProfile } from './connection-config.ts';
 import type { DataverseProvisionPlan } from './dataverse-provision-plan.ts';
 import { DEFAULT_OPTION_VALUE_PREFIX } from './dataverse-schema.ts';
+import { buildSecurityRolePlans } from './security-roles-plan.ts';
 import { assertSafeCliToken, shellQuote } from './shell-quote.ts';
 
 /** Dataverse solution component type for entities. */
@@ -33,6 +34,10 @@ export interface AlmManifest {
 		logicalName: string;
 		displayName: string;
 		connectorId: string;
+	}>;
+	securityRoles: Array<{
+		token: string;
+		displayName: string;
 	}>;
 	preferredPath: 'solution';
 	unmanagedApply: {
@@ -123,6 +128,10 @@ export function buildAlmManifest(
 			displayName: item.displayName,
 			connectorId: item.connectorId,
 		})),
+		securityRoles: buildSecurityRolePlans(plan.prefix).map((role) => ({
+			token: role.token,
+			displayName: role.displayName,
+		})),
 		preferredPath: 'solution',
 		unmanagedApply: {
 			allowedByProfile: Boolean(profile.allowUnmanagedApply),
@@ -177,8 +186,15 @@ export function renderSolutionPackMarkdown(manifest: AlmManifest): string {
 		'2. Create or import schema components into that solution (`pnpm provision:apply -- --into-solution`, or PAC / maker portal).',
 		'3. Bind real connections to the connection references per environment (see `pa-connect.sh` and maker portal).',
 		'4. Set per-environment **current values** for env vars using `environment-variable-values.md` (do not commit secrets).',
-		'5. Export unmanaged from a dev environment, then pack **managed** for shared test/prod.',
-		'6. Assign security roles (Phase 20).',
+		'5. Create security roles from `security-roles.md` **inside** this solution; assign via teams where possible.',
+		'6. Import prefix-correct flows from `flows/` (or package them into the solution) using the Document Routing Service principal.',
+		'7. Export unmanaged from a dev environment, then pack **managed** for shared test/prod (`pnpm provision:pack` / PAC).',
+		'',
+		'## Security roles',
+		'',
+		...manifest.securityRoles.map(
+			(role) => `- \`${role.displayName}\` (\`${role.token}\`)`,
+		),
 		'',
 		'## PAC / CLI sketches',
 		'',
@@ -186,8 +202,9 @@ export function renderSolutionPackMarkdown(manifest: AlmManifest): string {
 		'',
 		'```bash',
 		`# After publisher + solution exist (unique name ${solution.uniqueName})`,
-		`# pac solution export --name ${solution.uniqueName} --path ./dist/${solution.uniqueName}.zip`,
-		`# pac solution import --path ./dist/${solution.uniqueName}_managed.zip`,
+		`# pnpm provision:export`,
+		`# pnpm provision:pack`,
+		`# pnpm provision:import`,
 		'```',
 		'',
 		'Or use the generated `solution-pack.sh` helper beside this file.',

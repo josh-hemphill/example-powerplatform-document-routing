@@ -1,24 +1,27 @@
 # Power Automate flow stubs — Document Routing
 
-Phase 3 ships **documented stubs** (not packaged `.zip` solutions). Import these as
-Cloud Flows in your environment, then bind Dataverse connections to the `dr_*`
-tables from [`SCHEMA.md`](../SCHEMA.md).
+Templates in this folder use the default `dr_` publisher token as documentation.
+**Adopters should import the prefix-correct copies** written by `pnpm provision` to
+`deploy/generated/flows/` (substitution uses your `publisher.prefix`).
+
+Prefer packaging flows **into the solution** over “import JSON manually and rebind”
+after every prefix change. See [`SHARED_ENV.md`](../SHARED_ENV.md).
 
 ## Identity
 
-Flows that mutate approval steps or history must run as a **service principal /
-elevated connection** — never as the end-user SPA token. The Code App only
+Flows that mutate approval steps or history must run as a **Document Routing Service**
+principal / elevated connection — never as the end-user SPA token. The Code App only
 triggers privileged work by writing Dataverse status fields or calling a Custom
 Connector that starts a flow.
 
 ## Minimum set
 
-| Flow                                               | Trigger                                                      | Notes                                                                     |
-| -------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------- |
-| [`sla-sweeper.json`](./sla-sweeper.json)           | Recurrence (e.g. every 15 min)                               | Finds overdue active steps; elevates / requeues; writes `dr_historyevent` |
-| [`notify-approval.json`](./notify-approval.json)   | When `dr_approvalstep` is created/updated                    | Email/Teams to assignee or pool                                           |
-| [`publish-approved.json`](./publish-approved.json) | When `dr_document.status` → `approved` **or** manual Publish | HTML→PDF→SharePoint (Phase 5 fills binary steps)                          |
-| [`on-submit-guard.json`](./on-submit-guard.json)   | When status → `in_review`                                    | Optional double-check that chain rows exist                               |
+| Flow                                               | Trigger                                                     | Notes                                                                           |
+| -------------------------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| [`sla-sweeper.json`](./sla-sweeper.json)           | Recurrence (e.g. every 15 min)                              | Finds overdue active steps; elevates / requeues; writes `{prefix}_historyevent` |
+| [`notify-approval.json`](./notify-approval.json)   | When `{prefix}_approvalstep` is created/updated             | Email/Teams to assignee or pool                                                 |
+| [`publish-approved.json`](./publish-approved.json) | When `{prefix}_document.status` → `approved` **or** Publish | HTML→PDF→SharePoint (Phase 5 fills binary steps)                                |
+| [`on-submit-guard.json`](./on-submit-guard.json)   | When status → `in_review`                                   | Optional double-check that chain rows exist                                     |
 
 ## Elevation semantics (locked for this example)
 
@@ -43,14 +46,14 @@ Production sweeps use the flow’s wall clock. Do **not** accept a client-suppli
   store the artifact under a service identity.
 - Filename: `{title-slug}-{documentId8}-r{revision}.pdf`. Republishing the same
   revision is **idempotent** (returns the existing URL).
-- Stub: [`flows/publish-approved.json`](./flows/publish-approved.json).
+- Stub: [`flows/publish-approved.json`](./publish-approved.json).
 
 ## Flow health rows (Admin)
 
 At the end of each SLA sweeper or publish run, write a health row so Admin →
 **Flow health** can show recent outcomes:
 
-1. Create (or append to) `dr_flowrun` — or patch a JSON blob on `dr_appsetting` if
+1. Create (or append to) `{prefix}_flowrun` — or patch a JSON blob on `{prefix}_appsetting` if
    you skip a dedicated table in early environments.
 2. Fields: `flowname`, `status` (`succeeded`/`failed`/`running`), `at`, `message`.
 3. Keep a short rolling window (mock keeps 20).
