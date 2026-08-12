@@ -6,6 +6,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { looksLikePlaceholder } from '../src/provisioning/connection-urls.ts';
 import {
+	containsLeftoverDefaultPublisherPrefix,
 	expectedFlowArtifactNames,
 } from '../src/provisioning/flow-templates.ts';
 
@@ -77,8 +78,8 @@ export function validateProvisionArtifacts(
 					return existsSync(path) ? readFileSync(path, 'utf8') : '';
 				})
 				.join('\n');
-			if (flowBlob.includes('dr_')) {
-				issues.push(`Generated flows still contain dr_ for prefix ${prefix}`);
+			if (containsLeftoverDefaultPublisherPrefix(flowBlob)) {
+				issues.push(`Generated flows still contain leftover dr_ for prefix ${prefix}`);
 			}
 			if (!flowBlob.includes(`${prefix}_document`)) {
 				issues.push(`Generated flows missing ${prefix}_document`);
