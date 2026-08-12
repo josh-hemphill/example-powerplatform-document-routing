@@ -7,6 +7,7 @@
  *   pnpm provision:solution        # generate + ensure publisher/solution (token)
  *   pnpm provision:apply -- --unmanaged-ok     # scratch unmanaged apply
  *   pnpm provision:apply -- --into-solution    # apply + add tables to solution
+ *   pnpm provision -- --demo-seed              # include Contoso demo identities in control-seed
  *
  * Env: DATAVERSE_ACCESS_TOKEN (required for apply / live solution ensure)
  */
@@ -37,6 +38,7 @@ export interface ProvisionCliArgs {
 	intoSolution: boolean;
 	unmanagedOk: boolean;
 	strict: boolean;
+	demoSeed: boolean;
 }
 
 /**
@@ -51,6 +53,7 @@ export function parseProvisionArgs(argv: string[]): ProvisionCliArgs {
 		intoSolution: args.has('--into-solution'),
 		unmanagedOk: args.has('--unmanaged-ok'),
 		strict: args.has('--strict'),
+		demoSeed: args.has('--demo-seed'),
 	};
 }
 
@@ -82,6 +85,7 @@ export async function runProvision(argv: string[]): Promise<number> {
 	const outputDir = resolve(root, 'deploy/generated');
 	const artifacts = writeProvisionArtifacts(profile, outputDir, {
 		requireDeployableHosts: requireHosts,
+		includeDemoIdentities: flags.demoSeed,
 	});
 
 	for (const warning of artifacts.validationWarnings) {

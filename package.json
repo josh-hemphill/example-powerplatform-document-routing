@@ -26,7 +26,11 @@
 		"provision": "node --experimental-strip-types scripts/provision.ts",
 		"provision:example": "node --experimental-strip-types scripts/provision.ts --example",
 		"provision:solution": "node --experimental-strip-types scripts/provision.ts --solution",
-		"provision:apply": "node --experimental-strip-types scripts/provision.ts --apply"
+		"provision:apply": "node --experimental-strip-types scripts/provision.ts --apply",
+		"provision:export": "node --experimental-strip-types scripts/provision-pack.ts export",
+		"provision:pack": "node --experimental-strip-types scripts/provision-pack.ts pack",
+		"provision:import": "node --experimental-strip-types scripts/provision-pack.ts import",
+		"provision:validate": "node --experimental-strip-types scripts/validate-provision-artifacts.ts"
 	},
 	"dependencies": {
 		"@mdi/js": "^7.4.47",

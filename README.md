@@ -4,7 +4,7 @@ Example Power Platform **Code App** that routes freeform document requests throu
 
 **Adopting for your org?** Start with [`SETUP.md`](./SETUP.md) — config in `src/config/*`, deploy scaffolding in [`deploy/`](./deploy/README.md).
 
-**Hardening / Dataverse-first roadmap:** see [`docs/remediation-roadmap.md`](./docs/remediation-roadmap.md) (Phases 0–8). Phases **9–13** — [`docs/post-phase-8-review-roadmap.md`](./docs/post-phase-8-review-roadmap.md). Phases **14–17** — [`docs/post-phase-13-review-roadmap.md`](./docs/post-phase-13-review-roadmap.md). **Deploy ALM:** [`docs/provisioning-alm-roadmap.md`](./docs/provisioning-alm-roadmap.md) (Phases **18–19** done; 20–22: roles, prefix-aware flows, shared-env CI).
+**Hardening / Dataverse-first roadmap:** see [`docs/remediation-roadmap.md`](./docs/remediation-roadmap.md) (Phases 0–8). Phases **9–13** — [`docs/post-phase-8-review-roadmap.md`](./docs/post-phase-8-review-roadmap.md). Phases **14–17** — [`docs/post-phase-13-review-roadmap.md`](./docs/post-phase-13-review-roadmap.md). **Deploy ALM:** [`docs/provisioning-alm-roadmap.md`](./docs/provisioning-alm-roadmap.md) (Phases **18–22** done: publisher/solution, connection refs, roles, prefix-aware flows, shared-env CI).
 
 Stack:
 

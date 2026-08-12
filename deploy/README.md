@@ -20,6 +20,7 @@ bash deploy/generated/pa-connect.sh   # after replacing CONNECTION_ID
 
 | Path                       | Purpose                                         |
 | -------------------------- | ----------------------------------------------- |
+| `SHARED_ENV.md`            | Shared-org adopter checklist                    |
 | `connections.example.json` | Template connection profile (placeholder hosts) |
 | `connections.json`         | Your real profile (**gitignored**)              |
 | `connections.schema.json`  | JSON Schema for the profile                     |
@@ -34,20 +35,20 @@ bash deploy/generated/pa-connect.sh   # after replacing CONNECTION_ID
 
 ## What gets created
 
-Dataverse tables (publisher prefix default `dr`) — see [`SCHEMA.md`](./SCHEMA.md):
+Dataverse tables (publisher prefix default `dr` — substitute your `publisher.prefix`) — see [`SCHEMA.md`](./SCHEMA.md):
 
 **Control (org-owned)**
 
-- `dr_publishdestination` — allowlisted SharePoint publish roots
-- `dr_approverpool` / `dr_approverpoolmember` — pools + members
-- `dr_documenttype` / `dr_approvalchainstep` — types, scaffolds, policy version, chain templates
-- `dr_appsetting` — feature flags
+- `{prefix}_publishdestination` — allowlisted SharePoint publish roots
+- `{prefix}_approverpool` / `{prefix}_approverpoolmember` — pools + members
+- `{prefix}_documenttype` / `{prefix}_approvalchainstep` — types, scaffolds, policy version, chain templates
+- `{prefix}_appsetting` — feature flags
 
 **Case**
 
-- `dr_document` — case + collaborative draft + revision + publish destination lookup
-- `dr_approvalstep` — runtime steps with immutable `activatedueat` SLA
-- `dr_historyevent` — audit trail
+- `{prefix}_document` — case + collaborative draft + revision + publish destination lookup
+- `{prefix}_approvalstep` — runtime steps with immutable `activatedueat` SLA
+- `{prefix}_historyevent` — audit trail
 
 Environment variables (seeded defaults from your connection profile; **current values** are per-environment — see `environment-variable-values.md`):
 
@@ -59,24 +60,33 @@ Connection references (solution components; defaults overridable in `connectionR
 - `{prefix}_sharepoint` → SharePoint Online connector
 - `{prefix}_dataverse` → Dataverse connector (flows / solution apps; omit with `"dataverse": false`)
 
-`pnpm provision` also writes `control-seed.json`, `connection-references.json`, `environment-variable-values.md`, and a shell-quoted `pa-connect.sh` (bind-to-ref by default). **Validation errors prevent writing executable artifacts.**
+Security roles (display names stable; privilege targets use `{prefix}_*` — see generated `security-roles.md`):
+
+- Document Routing User / Author / Approver / Publisher / Admin
+
+`pnpm provision` also writes prefix-correct `flows/`, `security-roles.json`, shared-env-safe `control-seed.json` (Contoso only with `--demo-seed`), and bind-to-ref `pa-connect.sh`. **Validation errors prevent writing executable artifacts.**
 
 SharePoint remains the **PDF binary** target. Lists are not used as the workflow store.
 
+Shared-org checklist: [`SHARED_ENV.md`](./SHARED_ENV.md).
+
 Security role sketch: [`SECURITY_ROLES.md`](./SECURITY_ROLES.md).
 
-Power Automate stubs (SLA, notify, publish, submit guard): [`flows/`](./flows/).
+Power Automate templates: [`flows/`](./flows/) → generated under `deploy/generated/flows/`.
 
 ## Solution-first vs unmanaged apply
 
-| Command                                   | Use when                                                                                      |
-| ----------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `pnpm provision`                          | Generate plans, ALM manifest, connection refs, env-value guide, `pa-connect.sh`               |
-| `pnpm provision:solution`                 | Shared/dev org: ensure publisher owns the prefix and create the unmanaged solution            |
-| `pnpm provision:apply -- --into-solution` | Apply plan (tables + env defs + connection refs) then add components to `solution.uniqueName` |
-| `pnpm provision:apply -- --unmanaged-ok`  | **Scratch only** — unmanaged metadata outside a solution                                      |
-| Profile `allowUnmanagedApply: true`       | Same as `--unmanaged-ok` without the CLI flag (local profiles only)                           |
-| Profile `legacyDirectConnection: true`    | Scratch `pa-connect.sh` without connection-reference bind guidance                            |
+| Command                                     | Use when                                                                                      |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `pnpm provision`                            | Generate plans, ALM manifest, connection refs, roles, flows, env-value guide, `pa-connect.sh` |
+| `pnpm provision:solution`                   | Shared/dev org: ensure publisher owns the prefix and create the unmanaged solution            |
+| `pnpm provision:apply -- --into-solution`   | Apply plan (tables + env defs + connection refs) then add components to `solution.uniqueName` |
+| `pnpm provision:export` / `pack` / `import` | PAC-oriented promote commands (fails on placeholder hosts)                                    |
+| `pnpm provision:validate`                   | Offline CI validation of `deploy/generated`                                                   |
+| `pnpm provision:apply -- --unmanaged-ok`    | **Scratch only** — unmanaged metadata outside a solution                                      |
+| Profile `allowUnmanagedApply: true`         | Same as `--unmanaged-ok` without the CLI flag (local profiles only)                           |
+| Profile `legacyDirectConnection: true`      | Scratch `pa-connect.sh` without connection-reference bind guidance                            |
+| `pnpm provision -- --demo-seed`             | Include Contoso demo identities in `control-seed.json` (local only)                           |
 
 Prefix collision (prefix already owned by another `publisher.uniqueName`) **fails closed** on solution ensure and apply.
 

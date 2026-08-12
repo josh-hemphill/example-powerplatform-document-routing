@@ -2,8 +2,8 @@
 
 Plan to close the gaps between today’s **generate → optional Web API apply** toolkit and elegant adoption in **large shared Power Platform environments** (publisher ownership, solution ALM, connection references, security roles, prefix governance, and prefix-aware downstream artifacts).
 
-**Status:** Phases 18–19 implemented; Phases 20–22 planned.  
-**Context:** Publisher/solution scaffolding and connection-reference / env-var ALM are in place. Phases 20+ still need security roles in-solution, prefix-aware flows/docs, and shared-env CI wrappers.
+**Status:** Phases 18–22 implemented.  
+**Context:** Shared-env ALM path is complete: publisher/solution scaffolding, connection refs + env vars, security role templates, prefix-aware flows/seed, and SHARED_ENV + CI validation.
 
 **Preceding app roadmaps:** [`remediation-roadmap.md`](./remediation-roadmap.md) (0–8), [`post-phase-8-review-roadmap.md`](./post-phase-8-review-roadmap.md) (9–13), [`post-phase-13-review-roadmap.md`](./post-phase-13-review-roadmap.md) (14–17).
 
@@ -103,121 +103,65 @@ Plan to close the gaps between today’s **generate → optional Web API apply**
 
 ## Phase 20 — Security roles as solution components
 
+**Status:** Implemented.
+
 **Goal:** The five Document Routing roles are provisionable and assignable in shared orgs without hand-building privilege matrices from a markdown table alone.
 
-### Work
+### Delivered
 
-1. **Role definitions as data**
-   - Codify `SECURITY_ROLES.md` into a machine-readable privilege template (JSON/YAML) keyed to **schema names** (prefix applied at generate time).
-   - Keep display-name mapping aligned with `src/domain/security-roles.ts`.
-
-2. **Provision path**
-   - Generate role create / privilege grant steps into the solution plan (or PAC role import artifacts).
-   - Add roles to the solution; document assignment (teams vs users) for shared envs.
-
-3. **Hosted `/principal` contract**
-   - Document production expectation: return Dataverse role **display names**; mapping already exists — ensure SETUP points at generated role names when prefix/branding changes labels.
-
-4. **Service / Flow principal**
-   - Document a **Document Routing Service** (or reuse Admin + service account) for SLA/publish flows; do not invent SPA-token elevation.
+1. **Role definitions as data** — `src/provisioning/security-roles-plan.ts` privilege template keyed by schema names; prefix applied at generate time; display names stay aligned with `src/domain/security-roles.ts`.
+2. **Provision path** — `security-roles.json` / `security-roles.md` artifacts; SUMMARY + alm-manifest list roles; create inside the solution (maker/PAC).
+3. **`/principal` contract** — SETUP + SECURITY_ROLES document display-name expectation.
+4. **Service / Flow principal** — Documented Document Routing Service; no SPA-token elevation.
 
 ### Exit criteria
 
-- Roles can be created/imported with the solution for a non-`dr` prefix without editing markdown by hand.
-- SETUP/SECURITY_ROLES describe assignment in shared environments.
-- Domain role mapping tests cover generated display names.
-
-### PR slicing
-
-| PR  | Focus                                            |
-| --- | ------------------------------------------------ |
-| 20a | Privilege template + prefix substitution         |
-| 20b | Solution membership / apply or PAC import        |
-| 20c | Docs + `/principal` / service principal guidance |
+- [x] Roles can be created/imported with the solution for a non-`dr` prefix without editing markdown by hand.
+- [x] SETUP/SECURITY_ROLES describe assignment in shared environments.
+- [x] Domain role mapping tests cover generated display names.
 
 ---
 
 ## Phase 21 — Prefix-aware flows, docs, and control seed
 
+**Status:** Implemented.
+
 **Goal:** Nothing in the adopter path silently assumes `dr_` when `publisher.prefix` is something else.
 
-### Work
+### Delivered
 
-1. **Flow stubs**
-   - Parameterize table/column logical names from the provision prefix (generate `deploy/generated/flows/*` from templates under `deploy/flows/`).
-   - Prefer packaging flows **into the solution** (Phase 18/19 scaffolding) over “import JSON manually and rebind.”
-   - Keep human-readable stubs in `deploy/flows/` as templates; generated copies are prefix-correct.
-
-2. **Docs & comments**
-   - Replace hardcoded `` `dr_*` `` in SUMMARY, SETUP, deploy README, runtime comments with “`{prefix}_*` (default `dr`)” or generate examples from the active profile.
-   - Fix the aspirational “or import a solution built from this schema” line so it points at the real `provision:solution` path once it exists.
-
-3. **Control seed**
-   - Generate seed with prefixed lookups / type ids as needed.
-   - Shared-env default: **do not** auto-import Contoso emails; require `--demo-seed` or an explicit Admin import action.
-   - Document how seed rows relate to solution (configuration data vs reference data).
-
-4. **Schema / Flow contract tests**
-   - Test that generated flow templates contain `prefixedLogicalName(prefix, …)` for every table touch.
-   - Test SUMMARY samples for a non-default prefix (e.g. `acme`).
+1. **Flow stubs** — `deploy/generated/flows/*` from `deploy/flows/` with prefix substitution.
+2. **Docs** — SETUP / deploy README / flows README / SHARED*ENV use `{prefix}*\*`; solution path first.
+3. **Control seed** — shared-env safe by default; Contoso only with `--demo-seed`.
+4. **Tests** — non-default prefix (`acme`) for flows + SUMMARY.
 
 ### Exit criteria
 
-- `publisher.prefix: "acme"` yields flows/docs/examples with `acme_*`, not leftover `dr_*`.
-- Demo seed cannot land in a shared org without an explicit opt-in.
-- Deploy README describes solution path first, unmanaged apply last.
-
-### PR slicing
-
-| PR  | Focus                                              |
-| --- | -------------------------------------------------- |
-| 21a | Prefix-parameterized flow generation               |
-| 21b | Docs/SUMMARY/runtime comment sweep                 |
-| 21c | Control seed opt-in + tests for non-default prefix |
+- [x] `publisher.prefix: "acme"` yields flows/docs/examples with `acme_*`, not leftover `dr_*`.
+- [x] Demo seed cannot land in a shared org without an explicit opt-in.
+- [x] Deploy README describes solution path first, unmanaged apply last.
 
 ---
 
 ## Phase 22 — Shared-environment adopter experience & CI
 
+**Status:** Implemented.
+
 **Goal:** A team landing in a busy shared org has a checklist, scripts, and CI-shaped commands that match Power Platform ALM norms.
 
-### Work
+### Delivered
 
-1. **Adopter checklist** (`SETUP.md` or `deploy/SHARED_ENV.md`)
-   - Reserve/confirm publisher prefix with the platform owners.
-   - Create or reuse solution unique name; avoid unmanaged apply.
-   - Bind connection references per environment.
-   - Assign security roles; configure Flow service principal.
-   - Import managed (or unmanaged-dev) solution; smoke-test Code App.
-
-2. **CLI surface**
-   - Document / implement scripts such as:
-     - `pnpm provision` (generate)
-     - `pnpm provision:solution` (ensure publisher/solution + emit pack)
-     - `pnpm provision:pack` / `provision:export` / `provision:import` (PAC wrappers where available)
-     - `pnpm provision:apply --unmanaged-ok` (scratch only)
-   - Fail CI if generated artifacts still contain placeholder hosts when packing.
-
-3. **Layer guidance**
-   - Short doc: unmanaged in personal/dev → export → managed import to shared test/prod.
-   - Version bump rules for `solution.version`.
-
-4. **Observability**
-   - SUMMARY includes: prefix, publisher unique name, solution unique name/version, connection ref names, role names, whether unmanaged apply is enabled.
+1. **`deploy/SHARED_ENV.md`** + SETUP cross-links.
+2. **CLI** — `provision:export` / `pack` / `import` wrappers; `provision:validate`; placeholder fail-closed for pack.
+3. **Layer guidance** — unmanaged → export → managed import; version bump note.
+4. **Observability** — SUMMARY includes prefix, publisher, solution, connection refs, role names, unmanaged-apply + demo-seed flags.
+5. **CI** — generate example artifacts + offline validate (no live org).
 
 ### Exit criteria
 
-- New adopter can follow SHARED_ENV.md without reading provisioning TypeScript.
-- CI can generate + validate solution artifacts for a sample prefix without calling a live org (pack dry-run / fixture).
-- Unmanaged apply is clearly secondary and gated.
-
-### PR slicing
-
-| PR  | Focus                                              |
-| --- | -------------------------------------------------- |
-| 22a | SHARED_ENV.md + SETUP cross-links                  |
-| 22b | PAC wrapper scripts + package.json entries         |
-| 22c | CI validation job for generated solution artifacts |
+- [x] New adopter can follow SHARED_ENV.md without reading provisioning TypeScript.
+- [x] CI can generate + validate solution artifacts for a sample prefix without calling a live org.
+- [x] Unmanaged apply is clearly secondary and gated.
 
 ---
 
@@ -251,14 +195,14 @@ Phases 20 and 21 may proceed in parallel after 18c lands solution membership hoo
 
 ## Relationship to current code
 
-| Today                                                                                  | After this roadmap                                            |
-| -------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| `pnpm provision` generates Web API plan + ALM manifest + connection refs + pack guides | Same foundation; Phases 20+ add roles / flows                 |
-| `pnpm provision:apply` gated; `provision:solution` preferred                           | Scratch unmanaged vs solution-first dual path (Phase 18 done) |
-| Connection refs + env var defs are solution-scoped; `pa-connect` binds to refs         | Roles + flows still to follow                                 |
-| Prefix stamps logical names + publisher ownership check                                | Keep; extend to flows/docs in Phase 21                        |
-| Roles in markdown                                                                      | Privilege templates in the solution                           |
-| Flow stubs with `dr_*`                                                                 | Generated prefix-correct flows (+ optional solution package)  |
+| Today                                                                          | After this roadmap                            |
+| ------------------------------------------------------------------------------ | --------------------------------------------- |
+| `pnpm provision` generates ALM artifacts (solution, refs, roles, flows, seed)  | Shared-env path complete (Phases 18–22)       |
+| `pnpm provision:apply` gated; `provision:solution` preferred                   | Scratch unmanaged vs solution-first dual path |
+| Connection refs + env var defs are solution-scoped; `pa-connect` binds to refs | Done (Phase 19)                               |
+| Prefix stamps logical names + publisher ownership check                        | Flows/docs/seed prefix-aware (Phase 21)       |
+| Roles as privilege template + generated guide                                  | Assign via teams; `/principal` display names  |
+| Flow templates with `dr_`; generated copies use active prefix                  | Import `deploy/generated/flows/`              |
 
 ---
 

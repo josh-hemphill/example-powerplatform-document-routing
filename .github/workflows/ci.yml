@@ -52,3 +52,8 @@ jobs:
 
       - name: Bundle budget
         run: pnpm check:bundle
+
+      - name: Provision generate + offline validate
+        run: |
+          pnpm provision:example
+          pnpm provision:validate deploy/generated

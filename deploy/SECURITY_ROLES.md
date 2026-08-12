@@ -4,6 +4,11 @@ Assign these security roles (or equivalent privilege sets) in the Dataverse
 environment. The Code App gates UI from host identity + mapped roles;
 **enforcement** belongs in Dataverse privileges + Power Automate.
 
+> **Generated matrix:** After `pnpm provision`, see
+> [`deploy/generated/security-roles.md`](./generated/security-roles.md) and
+> `security-roles.json` for **prefix-correct** table logical names. Display names
+> below stay stable so `/principal` mapping does not depend on `publisher.prefix`.
+
 | Role                           | Typical privileges                                                                 |
 | ------------------------------ | ---------------------------------------------------------------------------------- |
 | **Document Routing User**      | Create `document` (own); read shared / owned cases; create requests                |
@@ -12,12 +17,25 @@ environment. The Code App gates UI from host identity + mapped roles;
 | **Document Routing Publisher** | Update publish fields / trigger publish Flow on `approved` documents               |
 | **Document Routing Admin**     | CRUD control tables (`documenttype`, pools, destinations, `appsetting`); Admin UI  |
 
+## Shared-environment assignment
+
+- Create roles **inside** your unmanaged solution (see [`SHARED_ENV.md`](./SHARED_ENV.md)).
+- Prefer **Dataverse / Entra teams** over one-off user assignments when authors and approvers rotate.
+- Publishers and Approvers still need case access (ownership or share) in addition to the role.
+
+## Service / Flow principal
+
+SLA sweeper and publish flows must run as a **Document Routing Service** account
+(or Admin + dedicated service principal) with an elevated Dataverse connection.
+Do **not** invent SPA-token elevation — the Code App only triggers privileged work
+by writing Dataverse status fields or calling a Custom Connector that starts a flow.
+
 ## Hosted identity (Phase 9)
 
 On successful Power Apps `getContext()`, the app defaults to **`user` only**, then
 calls **`GET /principal`** to load server-derived roles (`refreshHostedRoles`).
 Host context does **not** include security roles. Production `/principal` should
-return Dataverse security role display names (or mapped tokens); the mock resolves
+return Dataverse security role **display names** (or mapped tokens); the mock resolves
 roles from a server-side email directory and **ignores** client role headers on
 that request.
 

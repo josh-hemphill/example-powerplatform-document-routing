@@ -328,6 +328,14 @@ describe('writeProvisionArtifacts', () => {
 		expect(result.files.some((file) => file.endsWith('control-seed.json'))).toBe(true);
 		const seed = JSON.parse(readFileSync(join(dir, 'control-seed.json'), 'utf8'));
 		expect(seed.documentTypes.length).toBeGreaterThan(0);
+		expect(seed.sampleIdentityEmails).toEqual([]);
+	});
+
+	it('writes demo identities when includeDemoIdentities is set', () => {
+		const dir = mkdtempSync(join(tmpdir(), 'prov-demo-seed-'));
+		tempDirs.push(dir);
+		writeProvisionArtifacts(sampleProfile(), dir, { includeDemoIdentities: true });
+		const seed = JSON.parse(readFileSync(join(dir, 'control-seed.json'), 'utf8'));
 		expect(seed.sampleIdentityEmails.length).toBeGreaterThan(0);
 	});
 
@@ -343,11 +351,14 @@ describe('writeProvisionArtifacts', () => {
 		expect(result.files.some((file) => file.endsWith('solution-pack.sh'))).toBe(true);
 		expect(result.files.some((file) => file.endsWith('connection-references.json'))).toBe(true);
 		expect(result.files.some((file) => file.endsWith('environment-variable-values.md'))).toBe(true);
+		expect(result.files.some((file) => file.endsWith('security-roles.json'))).toBe(true);
+		expect(result.files.some((file) => file.includes(`${join('flows', 'sla-sweeper.json')}`) || file.endsWith('flows/sla-sweeper.json'))).toBe(true);
 		const summary = readFileSync(join(dir, 'SUMMARY.md'), 'utf8');
 		expect(summary).toContain('docrouting');
 		expect(summary).toContain('DocumentRouting');
 		expect(summary).toContain('pnpm provision:solution');
 		expect(summary).toContain('dr_sharepoint');
+		expect(summary).toContain('Document Routing Admin');
 		expect(summary).toMatch(/connection reference/i);
 		expect(summary).not.toMatch(/connection references arrive in Phase 19/i);
 		const manifest = JSON.parse(readFileSync(join(dir, 'alm-manifest.json'), 'utf8'));
@@ -360,12 +371,18 @@ describe('writeProvisionArtifacts', () => {
 });
 
 describe('control seed', () => {
-	it('flags Contoso sample identities', () => {
-		const seed = buildControlSeedBundle('dr');
+	it('flags Contoso sample identities when demo seed is requested', () => {
+		const seed = buildControlSeedBundle('dr', undefined, { includeDemoIdentities: true });
 		expect(controlSeedHasSampleIdentities(seed)).toBe(true);
 		expect(seed.appSettings.some((item) => item.key === 'allowApproverOverride')).toBe(
 			true,
 		);
+	});
+
+	it('omits Contoso identities by default for shared-env safety', () => {
+		const seed = buildControlSeedBundle('dr');
+		expect(controlSeedHasSampleIdentities(seed)).toBe(false);
+		expect(seed.sampleIdentityEmails).toEqual([]);
 	});
 });
 

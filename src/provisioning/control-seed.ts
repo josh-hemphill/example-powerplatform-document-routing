@@ -161,30 +161,48 @@ function mapChainStep(step: ApprovalStepTemplate, order: number): SeedChainStep 
 
 /**
  * Builds a control seed bundle for provision artifacts / Admin import.
+ * Shared-env default omits Contoso demo identities unless `includeDemoIdentities` is true.
  */
 export function buildControlSeedBundle(
 	publisherPrefix: string,
 	types: DocumentTypeDefinition[] = documentTypes,
+	options: { includeDemoIdentities?: boolean } = {},
 ): ControlSeedBundle {
-	const approverPools = collectPools(types);
-	const sampleIdentityEmails = [
-		...new Set(
-			approverPools.flatMap((pool) => pool.members.map((member) => member.email)),
-		),
-	].filter(isSampleControlEmail);
+	const includeDemoIdentities = options.includeDemoIdentities === true;
+	const approverPools = collectPools(types).map((pool) => {
+		if (includeDemoIdentities) {
+			return pool;
+		}
+		return {
+			...pool,
+			members: [],
+		};
+	});
+	const sampleIdentityEmails = includeDemoIdentities
+		? [
+				...new Set(
+					collectPools(types).flatMap((pool) =>
+						pool.members.map((member) => member.email),
+					),
+				),
+			].filter(isSampleControlEmail)
+		: [];
 
 	return {
 		publisherPrefix: publisherPrefix.toLowerCase(),
-		warning:
-			'Demo seed only. Replace Contoso/example emails and destinations before production.',
-		publishDestinations: [
-			{
-				name: 'Default Policies Library',
-				siteUrl: 'https://docs.example.com/sites/Policies',
-				libraryName: 'Published Documents',
-				folderPath: '/Policies',
-			},
-		],
+		warning: includeDemoIdentities
+			? 'Demo seed only. Replace Contoso/example emails and destinations before production. Shared orgs: require --demo-seed intentionally.'
+			: 'Shared-env safe seed: demo identities omitted. Use Admin to add real pools/members, or regenerate with --demo-seed for local Contoso samples.',
+		publishDestinations: includeDemoIdentities
+			? [
+					{
+						name: 'Default Policies Library',
+						siteUrl: 'https://docs.example.com/sites/Policies',
+						libraryName: 'Published Documents',
+						folderPath: '/Policies',
+					},
+				]
+			: [],
 		approverPools,
 		documentTypes: types.map((type) => ({
 			id: type.id,
@@ -194,9 +212,17 @@ export function buildControlSeedBundle(
 			draftScaffold: type.draftTemplate,
 			defaultFolderPath: type.folderPath,
 			policyVersion: 1,
-			chain: type.approvalChain.map((step, index) =>
-				mapChainStep(step, index + 1),
-			),
+			chain: type.approvalChain.map((step, index) => {
+				const mapped = mapChainStep(step, index + 1);
+				if (includeDemoIdentities) {
+					return mapped;
+				}
+				return {
+					...mapped,
+					namedApproverEmail: undefined,
+					namedApproverDisplayName: undefined,
+				};
+			}),
 		})),
 		appSettings: [
 			{

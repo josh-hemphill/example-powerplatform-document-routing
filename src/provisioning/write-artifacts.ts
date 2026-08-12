@@ -4,12 +4,16 @@ import type { ExistingAttributeMetadata } from './schema-drift.ts';
 import type { AlmManifest } from './solution-alm.ts';
 import { mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { validateConnectionProfile } from './connection-config.ts';
 import { buildControlSeedBundle } from './control-seed.ts';
 import {
 	buildDataverseProvisionPlan,
 } from './dataverse-provision-plan.ts';
+import {
+	generatePrefixedFlowArtifacts,
+} from './flow-templates.ts';
 import {
 	buildPaConnectCommands,
 	renderPaCommandsScript,
@@ -19,6 +23,10 @@ import {
 
 	plannedTypeFromAttributeBody,
 } from './schema-drift.ts';
+import {
+	buildSecurityRolePlans,
+	renderSecurityRolesMarkdown,
+} from './security-roles-plan.ts';
 import {
 	buildAlmManifest,
 	renderSolutionPackMarkdown,
@@ -109,13 +117,18 @@ export function renderEnvironmentVariableValuesGuide(
 }
 
 /**
- * Writes provision plan JSON, env defaults, ALM guides, and pa connect script under deploy/generated.
+ * Writes provision plan JSON, env defaults, ALM guides, flows, roles, and pa connect script.
  * On validation errors, no executable artifacts are written (atomic replace only on success).
  */
 export function writeProvisionArtifacts(
 	profile: ConnectionProfile,
 	outputDir: string,
-	options: { requireDeployableHosts?: boolean } = {},
+	options: {
+		requireDeployableHosts?: boolean;
+		/** Include Contoso demo identities in control-seed.json (local only). */
+		includeDemoIdentities?: boolean;
+		flowTemplatesDir?: string;
+	} = {},
 ): ProvisionArtifacts {
 	const issues = validateConnectionProfile(profile, {
 		requireDeployableHosts: options.requireDeployableHosts,
@@ -141,14 +154,22 @@ export function writeProvisionArtifacts(
 	const plan = buildDataverseProvisionPlan(profile);
 	const almManifest = buildAlmManifest(profile, plan);
 	const commands = buildPaConnectCommands(profile, plan);
-	const seed = buildControlSeedBundle(profile.publisher.prefix);
+	const includeDemoIdentities = options.includeDemoIdentities === true;
+	const seed = buildControlSeedBundle(profile.publisher.prefix, undefined, {
+		includeDemoIdentities,
+	});
+	const rolePlans = buildSecurityRolePlans(plan.prefix);
 	const envVarPattern = `${plan.prefix}_*`;
+	const templatesDir = options.flowTemplatesDir
+		?? join(dirname(fileURLToPath(import.meta.url)), '../../deploy/flows');
+	const flowArtifacts = generatePrefixedFlowArtifacts(templatesDir, plan.prefix);
 
 	const staging = mkdtempSync(join(tmpdir(), 'doc-routing-provision-'));
 	const files: string[] = [];
 
 	const write = (name: string, contents: string) => {
 		const target = join(staging, name);
+		mkdirSync(dirname(target), { recursive: true });
 		writeFileSync(target, contents, 'utf8');
 		files.push(join(outputDir, name));
 	};
@@ -159,6 +180,8 @@ export function writeProvisionArtifacts(
 		'environment-variable-defaults.json',
 		'environment-variable-values.md',
 		'connection-references.json',
+		'security-roles.json',
+		'security-roles.md',
 		'control-seed.json',
 		'alm-manifest.json',
 		'solution-pack.md',
@@ -166,6 +189,7 @@ export function writeProvisionArtifacts(
 		'pa-connect.sh',
 		'app.env.example',
 		'SUMMARY.md',
+		...flowArtifacts.map((item) => join('flows', item.fileName)),
 	];
 
 	try {
@@ -179,6 +203,7 @@ export function writeProvisionArtifacts(
 					environmentVariableDefaults: plan.environmentVariableDefaults,
 					environmentVariableSchemaNames: plan.environmentVariableSchemaNames,
 					connectionReferences: plan.connectionReferences,
+					securityRoles: almManifest.securityRoles,
 					requests: plan.requests,
 				},
 				null,
@@ -198,11 +223,16 @@ export function writeProvisionArtifacts(
 			'connection-references.json',
 			`${JSON.stringify(plan.connectionReferences, null, 2)}\n`,
 		);
+		write('security-roles.json', `${JSON.stringify(rolePlans, null, 2)}\n`);
+		write('security-roles.md', renderSecurityRolesMarkdown(rolePlans, plan.prefix));
 		write('control-seed.json', `${JSON.stringify(seed, null, 2)}\n`);
 		write('alm-manifest.json', `${JSON.stringify(almManifest, null, 2)}\n`);
 		write('solution-pack.md', renderSolutionPackMarkdown(almManifest));
 		write('solution-pack.sh', renderSolutionPackScript(almManifest));
 		write('pa-connect.sh', renderPaCommandsScript(commands));
+		for (const flow of flowArtifacts) {
+			write(join('flows', flow.fileName), flow.contents);
+		}
 		write(
 			'app.env.example',
 			[
@@ -235,6 +265,7 @@ export function writeProvisionArtifacts(
 				`- Preferred path: **solution** (\`pnpm provision:solution\`)`,
 				`- Unmanaged apply allowed by profile: \`${Boolean(profile.allowUnmanagedApply)}\``,
 				`- Legacy direct pa-connect: \`${Boolean(profile.legacyDirectConnection)}\``,
+				`- Demo control seed identities: \`${includeDemoIdentities}\``,
 				'',
 				`Dataverse Web API root: \`${plan.apiRoot}\``,
 				'',
@@ -248,24 +279,41 @@ export function writeProvisionArtifacts(
 						`- \`${item.logicalName}\` (${item.purpose}, \`${item.connectorId}\`)`,
 				),
 				'',
+				'## Security roles',
+				'',
+				...almManifest.securityRoles.map(
+					(role) => `- \`${role.displayName}\` (\`${role.token}\`)`,
+				),
+				'',
+				'See `security-roles.md` for prefixed privilege guidance. Create roles inside the solution; production `/principal` returns these display names.',
+				'',
 				'## Environment variables',
 				'',
 				...plan.environmentVariableSchemaNames.map((name) => `- \`${name}\``),
 				'',
 				'See `environment-variable-values.md` for per-environment current-value guidance (do not commit secrets).',
 				'',
+				'## Flows',
+				'',
+				`Prefix-correct stubs are under \`flows/\` (from \`deploy/flows\` templates). Tables use \`${plan.prefix}_*\`.`,
+				'Run flows as the Document Routing Service principal — never the end-user SPA token.',
+				'',
 				'## Control seed',
 				'',
-				'Sample document types / pools from `src/config/document-types.ts` are mirrored in `control-seed.json` for Admin / import.',
-				'Replace Contoso sample emails before production.',
+				includeDemoIdentities
+					? 'Demo identities included (`--demo-seed`). Replace Contoso emails before any shared-org import.'
+					: 'Shared-env safe seed (no Contoso emails). Use Admin to add real members, or regenerate with `--demo-seed` for local demos only.',
+				'Control seed is **configuration/reference data**, not a solution component — import via Admin after solution deploy.',
 				'',
 				'## Next steps (shared environments)',
 				'',
-				'1. Run `DATAVERSE_ACCESS_TOKEN=… pnpm provision:solution` to ensure publisher ownership + unmanaged solution (prefix collisions fail closed).',
-				'2. Run `pnpm provision:apply -- --into-solution` (or pack/import) so tables, env var definitions, and connection references land in the solution.',
-				`3. Bind a real SharePoint connection to \`${sharePointRef?.logicalName ?? `${plan.prefix}_sharepoint`}\`, then review \`pa-connect.sh\` for Code App data sources.`,
-				`4. Set env var **current values** per environment (\`${envVarPattern}\`); use \`app.env.example\` for local Vite only.`,
-				'5. Load control seed via Admin UI (or opt-in import) then remove sample identities.',
+				'1. Follow [`deploy/SHARED_ENV.md`](../SHARED_ENV.md) (publisher → solution → refs → roles → managed import).',
+				'2. Run `DATAVERSE_ACCESS_TOKEN=… pnpm provision:solution` to ensure publisher ownership + unmanaged solution.',
+				'3. Run `pnpm provision:apply -- --into-solution` (or pack/import) so tables, env var definitions, and connection references land in the solution.',
+				`4. Bind a real SharePoint connection to \`${sharePointRef?.logicalName ?? `${plan.prefix}_sharepoint`}\`, then review \`pa-connect.sh\`.`,
+				`5. Set env var **current values** per environment (\`${envVarPattern}\`); use \`app.env.example\` for local Vite only.`,
+				'6. Create/assign security roles from `security-roles.md`; configure the Flow service principal.',
+				'7. Import generated `flows/` (or package into the solution) and smoke-test the Code App.',
 				'',
 				'## Scratch / unmanaged apply (avoid in shared orgs)',
 				'',
@@ -281,7 +329,9 @@ export function writeProvisionArtifacts(
 		);
 
 		mkdirSync(outputDir, { recursive: true });
+		mkdirSync(join(outputDir, 'flows'), { recursive: true });
 		for (const name of artifactNames) {
+			mkdirSync(dirname(join(outputDir, name)), { recursive: true });
 			renameSync(join(staging, name), join(outputDir, name));
 		}
 	}

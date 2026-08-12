@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { buildSecurityRolePlans } from '../provisioning/security-roles-plan.ts';
 import {
 	DATAVERSE_SECURITY_ROLE_NAMES,
 	defaultHostedRoles,
 	mapDataverseSecurityRoles,
 	resolveHostedRoles,
+	toDataverseSecurityRoleNames,
 } from './security-roles.ts';
 
 describe('mapDataverseSecurityRoles', () => {
@@ -41,5 +43,23 @@ describe('resolveHostedRoles', () => {
 	it('never implies publisher without an explicit mapped role', () => {
 		expect(resolveHostedRoles(null)).not.toContain('publisher');
 		expect(resolveHostedRoles(['Document Routing User'])).toEqual(['user']);
+	});
+});
+
+describe('generated role display names', () => {
+	it('round-trip through toDataverseSecurityRoleNames for provisioned plans', () => {
+		const plans = buildSecurityRolePlans('acme');
+		const names = plans.map((role) => role.displayName);
+		expect(mapDataverseSecurityRoles(names)).toEqual([
+			'user',
+			'author',
+			'approver',
+			'publisher',
+			'admin',
+		]);
+		expect(toDataverseSecurityRoleNames(['admin', 'publisher'])).toEqual([
+			DATAVERSE_SECURITY_ROLE_NAMES.admin,
+			DATAVERSE_SECURITY_ROLE_NAMES.publisher,
+		]);
 	});
 });
