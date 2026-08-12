@@ -5,7 +5,9 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { looksLikePlaceholder } from '../src/provisioning/connection-urls.ts';
-import { expectedFlowArtifactNames } from '../src/provisioning/flow-templates.ts';
+import {
+	expectedFlowArtifactNames,
+} from '../src/provisioning/flow-templates.ts';
 
 export interface ValidateProvisionArtifactsOptions {
 	outputDir: string;

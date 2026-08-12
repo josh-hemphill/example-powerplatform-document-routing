@@ -58,6 +58,14 @@ export function expectedFlowArtifactNames(): string[] {
 }
 
 /**
+ * True when text still contains the default publisher stamp `dr_` as its own prefix token.
+ * Avoids false positives for valid prefixes that end in `dr` (e.g. `adr_document`).
+ */
+export function containsLeftoverDefaultPublisherPrefix(text: string): boolean {
+	return /(?<![a-z])dr_/i.test(text);
+}
+
+/**
  * Asserts every planned table logical name appears in generated flow contents when touched by stubs.
  */
 export function assertFlowsReferencePrefix(
@@ -67,7 +75,7 @@ export function assertFlowsReferencePrefix(
 	const prefix = publisherPrefix.toLowerCase();
 	const blob = artifacts.map((item) => item.contents).join('\n');
 	const issues: string[] = [];
-	if (prefix !== 'dr' && blob.includes('dr_')) {
+	if (prefix !== 'dr' && containsLeftoverDefaultPublisherPrefix(blob)) {
 		issues.push(`Generated flows still contain leftover dr_ for prefix "${prefix}"`);
 	}
 	const required = [

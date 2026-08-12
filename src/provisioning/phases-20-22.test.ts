@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { DATAVERSE_SECURITY_ROLE_NAMES } from '../domain/security-roles.ts';
 import {
 	assertFlowsReferencePrefix,
+	containsLeftoverDefaultPublisherPrefix,
 	generatePrefixedFlowArtifacts,
 } from './flow-templates.ts';
 import {
@@ -83,7 +84,22 @@ describe('flow prefix generation', () => {
 		expect(artifacts.some((item) => item.contents.includes('acme_approvalsteps'))).toBe(
 			true,
 		);
-		expect(artifacts.some((item) => item.contents.includes('dr_'))).toBe(false);
+		expect(
+			artifacts.some((item) => containsLeftoverDefaultPublisherPrefix(item.contents)),
+		).toBe(false);
+	});
+
+	it('does not treat prefixes ending in dr as leftover default stamps', () => {
+		expect(containsLeftoverDefaultPublisherPrefix('adr_document')).toBe(false);
+		expect(containsLeftoverDefaultPublisherPrefix('xdr_historyevent')).toBe(false);
+		expect(containsLeftoverDefaultPublisherPrefix('dr_document')).toBe(true);
+		expect(containsLeftoverDefaultPublisherPrefix('/api/data/v9.2/dr_approvalsteps')).toBe(
+			true,
+		);
+
+		const artifacts = generatePrefixedFlowArtifacts('deploy/flows', 'adr');
+		expect(assertFlowsReferencePrefix(artifacts, 'adr')).toEqual([]);
+		expect(artifacts.some((item) => item.contents.includes('adr_document'))).toBe(true);
 	});
 });
 
@@ -118,7 +134,7 @@ describe('phases 20–22 provision artifacts', () => {
 		);
 		const flow = readFileSync(join(dir, 'flows/sla-sweeper.json'), 'utf8');
 		expect(flow).toContain('acme_approvalstep');
-		expect(flow).not.toContain('dr_');
+		expect(containsLeftoverDefaultPublisherPrefix(flow)).toBe(false);
 		const seed = JSON.parse(readFileSync(join(dir, 'control-seed.json'), 'utf8')) as {
 			sampleIdentityEmails: string[];
 		};
