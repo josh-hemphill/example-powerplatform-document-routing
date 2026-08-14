@@ -2,7 +2,12 @@
  * Adopter-facing app configuration.
  * Change this file (and `document-types.ts`) for most tenant-specific behavior.
  * Prefer env overrides / deploy/connections.json for hosts so custom domains stay out of source.
+ *
+ * Dev-only identity (`localDemoUser`, `VITE_LOCAL_DEMO_*`) never applies in hosted production —
+ * see `allowsDemoIdentityFallback()` in the identity store.
  */
+import type { DocumentRoutingRole } from '../domain/security-roles.ts';
+import { mapDataverseSecurityRoles } from '../domain/security-roles.ts';
 import { bundledDocumentTypesHaveSampleIdentities } from './sample-identities.ts';
 
 export interface SharePointDefaults {
@@ -20,6 +25,11 @@ export interface AppBrand {
 export interface LocalDemoUser {
 	userName: string;
 	email: string;
+	/**
+	 * Roles for the primary local demo persona (DEV / standalone Vite only).
+	 * Override with `VITE_LOCAL_DEMO_ROLES` (comma-separated tokens or Dataverse display names).
+	 */
+	roles: DocumentRoutingRole[];
 }
 
 export interface AppConfig {
@@ -32,7 +42,7 @@ export interface AppConfig {
 	sharePoint: SharePointDefaults;
 	/** Optional Dataverse org URL for docs / future adapters (custom domains OK). */
 	dataverseEnvironmentUrl?: string;
-	/** Used only when Power Apps host context is unavailable (local Vite). */
+	/** Used only when Power Apps host context is unavailable (local Vite DEV). */
 	localDemoUser: LocalDemoUser;
 	features: {
 		/** Show the in-app setup banner until placeholders are replaced. */
@@ -46,7 +56,18 @@ type AppEnvKey
 	= | 'VITE_SHAREPOINT_SITE_URL'
 		| 'VITE_SHAREPOINT_LIBRARY_NAME'
 		| 'VITE_SHAREPOINT_FOLDER_PATH'
-		| 'VITE_DATAVERSE_ENVIRONMENT_URL';
+		| 'VITE_DATAVERSE_ENVIRONMENT_URL'
+		| 'VITE_LOCAL_DEMO_EMAIL'
+		| 'VITE_LOCAL_DEMO_USER_NAME'
+		| 'VITE_LOCAL_DEMO_ROLES';
+
+const DEFAULT_LOCAL_DEMO_ROLES: DocumentRoutingRole[] = [
+	'user',
+	'author',
+	'approver',
+	'publisher',
+	'admin',
+];
 
 function env(key: AppEnvKey): string | undefined {
 	try {
@@ -61,6 +82,20 @@ function env(key: AppEnvKey): string | undefined {
 	catch {
 		return undefined;
 	}
+}
+
+/**
+ * Parses `VITE_LOCAL_DEMO_ROLES` into app role tokens; empty/invalid → undefined (use defaults).
+ */
+export function parseLocalDemoRoles(
+	raw: string | undefined,
+): DocumentRoutingRole[] | undefined {
+	if (!raw?.trim()) {
+		return undefined;
+	}
+	const parts = raw.split(/[,;|]/).map((part) => part.trim()).filter(Boolean);
+	const mapped = mapDataverseSecurityRoles(parts);
+	return mapped.length > 0 ? mapped : undefined;
 }
 
 export const appConfig: AppConfig = {
@@ -80,8 +115,11 @@ export const appConfig: AppConfig = {
 	},
 	dataverseEnvironmentUrl: env('VITE_DATAVERSE_ENVIRONMENT_URL'),
 	localDemoUser: {
-		userName: 'Local Developer',
-		email: 'developer@example.com',
+		userName: env('VITE_LOCAL_DEMO_USER_NAME') ?? 'Local Developer',
+		email: env('VITE_LOCAL_DEMO_EMAIL') ?? 'developer@example.com',
+		roles:
+			parseLocalDemoRoles(env('VITE_LOCAL_DEMO_ROLES'))
+			?? [...DEFAULT_LOCAL_DEMO_ROLES],
 	},
 	features: {
 		showSetupBanner: true,

@@ -1,5 +1,6 @@
 /**
  * Local demo personas shared by the identity switcher and mock principal directory.
+ * DEV / standalone only — hosted production uses Dataverse security roles.
  */
 import type { DocumentRoutingRole } from '../domain/security-roles.ts';
 import { appConfig } from './app.config.ts';
@@ -13,14 +14,17 @@ export interface LocalDemoPersona {
 
 /**
  * DEV/standalone personas for collaborative draft / approval demos.
- * Only the local developer persona includes Admin.
+ * The primary persona uses `appConfig.localDemoUser` (email / name / roles),
+ * overridable via `VITE_LOCAL_DEMO_*` in `.env.local`.
  */
 export const LOCAL_DEMO_PERSONAS: LocalDemoPersona[] = [
 	{
-		label: 'Local developer (Admin)',
+		label: appConfig.localDemoUser.roles.includes('admin')
+			? 'Local developer (Admin)'
+			: 'Local developer',
 		email: appConfig.localDemoUser.email,
 		userName: appConfig.localDemoUser.userName,
-		roles: ['user', 'author', 'approver', 'publisher', 'admin'],
+		roles: [...appConfig.localDemoUser.roles],
 	},
 	{
 		label: 'Jordan Legal (pool)',
@@ -39,6 +43,12 @@ export const LOCAL_DEMO_PERSONAS: LocalDemoPersona[] = [
 		email: 'casey.author@contoso.com',
 		userName: 'Casey Author',
 		roles: ['user', 'author'],
+	},
+	{
+		label: 'Sam Compliance (named)',
+		email: 'sam.compliance@contoso.com',
+		userName: 'Sam Compliance',
+		roles: ['user', 'approver'],
 	},
 ];
 

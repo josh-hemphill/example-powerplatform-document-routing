@@ -36,17 +36,38 @@ Details: [`deploy/README.md`](./deploy/README.md).
 
 | Field / env                      | What to change                                                                                                                          |
 | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `brand.*`                        | Product name shown in the shell                                                                                                         |
+| `brand.*`                        | Product name + tagline shown in the shell                                                                                               |
 | `VITE_SHAREPOINT_*`              | Local SharePoint defaults (any HTTPS host)                                                                                              |
 | `VITE_DATAVERSE_ENVIRONMENT_URL` | Optional org URL for adapters                                                                                                           |
 | `VITE_DOCUMENT_API_BASE_URL`     | API / Custom Connector base                                                                                                             |
-| `localDemoUser`                  | Fallback identity for local Vite play only (`import.meta.env.DEV`)                                                                      |
+| `VITE_LOCAL_DEMO_*`              | **DEV only** — email / display name / roles for the primary local persona (see below)                                                   |
+| `localDemoUser`                  | Code defaults for the same identity when env is unset (`import.meta.env.DEV` / standalone only)                                         |
 | Runtime hosts                    | Prefer Dataverse `{prefix}_*` via `window.__DOCUMENT_ROUTING_ENV__`; `.env` `VITE_*` is local-only — see `src/config/runtime-config.ts` |
 | `features.showSetupBanner`       | Set `false` once placeholders are gone                                                                                                  |
 
 **Routing policy is not edited in the SPA bundle for production.** Use the in-app **Admin** page (`#/admin`) or provisioned Dataverse control tables.
 
 `features.allowApproverOverride` in `app.config.ts` is only a **seed hint**. Runtime value lives in control settings (`appsetting` / Admin → Settings), default **off** (submit materializes chains from control data).
+
+### Local Admin in Dev
+
+Hosted production Admin requires the Dataverse **Document Routing Admin** security role (see [`deploy/SECURITY_ROLES.md`](./deploy/SECURITY_ROLES.md)).
+
+For **local Vite** (`pnpm dev`, standalone / no Power Apps host):
+
+1. Stay on the **Local developer** persona (or your `VITE_LOCAL_DEMO_*` override) — it includes `admin` by default.
+2. Open `#/admin` from the nav (visible only when the identity has `admin`).
+3. Optional: put your own identity in `.env.local` so seeds and the persona switcher match you:
+
+```bash
+cp .env.example .env.local
+# edit:
+# VITE_LOCAL_DEMO_EMAIL=you@contoso.com
+# VITE_LOCAL_DEMO_USER_NAME=Your Name
+# VITE_LOCAL_DEMO_ROLES=user,author,approver,publisher,admin
+```
+
+`VITE_LOCAL_DEMO_*` is ignored when the app is hosted in Power Apps. Without `admin` in `VITE_LOCAL_DEMO_ROLES`, `#/admin` stays hidden and returns you to Inbox.
 
 ## 3. Document types, pools, destinations
 
@@ -77,7 +98,7 @@ pnpm generate:api
 pnpm dev
 ```
 
-Walk the seeded inbox: request → draft → approvals → publish. Demo cases live in `src/mock/seed-documents.ts`. Use the persona switcher; only **Local developer** has Admin.
+Walk the seeded inbox: request → draft → approvals → publish. Demo cases live in `src/mock/seed-documents.ts` (mock/DEV only — not used by hosted Dataverse). Use the persona switcher; only the **Local developer** persona (or your `VITE_LOCAL_DEMO_*` override with `admin`) can open Admin. See **Local Admin in Dev** above.
 
 ## 5. Provision Dataverse + connect SharePoint
 

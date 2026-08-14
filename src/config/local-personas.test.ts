@@ -10,9 +10,14 @@ describe('resolvePrincipalRolesByEmail', () => {
 		expect(resolvePrincipalRolesByEmail(appConfig.localDemoUser.email)).toEqual(
 			LOCAL_DEMO_PERSONAS[0].roles,
 		);
+		expect(LOCAL_DEMO_PERSONAS[0].roles).toContain('admin');
 		expect(resolvePrincipalRolesByEmail('casey.author@contoso.com')).toEqual([
 			'user',
 			'author',
+		]);
+		expect(resolvePrincipalRolesByEmail('sam.compliance@contoso.com')).toEqual([
+			'user',
+			'approver',
 		]);
 	});
 

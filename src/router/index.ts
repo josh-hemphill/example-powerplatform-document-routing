@@ -22,7 +22,8 @@ export const router = createRouter({
 			component: async() => import('@/views/InboxView.vue'),
 			meta: {
 				title: 'Inbox',
-				subtitle: 'Requests, drafts, and approvals assigned to you',
+				/** Persona helper text lives under the chip group — avoid stacked subtitles. */
+				subtitle: null,
 			},
 		},
 		{

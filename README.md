@@ -41,7 +41,7 @@ pnpm generate:api
 pnpm dev
 ```
 
-Open the Vite URL. A Vite middleware mock implements `openapi/document-routing.yaml` at `/api`, so the full workflow works offline.
+Open the Vite URL. A Vite middleware mock implements `openapi/document-routing.yaml` at `/api`, so the full workflow works offline. Seeded cases cover request → draft → claim/decide → elevate → approve → publish → supersede (see `src/mock/seed-documents.ts`). Admin: stay on **Local developer**, or set `VITE_LOCAL_DEMO_*` in `.env.local` (docs in [`SETUP.md`](./SETUP.md)).
 
 ```bash
 pnpm test

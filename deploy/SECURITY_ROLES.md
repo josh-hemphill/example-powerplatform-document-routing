@@ -73,8 +73,20 @@ The SPA sets these from the identity store for **local play only**. Production
 APIs **must ignore** both headers and derive principal + roles from the token /
 Dataverse. Never treat client-supplied roles as authoritative when hosted.
 
-In DEV only, a persona switcher changes the store — **Local developer** includes
-`admin` (and publisher); other personas do not.
+In DEV only, a persona switcher changes the store — the **Local developer** persona
+includes `admin` (and publisher) by default; other Contoso personas do not.
+
+To act as yourself locally (email, display name, roles), set in `.env.local`:
+
+```bash
+VITE_LOCAL_DEMO_EMAIL=you@contoso.com
+VITE_LOCAL_DEMO_USER_NAME=Your Name
+VITE_LOCAL_DEMO_ROLES=user,author,approver,publisher,admin
+```
+
+Roles accept app tokens (`admin`) or Dataverse display names (`Document Routing Admin`).
+These env vars apply only to standalone Vite DEV — hosted Power Apps uses Dataverse
+security roles from `GET /principal`. Without `admin`, `#/admin` is hidden and guarded.
 
 ### Privileged mock checks
 
