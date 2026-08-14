@@ -6,9 +6,12 @@
  * Dev-only identity (`localDemoUser`, `VITE_LOCAL_DEMO_*`) never applies in hosted production —
  * see `allowsDemoIdentityFallback()` in the identity store.
  */
-import type { DocumentRoutingRole } from '../domain/security-roles.ts';
-import { mapDataverseSecurityRoles } from '../domain/security-roles.ts';
+import type { LocalDemoUser } from './local-demo-user.ts';
+import { localDemoUser } from './local-demo-user.ts';
 import { bundledDocumentTypesHaveSampleIdentities } from './sample-identities.ts';
+
+export type { LocalDemoUser } from './local-demo-user.ts';
+export { parseLocalDemoRoles } from './local-demo-user.ts';
 
 export interface SharePointDefaults {
 	siteUrl: string;
@@ -20,16 +23,6 @@ export interface SharePointDefaults {
 export interface AppBrand {
 	name: string;
 	tagline: string;
-}
-
-export interface LocalDemoUser {
-	userName: string;
-	email: string;
-	/**
-	 * Roles for the primary local demo persona (DEV / standalone Vite only).
-	 * Override with `VITE_LOCAL_DEMO_ROLES` (comma-separated tokens or Dataverse display names).
-	 */
-	roles: DocumentRoutingRole[];
 }
 
 export interface AppConfig {
@@ -56,18 +49,7 @@ type AppEnvKey
 	= | 'VITE_SHAREPOINT_SITE_URL'
 		| 'VITE_SHAREPOINT_LIBRARY_NAME'
 		| 'VITE_SHAREPOINT_FOLDER_PATH'
-		| 'VITE_DATAVERSE_ENVIRONMENT_URL'
-		| 'VITE_LOCAL_DEMO_EMAIL'
-		| 'VITE_LOCAL_DEMO_USER_NAME'
-		| 'VITE_LOCAL_DEMO_ROLES';
-
-const DEFAULT_LOCAL_DEMO_ROLES: DocumentRoutingRole[] = [
-	'user',
-	'author',
-	'approver',
-	'publisher',
-	'admin',
-];
+		| 'VITE_DATAVERSE_ENVIRONMENT_URL';
 
 function env(key: AppEnvKey): string | undefined {
 	try {
@@ -82,20 +64,6 @@ function env(key: AppEnvKey): string | undefined {
 	catch {
 		return undefined;
 	}
-}
-
-/**
- * Parses `VITE_LOCAL_DEMO_ROLES` into app role tokens; empty/invalid → undefined (use defaults).
- */
-export function parseLocalDemoRoles(
-	raw: string | undefined,
-): DocumentRoutingRole[] | undefined {
-	if (!raw?.trim()) {
-		return undefined;
-	}
-	const parts = raw.split(/[,;|]/).map((part) => part.trim()).filter(Boolean);
-	const mapped = mapDataverseSecurityRoles(parts);
-	return mapped.length > 0 ? mapped : undefined;
 }
 
 export const appConfig: AppConfig = {
@@ -114,13 +82,7 @@ export const appConfig: AppConfig = {
 		folderPath: env('VITE_SHAREPOINT_FOLDER_PATH') ?? '/Policies',
 	},
 	dataverseEnvironmentUrl: env('VITE_DATAVERSE_ENVIRONMENT_URL'),
-	localDemoUser: {
-		userName: env('VITE_LOCAL_DEMO_USER_NAME') ?? 'Local Developer',
-		email: env('VITE_LOCAL_DEMO_EMAIL') ?? 'developer@example.com',
-		roles:
-			parseLocalDemoRoles(env('VITE_LOCAL_DEMO_ROLES'))
-			?? [...DEFAULT_LOCAL_DEMO_ROLES],
-	},
+	localDemoUser,
 	features: {
 		showSetupBanner: true,
 		/**

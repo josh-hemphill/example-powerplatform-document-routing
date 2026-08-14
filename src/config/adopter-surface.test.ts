@@ -26,6 +26,15 @@ describe('document types', () => {
 		expect(draft).toContain('# Travel Policy');
 		expect(draft).toContain('Need updates');
 	});
+
+	it('puts the local demo email on every seeded author team', async() => {
+		const { documentTypes } = await import('@/config/document-types');
+		const { localDemoUser } = await import('@/config/local-demo-user');
+		for (const type of documentTypes) {
+			expect(type.authorTeamEmails?.length).toBeGreaterThan(0);
+			expect(type.authorTeamEmails).toContain(localDemoUser.email);
+		}
+	});
 });
 
 describe('inbox personas', () => {

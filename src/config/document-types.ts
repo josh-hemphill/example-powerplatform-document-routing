@@ -7,6 +7,7 @@
  * id is missing from the API response.
  */
 import type { ApproverPerson } from '../domain/approval-queue.ts';
+import { localDemoUser } from './local-demo-user.ts';
 
 export type { ApproverPerson };
 
@@ -79,7 +80,7 @@ Who and what this policy covers.
 `,
 		folderPath: '/Policies',
 		authorTeamEmails: [
-			'developer@example.com',
+			localDemoUser.email,
 			'casey.author@contoso.com',
 			'alex.requester@contoso.com',
 		],
@@ -144,7 +145,7 @@ Who and what this policy covers.
 `,
 		folderPath: '/SOPs',
 		authorTeamEmails: [
-			'developer@example.com',
+			localDemoUser.email,
 			'casey.author@contoso.com',
 		],
 		approvalChain: [
@@ -192,7 +193,7 @@ Who and what this policy covers.
 - 
 `,
 		folderPath: '/Announcements',
-		authorTeamEmails: ['developer@example.com', 'casey.author@contoso.com'],
+		authorTeamEmails: [localDemoUser.email, 'casey.author@contoso.com'],
 		approvalChain: [
 			{
 				mode: 'named',
