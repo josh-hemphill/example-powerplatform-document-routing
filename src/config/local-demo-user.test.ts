@@ -27,7 +27,7 @@ describe('parseLocalDemoRoles', () => {
 	});
 });
 
-describe('VITE_LOCAL_DEMO_EMAIL override', () => {
+describe('vite local demo email override', () => {
 	afterEach(() => {
 		vi.unstubAllEnvs();
 		vi.resetModules();
