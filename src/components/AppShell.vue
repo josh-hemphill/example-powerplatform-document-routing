@@ -216,7 +216,7 @@ watch(
 					:key="item.name"
 					class="me-1 shell-nav-btn"
 					:variant="isNavActive(item) ? 'flat' : 'tonal'"
-					:color="isNavActive(item) ? 'primary' : undefined"
+					color="primary"
 					:prepend-icon="item.icon"
 					:aria-current="isNavActive(item) ? 'page' : undefined"
 					@click="goTo(item.name)"
@@ -322,18 +322,22 @@ watch(
 	outline-offset: 2px;
 }
 
+.shell-brand-title :deep(.v-toolbar-title__placeholder),
 .shell-brand-title {
 	overflow: visible;
+	flex: 0 1 auto;
+	max-width: min(42rem, 55vw);
 }
 
 .shell-brand-tagline {
 	line-height: 1.2;
 	font-weight: 400;
 	max-width: 28rem;
+	white-space: normal;
 }
 
-.shell-nav-btn:not(.v-btn--active):not([aria-current='page']) {
-	opacity: 0.92;
+.shell-nav-btn[aria-current='page'] {
+	font-weight: 600;
 }
 
 .shell-footer {

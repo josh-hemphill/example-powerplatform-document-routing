@@ -98,7 +98,7 @@ describe('identity store', () => {
 		expect(store.hasRole('admin')).toBe(true);
 	});
 
-	it('fails on host context timeout without installing demo identity', async() => {
+	it('falls back to demo identity on host context timeout in DEV', async() => {
 		vi.useFakeTimers();
 		getContext.mockImplementation(async() => new Promise(() => {}));
 
@@ -107,24 +107,19 @@ describe('identity store', () => {
 		await vi.advanceTimersByTimeAsync(1_500);
 		await pending;
 
-		expect(store.status).toBe('failed');
-		expect(store.error).toMatch(/timed out/i);
-		expect(store.identity.email).toBeUndefined();
-		expect(store.identity.roles).toEqual([]);
+		expect(store.status).toBe('standalone');
+		expect(store.hasRole('admin')).toBe(true);
+		expect(store.email).toBeTruthy();
 		expect(fetchPrincipal).not.toHaveBeenCalled();
 	});
 
-	it('retries after a failed load', async() => {
-		vi.useFakeTimers();
-		getContext.mockImplementation(async() => new Promise(() => {}));
+	it('retries after a failed load when host later returns context', async() => {
+		getContext.mockRejectedValueOnce(new Error('plugin missing'));
 
 		const store = useIdentityStore();
-		const first = store.ensureLoaded();
-		await vi.advanceTimersByTimeAsync(1_500);
-		await first;
-		expect(store.status).toBe('failed');
+		await store.ensureLoaded();
+		expect(store.status).toBe('standalone');
 
-		vi.useRealTimers();
 		getContext.mockResolvedValue({
 			user: { userPrincipalName: 'retry@contoso.com', fullName: 'Retry' },
 			app: { environmentId: 'env' },
@@ -147,5 +142,22 @@ describe('identity store', () => {
 		expect(store.hasRole('admin')).toBe(true);
 		expect(store.email).toBeTruthy();
 		expect(fetchPrincipal).not.toHaveBeenCalled();
+	});
+
+	it('does not install demo identity on timeout when DEV fallback is off', async() => {
+		vi.stubEnv('DEV', false);
+		vi.useFakeTimers();
+		getContext.mockImplementation(async() => new Promise(() => {}));
+
+		const store = useIdentityStore();
+		const pending = store.ensureLoaded();
+		await vi.advanceTimersByTimeAsync(1_500);
+		await pending;
+
+		expect(store.status).toBe('failed');
+		expect(store.error).toMatch(/timed out/i);
+		expect(store.identity.email).toBeUndefined();
+		expect(store.identity.roles).toEqual([]);
+		vi.unstubAllEnvs();
 	});
 });

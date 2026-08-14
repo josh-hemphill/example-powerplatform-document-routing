@@ -69,6 +69,8 @@ cp .env.example .env.local
 
 `VITE_LOCAL_DEMO_*` is ignored when the app is hosted in Power Apps. Without `admin` in `VITE_LOCAL_DEMO_ROLES`, `#/admin` stays hidden and returns you to Inbox.
 
+In standalone Vite, missing/slow Power Apps host context falls back to the local demo persona (DEV only). Production builds never install that fallback on host timeout.
+
 ## 3. Document types, pools, destinations
 
 ### Production / hosted
