@@ -190,10 +190,16 @@ export const useIdentityStore = defineStore('identity', () => {
 			const result = await raceHostContext();
 
 			if (result.kind === 'timeout') {
-				// Timeout is not "standalone" — never install demo identity on a slow host.
-				status.value = 'failed';
-				error.value = 'Power Apps host context timed out';
-				identity.value = { roles: [] };
+				// Hosted/prod builds must not install demo identity on a slow host.
+				// In DEV, a hanging getContext (no Power Apps host / missing pac init)
+				// is treated like a missing plugin so local play still works.
+				if (!allowsDemoIdentityFallback()) {
+					status.value = 'failed';
+					error.value = 'Power Apps host context timed out';
+					identity.value = { roles: [] };
+					return;
+				}
+				applyStandaloneDemo(LOCAL_DEMO_PERSONAS[0]);
 				return;
 			}
 

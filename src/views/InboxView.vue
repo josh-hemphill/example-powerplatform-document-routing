@@ -10,7 +10,6 @@ import { listDocumentsQuery, listDocumentTypesQuery } from '@/client/@pinia/cola
 import DocumentStatusChip from '@/components/DocumentStatusChip.vue';
 import { useDocumentTypeLabel } from '@/composables/use-document-type-label';
 import { usePowerAppsContext } from '@/composables/use-power-apps-context';
-import { appConfig } from '@/config/app.config';
 import {
 	INBOX_PERSONAS,
 	matchesInboxPersona,
@@ -192,32 +191,32 @@ watch(
 
 <template>
 	<div>
-		<p class="text-body-2 text-medium-emphasis mb-2">
-			{{ INBOX_PERSONAS.find((option) => option.value === persona)?.description }}
-		</p>
-		<p
-			v-if="persona === 'all'"
-			class="text-caption text-medium-emphasis mb-2"
-		>
-			{{ appConfig.brand.tagline }}
-		</p>
-		<v-chip-group
-			v-model="persona"
-			mandatory
-			class="mb-3"
-			selected-class="text-primary"
-		>
-			<v-chip
-				v-for="option in INBOX_PERSONAS"
-				:key="option.value"
-				:value="option.value"
-				:title="option.description"
-				filter
-				variant="outlined"
+		<div class="mb-4">
+			<v-chip-group
+				v-model="persona"
+				mandatory
+				class="mb-1"
+				selected-class="text-primary"
+				aria-label="Inbox persona"
 			>
-				{{ option.title }}
-			</v-chip>
-		</v-chip-group>
+				<v-chip
+					v-for="option in INBOX_PERSONAS"
+					:key="option.value"
+					:value="option.value"
+					:title="option.description"
+					filter
+					variant="outlined"
+				>
+					{{ option.title }}
+				</v-chip>
+			</v-chip-group>
+			<p
+				class="text-body-2 text-medium-emphasis mb-0"
+				aria-live="polite"
+			>
+				{{ INBOX_PERSONAS.find((option) => option.value === persona)?.description }}
+			</p>
+		</div>
 
 		<v-row class="mb-2" dense>
 			<v-col cols="12" md="5">

@@ -2,8 +2,16 @@
  * Adopter-facing app configuration.
  * Change this file (and `document-types.ts`) for most tenant-specific behavior.
  * Prefer env overrides / deploy/connections.json for hosts so custom domains stay out of source.
+ *
+ * Dev-only identity (`localDemoUser`, `VITE_LOCAL_DEMO_*`) never applies in hosted production —
+ * see `allowsDemoIdentityFallback()` in the identity store.
  */
+import type { LocalDemoUser } from './local-demo-user.ts';
+import { localDemoUser } from './local-demo-user.ts';
 import { bundledDocumentTypesHaveSampleIdentities } from './sample-identities.ts';
+
+export type { LocalDemoUser } from './local-demo-user.ts';
+export { parseLocalDemoRoles } from './local-demo-user.ts';
 
 export interface SharePointDefaults {
 	siteUrl: string;
@@ -17,11 +25,6 @@ export interface AppBrand {
 	tagline: string;
 }
 
-export interface LocalDemoUser {
-	userName: string;
-	email: string;
-}
-
 export interface AppConfig {
 	brand: AppBrand;
 	/**
@@ -32,7 +35,7 @@ export interface AppConfig {
 	sharePoint: SharePointDefaults;
 	/** Optional Dataverse org URL for docs / future adapters (custom domains OK). */
 	dataverseEnvironmentUrl?: string;
-	/** Used only when Power Apps host context is unavailable (local Vite). */
+	/** Used only when Power Apps host context is unavailable (local Vite DEV). */
 	localDemoUser: LocalDemoUser;
 	features: {
 		/** Show the in-app setup banner until placeholders are replaced. */
@@ -79,10 +82,7 @@ export const appConfig: AppConfig = {
 		folderPath: env('VITE_SHAREPOINT_FOLDER_PATH') ?? '/Policies',
 	},
 	dataverseEnvironmentUrl: env('VITE_DATAVERSE_ENVIRONMENT_URL'),
-	localDemoUser: {
-		userName: 'Local Developer',
-		email: 'developer@example.com',
-	},
+	localDemoUser,
 	features: {
 		showSetupBanner: true,
 		/**

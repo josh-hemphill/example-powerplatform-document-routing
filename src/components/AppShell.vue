@@ -24,7 +24,7 @@ interface ShellNavItem {
 const route = useRoute();
 const router = useRouter();
 const { mdAndUp } = useDisplay();
-const { context, isLoading, status, canAct } = usePowerAppsContext();
+const { context, status, canAct } = usePowerAppsContext();
 const identityStore = useIdentityStore();
 
 const drawerOpen = ref(false);
@@ -116,8 +116,22 @@ watch(
 			temporary
 			location="start"
 		>
-			<div class="pa-4 text-subtitle-1 font-weight-bold text-primary">
-				{{ appConfig.brand.name }}
+			<div class="pa-4">
+				<div class="d-flex align-center flex-wrap ga-2">
+					<span class="text-subtitle-1 font-weight-bold text-primary">
+						{{ appConfig.brand.name }}
+					</span>
+					<v-chip
+						size="x-small"
+						:color="status === 'hosted' ? 'success' : 'default'"
+						variant="tonal"
+					>
+						{{ hostChipLabel }}
+					</v-chip>
+				</div>
+				<p class="text-caption text-medium-emphasis mb-0 mt-1">
+					{{ appConfig.brand.tagline }}
+				</p>
 			</div>
 			<nav aria-label="Primary">
 				<v-list nav>
@@ -172,22 +186,37 @@ watch(
 				aria-label="Open navigation"
 				@click="drawerOpen = !drawerOpen"
 			/>
-			<v-app-bar-title class="font-weight-bold text-primary">
-				{{ appConfig.brand.name }}
+			<v-app-bar-title class="shell-brand-title">
+				<div class="d-flex align-center flex-wrap ga-2">
+					<span class="font-weight-bold text-primary">
+						{{ appConfig.brand.name }}
+					</span>
+					<v-chip
+						v-if="status !== 'failed'"
+						size="x-small"
+						:color="status === 'hosted' ? 'success' : 'default'"
+						variant="tonal"
+					>
+						{{ hostChipLabel }}
+					</v-chip>
+				</div>
+				<p class="shell-brand-tagline text-caption text-medium-emphasis mb-0 d-none d-md-block">
+					{{ appConfig.brand.tagline }}
+				</p>
 			</v-app-bar-title>
 			<v-spacer />
 
 			<nav
 				v-if="mdAndUp"
 				aria-label="Primary"
-				class="d-flex align-center"
+				class="d-flex align-center shell-nav"
 			>
 				<v-btn
 					v-for="item in navItems"
 					:key="item.name"
-					class="me-1"
-					:variant="isNavActive(item) ? 'flat' : 'text'"
-					:color="isNavActive(item) ? 'primary' : undefined"
+					class="me-1 shell-nav-btn"
+					:variant="isNavActive(item) ? 'flat' : 'tonal'"
+					color="primary"
 					:prepend-icon="item.icon"
 					:aria-current="isNavActive(item) ? 'page' : undefined"
 					@click="goTo(item.name)"
@@ -198,7 +227,7 @@ watch(
 
 			<v-btn
 				v-if="status === 'failed'"
-				class="me-2 ms-1"
+				class="me-2 ms-2"
 				size="small"
 				color="error"
 				variant="tonal"
@@ -206,15 +235,6 @@ watch(
 			>
 				Retry sign-in
 			</v-btn>
-			<v-chip
-				v-else
-				class="me-2 ms-1"
-				size="small"
-				:color="status === 'hosted' ? 'success' : 'default'"
-				variant="tonal"
-			>
-				{{ hostChipLabel }}
-			</v-chip>
 			<v-select
 				v-if="showPersonaSwitcher"
 				:model-value="context.email"
@@ -224,21 +244,10 @@ watch(
 				density="compact"
 				hide-details
 				label="Acting as"
-				class="me-2 d-none d-sm-flex"
-				style="max-width: 200px"
+				class="me-2 ms-2 d-none d-sm-flex"
+				style="max-width: 220px"
 				@update:model-value="identityStore.switchLocalPersona"
 			/>
-			<div
-				v-else
-				class="text-body-2 text-medium-emphasis me-3 d-none d-md-block"
-			>
-				<template v-if="isLoading">
-					Resolving user…
-				</template>
-				<template v-else>
-					{{ context.userName }}
-				</template>
-			</div>
 			<v-btn
 				v-if="mdAndUp"
 				color="primary"
@@ -284,6 +293,10 @@ watch(
 			</v-container>
 		</v-main>
 
+		<footer class="shell-footer text-caption text-medium-emphasis text-center py-3 d-md-none">
+			{{ appConfig.brand.tagline }}
+		</footer>
+
 		<ConfirmDialog />
 		<AppToast />
 	</v-app>
@@ -307,5 +320,27 @@ watch(
 	top: 0.75rem;
 	outline: 2px solid rgb(var(--v-theme-on-primary));
 	outline-offset: 2px;
+}
+
+.shell-brand-title :deep(.v-toolbar-title__placeholder),
+.shell-brand-title {
+	overflow: visible;
+	flex: 0 1 auto;
+	max-width: min(42rem, 55vw);
+}
+
+.shell-brand-tagline {
+	line-height: 1.2;
+	font-weight: 400;
+	max-width: 28rem;
+	white-space: normal;
+}
+
+.shell-nav-btn[aria-current='page'] {
+	font-weight: 600;
+}
+
+.shell-footer {
+	border-top: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
 }
 </style>
