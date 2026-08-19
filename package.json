@@ -3,7 +3,7 @@
 	"type": "module",
 	"version": "0.1.0",
 	"private": true,
-	"packageManager": "pnpm@10.33.3",
+	"packageManager": "pnpm@12.0.0-rc.7",
 	"engines": {
 		"node": ">=22"
 	},
@@ -16,8 +16,10 @@
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage",
 		"typecheck": "vue-tsc -b --pretty false",
-		"lint": "eslint .",
-		"format": "eslint . --fix",
+		"lint": "oxlint .",
+		"lint:fix": "oxlint --fix .",
+		"format": "oxfmt .",
+		"format:check": "oxfmt --check .",
 		"check": "pnpm lint && pnpm typecheck && pnpm test:coverage",
 		"check:bundle": "node scripts/check-bundle-budget.mjs",
 		"power:init": "pa app init --display-name \"Document Routing\"",
@@ -42,7 +44,6 @@
 		"vuetify": "^4.1.7"
 	},
 	"devDependencies": {
-		"@antfu/eslint-config": "^9.2.0",
 		"@hey-api/openapi-ts": "^0.99.0",
 		"@microsoft/power-apps-cli": "^0.15.2",
 		"@microsoft/power-apps-vite": "^1.0.2",
@@ -53,10 +54,9 @@
 		"@vue/tsconfig": "^0.9.1",
 		"ajv": "^8.20.0",
 		"axe-core": "^4.13.0",
-		"eslint": "^10.8.0",
-		"eslint-plugin-format": "^2.0.1",
-		"eslint-plugin-vuejs-accessibility": "^2.5.0",
 		"jsdom": "^30.0.1",
+		"oxfmt": "^0.64.0",
+		"oxlint": "^1.79.0",
 		"sass-embedded": "^1.100.0",
 		"typescript": "~6.0.2",
 		"vite": "^8.2.0",

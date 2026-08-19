@@ -1,0 +1,18 @@
+{
+	"$schema": "./node_modules/oxfmt/configuration_schema.json",
+	"semi": true,
+	"singleQuote": true,
+	"useTabs": true,
+	"trailingComma": "all",
+	"printWidth": 100,
+	"arrowParens": "always",
+	"vueIndentScriptAndStyle": false,
+	"ignorePatterns": [
+		"src/client/**",
+		"deploy/generated/**",
+		"dist/**",
+		"coverage/**",
+		"pnpm-lock.yaml",
+		"power.config.json"
+	]
+}

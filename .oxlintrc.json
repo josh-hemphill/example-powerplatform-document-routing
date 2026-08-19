@@ -1,0 +1,99 @@
+{
+	"$schema": "./node_modules/oxlint/configuration_schema.json",
+	"plugins": [
+		"typescript",
+		"import",
+		"unicorn",
+		"vue",
+		"node"
+	],
+	"categories": {
+		"correctness": "error",
+		"suspicious": "warn",
+		"pedantic": "off",
+		"style": "off",
+		"restriction": "off",
+		"perf": "warn",
+		"nursery": "off"
+	},
+	"env": {
+		"builtin": true,
+		"es2026": true,
+		"browser": true,
+		"node": true
+	},
+	"ignorePatterns": [
+		"src/client/**",
+		"deploy/generated/**",
+		"dist/**",
+		"coverage/**",
+		"power.config.json",
+		".cursor/**"
+	],
+	"rules": {
+		"no-console": "warn",
+		"no-debugger": "warn",
+		"eqeqeq": "warn",
+		"no-unneeded-ternary": "warn",
+		"typescript/ban-ts-comment": "warn",
+		"typescript/no-explicit-any": "off",
+		"unicorn/filename-case": "off",
+		"unicorn/no-null": "off",
+		"unicorn/prefer-module": "off",
+		"unicorn/no-useless-fallback-in-spread": "warn",
+		"node/no-process-env": "off",
+		"node/no-sync": "off",
+		"no-await-in-loop": "off",
+		"no-underscore-dangle": [
+			"warn",
+			{
+				"allow": [
+					"__DOCUMENT_ROUTING_ENV__",
+					"_publisherid_value"
+				]
+			}
+		],
+		"import/no-default-export": "off",
+		"import/no-named-export": "off",
+		"import/prefer-default-export": "off",
+		"import/exports-last": "off",
+		"import/group-exports": "off",
+		"import/no-unassigned-import": "off",
+		"import/no-nodejs-modules": "off",
+		"import/no-cycle": "error"
+	},
+	"overrides": [
+		{
+			"files": [
+				"scripts/**/*.{ts,mjs,js}",
+				"src/provisioning/**/*.ts",
+				"src/mock/**/*.ts"
+			],
+			"rules": {
+				"no-console": "off"
+			}
+		},
+		{
+			"files": [
+				"**/*.{test,spec}.{ts,tsx,vue}",
+				"**/__tests__/**"
+			],
+			"plugins": [
+				"typescript",
+				"import",
+				"unicorn",
+				"vue",
+				"node",
+				"vitest"
+			],
+			"rules": {
+				"no-console": "off",
+				"vitest/require-mock-type-parameters": "off",
+				"vitest/no-conditional-expect": "warn",
+				"vitest/require-to-throw-message": "warn",
+				"vitest/expect-expect": "warn",
+				"vitest/require-hook": "off"
+			}
+		}
+	]
+}
