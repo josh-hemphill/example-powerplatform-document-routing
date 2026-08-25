@@ -188,9 +188,19 @@ watch(
 			/>
 			<v-app-bar-title class="shell-brand-title">
 				<div class="d-flex align-center flex-wrap ga-2">
-					<span class="font-weight-bold text-primary shell-brand-name">
-						{{ appConfig.brand.name }}
-					</span>
+					<v-tooltip
+						:text="appConfig.brand.tagline"
+						location="bottom"
+					>
+						<template #activator="{ props: tooltipProps }">
+							<span
+								v-bind="tooltipProps"
+								class="font-weight-bold text-primary shell-brand-name"
+							>
+								{{ appConfig.brand.name }}
+							</span>
+						</template>
+					</v-tooltip>
 					<v-chip
 						v-if="status !== 'failed'"
 						size="x-small"
@@ -200,12 +210,6 @@ watch(
 						{{ hostChipLabel }}
 					</v-chip>
 				</div>
-				<p
-					class="shell-brand-tagline text-caption text-medium-emphasis mb-0 d-none d-lg-block"
-					:title="appConfig.brand.tagline"
-				>
-					{{ appConfig.brand.tagline }}
-				</p>
 			</v-app-bar-title>
 			<v-spacer />
 
@@ -297,7 +301,7 @@ watch(
 		</v-main>
 
 		<footer class="shell-footer text-caption text-medium-emphasis text-center py-3 d-md-none">
-			{{ appConfig.brand.tagline }}
+			{{ appConfig.brand.name }}
 		</footer>
 
 		<ConfirmDialog />
@@ -336,15 +340,7 @@ watch(
 .shell-brand-name {
 	line-height: 1.2;
 	white-space: nowrap;
-}
-
-.shell-brand-tagline {
-	line-height: 1.2;
-	font-weight: 400;
-	max-width: 100%;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
+	cursor: default;
 }
 
 .shell-nav-btn[aria-current='page'] {
