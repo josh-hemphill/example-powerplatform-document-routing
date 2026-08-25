@@ -213,7 +213,7 @@ export function renderSecurityRolesMarkdown(
 	const lines = [
 		'# Dataverse security roles — Document Routing (generated)',
 		'',
-		`Publisher prefix: \`${prefix}\`. Display names stay **Document Routing \*** so \`/principal\` mapping in \`src/domain/security-roles.ts\` does not depend on prefix.`,
+		`Publisher prefix: \`${prefix}\`. Display names stay **Document Routing *** so \`/principal\` mapping in \`src/domain/security-roles.ts\` does not depend on prefix.`,
 		'',
 		'Create these roles **inside** your unmanaged solution (maker portal or PAC). Privilege depths below are guidance for shared environments — refine with your security team.',
 		'',

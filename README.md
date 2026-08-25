@@ -90,5 +90,5 @@ src/client/                       Generated SDK (do not hand-edit)
 src/mock/                         Local Vite mock + seed data
 src/views/                        Inbox, new request, document workspace
 scripts/provision.ts              pnpm provision / provision:solution / provision:apply CLI
-eslint.config.js                  @antfu/eslint-config (org Vue style)
+.oxlintrc.json                    Oxlint (Vue/TS) + .oxfmtrc.json (Oxfmt)
 ```
