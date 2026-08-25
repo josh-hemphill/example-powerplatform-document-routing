@@ -15,6 +15,7 @@ defineProps<{
 	isDirty: boolean;
 	hasRevisionConflict: boolean;
 	expanded: boolean;
+	isPrimary?: boolean;
 }>();
 const emit = defineEmits<{
 	save: [];
@@ -32,7 +33,10 @@ const draftBodyRules = bodyMarkdownRules();
 </script>
 
 <template>
-	<v-card class="pa-4 mb-4">
+	<v-card
+		class="pa-4 mb-4 stage-card"
+		:class="{ 'stage-card--primary': isPrimary && !expanded }"
+	>
 		<div class="d-flex align-center justify-space-between flex-wrap ga-2 mb-3">
 			<button
 				type="button"
@@ -43,6 +47,14 @@ const draftBodyRules = bodyMarkdownRules();
 				2. Author / draft
 			</button>
 			<div class="d-flex align-center ga-2">
+				<v-chip
+					v-if="!expanded && isPrimary"
+					size="small"
+					color="primary"
+					variant="tonal"
+				>
+					Open to continue
+				</v-chip>
 				<v-chip
 					v-if="isDirty"
 					size="small"
@@ -65,7 +77,7 @@ const draftBodyRules = bodyMarkdownRules();
 			v-if="!expanded"
 			class="text-body-2 text-medium-emphasis mb-0 text-truncate"
 		>
-			{{ title || 'Untitled draft' }}
+			{{ isPrimary ? 'Open this section to edit and save the draft.' : (title || 'Untitled draft') }}
 		</p>
 		<v-expand-transition>
 			<div v-if="expanded">

@@ -110,6 +110,25 @@ const typeLabel = computed(() => documentType.value.label);
 /** Manual overrides; reset when document status changes. */
 const stageOverrides = ref<Partial<Record<WorkspaceStageId, boolean>> | null>(null);
 
+const primaryStage = computed(() =>
+	document.value ? primaryWorkspaceStage(document.value.status) : null,
+);
+
+const stageGuide = computed(() => {
+	switch (primaryStage.value) {
+		case 'freeform':
+			return 'Next: expand Freeform request to review the intake.';
+		case 'draft':
+			return 'Next: expand Author / draft to edit and save, then submit from Approvals.';
+		case 'approval':
+			return 'Next: expand Approval chain to submit, claim, or decide.';
+		case 'publish':
+			return 'Next: expand Publish to choose a destination and publish the PDF.';
+		default:
+			return null;
+	}
+});
+
 watch(
 	() => document.value?.status,
 	() => {
@@ -121,13 +140,12 @@ function isStageExpanded(stage: WorkspaceStageId): boolean {
 	if (stageOverrides.value && stage in stageOverrides.value) {
 		return Boolean(stageOverrides.value[stage]);
 	}
-	const primary = document.value ? primaryWorkspaceStage(document.value.status) : null;
-	return primary === stage;
+	return primaryStage.value === stage;
 }
 
 function toggleStage(stage: WorkspaceStageId): void {
 	const currentlyOpen = isStageExpanded(stage);
-	const primary = document.value ? primaryWorkspaceStage(document.value.status) : null;
+	const primary = primaryStage.value;
 	const next: Partial<Record<WorkspaceStageId, boolean>> = {
 		...(stageOverrides.value ?? {}),
 	};
@@ -283,6 +301,17 @@ async function handleAbandonSupersede(): Promise<void> {
 				@refresh="() => refetch()"
 			/>
 
+			<v-alert
+				v-if="stageGuide"
+				type="info"
+				variant="tonal"
+				class="mb-4"
+				density="comfortable"
+			>
+				{{ stageGuide }}
+				Actions live inside each numbered section — expand a stage to work that step.
+			</v-alert>
+
 			<div
 				v-if="canSupersede || canAbandonSupersede"
 				class="mb-4 d-flex flex-wrap justify-end ga-2"
@@ -311,6 +340,7 @@ async function handleAbandonSupersede(): Promise<void> {
 					<FreeformRequestPanel
 						:freeform-request="document.freeformRequest"
 						:expanded="isStageExpanded('freeform')"
+						:is-primary="primaryStage === 'freeform'"
 						@toggle="toggleStage('freeform')"
 					/>
 
@@ -325,6 +355,7 @@ async function handleAbandonSupersede(): Promise<void> {
 						:is-dirty="isDraftDirty"
 						:has-revision-conflict="hasDraftRevisionConflict"
 						:expanded="isStageExpanded('draft')"
+						:is-primary="primaryStage === 'draft'"
 						@save="onSaveDraft"
 						@discard="() => hydrateFromDocument(true)"
 						@reload="onReloadDraftAfterConflict"
@@ -351,6 +382,7 @@ async function handleAbandonSupersede(): Promise<void> {
 						:is-processing-sla="isProcessingSla"
 						:is-withdrawing="isWithdrawing"
 						:expanded="isStageExpanded('approval')"
+						:is-primary="primaryStage === 'approval'"
 						@submit="onSubmitForApproval"
 						@claim="onClaim"
 						@release="onRelease"
@@ -371,6 +403,7 @@ async function handleAbandonSupersede(): Promise<void> {
 						:can-publish="Boolean(canPublish)"
 						:is-publishing="isPublishingPdf"
 						:expanded="isStageExpanded('publish')"
+						:is-primary="primaryStage === 'publish'"
 						@publish="handlePublish"
 						@toggle="toggleStage('publish')"
 					/>

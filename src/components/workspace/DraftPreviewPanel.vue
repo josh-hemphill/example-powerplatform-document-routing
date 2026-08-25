@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import MarkdownPreview from '@/components/MarkdownPreview.vue';
+
 defineProps<{
 	draftPreview: string;
 }>();
@@ -9,6 +11,9 @@ defineProps<{
 		<div class="text-subtitle-1 font-weight-bold mb-2">
 			Draft preview
 		</div>
-		<pre class="markdown-preview text-body-2 mb-0">{{ draftPreview || 'No draft yet.' }}</pre>
+		<MarkdownPreview
+			:source="draftPreview"
+			empty-text="No draft yet."
+		/>
 	</v-card>
 </template>

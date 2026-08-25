@@ -1,7 +1,11 @@
 <script setup lang="ts">
+import MarkdownPreview from '@/components/MarkdownPreview.vue';
+
 defineProps<{
 	freeformRequest: string;
 	expanded: boolean;
+	isPrimary?: boolean;
+	collapsedHint?: string | null;
 }>();
 const emit = defineEmits<{
 	toggle: [];
@@ -9,7 +13,10 @@ const emit = defineEmits<{
 </script>
 
 <template>
-	<v-card class="pa-4 mb-4">
+	<v-card
+		class="pa-4 mb-4 stage-card"
+		:class="{ 'stage-card--primary': isPrimary && !expanded }"
+	>
 		<div class="d-flex align-center justify-space-between ga-2 mb-2">
 			<button
 				type="button"
@@ -19,26 +26,34 @@ const emit = defineEmits<{
 			>
 				1. Freeform request
 			</button>
-			<v-btn
-				variant="text"
-				size="small"
-				:icon="expanded ? '$chevronUp' : '$chevronDown'"
-				:aria-label="expanded ? 'Collapse freeform request' : 'Expand freeform request'"
-				:aria-expanded="expanded"
-				@click="emit('toggle')"
-			/>
+			<div class="d-flex align-center ga-2">
+				<v-chip
+					v-if="!expanded && isPrimary"
+					size="small"
+					color="primary"
+					variant="tonal"
+				>
+					Open to continue
+				</v-chip>
+				<v-btn
+					variant="text"
+					size="small"
+					:icon="expanded ? '$chevronUp' : '$chevronDown'"
+					:aria-label="expanded ? 'Collapse freeform request' : 'Expand freeform request'"
+					:aria-expanded="expanded"
+					@click="emit('toggle')"
+				/>
+			</div>
 		</div>
 		<p
 			v-if="!expanded"
 			class="text-body-2 text-medium-emphasis mb-0 text-truncate"
 		>
-			{{ freeformRequest }}
+			{{ collapsedHint || freeformRequest }}
 		</p>
 		<v-expand-transition>
 			<div v-if="expanded">
-				<p class="markdown-preview mb-0">
-					{{ freeformRequest }}
-				</p>
+				<MarkdownPreview :source="freeformRequest" />
 			</div>
 		</v-expand-transition>
 	</v-card>

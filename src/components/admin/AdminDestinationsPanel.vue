@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryCache } from '@pinia/colada';
 import { computed, reactive, watch } from 'vue';
 import { getApiErrorMessage } from '@/api/api-error';
 import {
+	createPublishDestinationMutation,
 	listApproverPoolsQueryKey,
 	listDocumentTypesQueryKey,
 	listPublishDestinationsQuery,
@@ -13,6 +14,8 @@ import {
 import AdminStickySave from '@/components/admin/AdminStickySave.vue';
 import { useAdminDirtyForm } from '@/composables/use-admin-dirty-form';
 import { useAdminSelectionGuard } from '@/composables/use-admin-selection-guard';
+import { useConfirmDialog } from '@/composables/use-confirm-dialog';
+import { appConfig } from '@/config/app.config';
 
 defineProps<{
 	canAct: boolean;
@@ -25,6 +28,7 @@ const emit = defineEmits<{
 
 const dirtyModel = defineModel<boolean>('dirty', { required: true });
 const queryCache = useQueryCache();
+const { confirm } = useConfirmDialog();
 
 const { data: destinationsData } = useQuery(() => listPublishDestinationsQuery());
 const destinations = computed(() => destinationsData.value?.items ?? []);
@@ -84,6 +88,45 @@ const { mutateAsync: saveAsync, isLoading: saving } = useMutation({
 	},
 });
 
+const { mutateAsync: createAsync, isLoading: creating } = useMutation({
+	...createPublishDestinationMutation(),
+	async onSettled() {
+		await invalidateControl();
+	},
+});
+
+async function createDestination(): Promise<void> {
+	emit('error', null);
+	emit('success', null);
+	if (dirty.value) {
+		const ok = await confirm({
+			title: 'Discard unsaved destination changes?',
+			message: 'Creating a new destination will lose edits that have not been saved.',
+			confirmText: 'Discard',
+			color: 'warning',
+		});
+		if (!ok) {
+			return;
+		}
+	}
+	try {
+		const created = await createAsync({
+			body: {
+				name: 'New publish destination',
+				siteUrl: appConfig.sharePoint.siteUrl,
+				libraryName: appConfig.sharePoint.libraryName,
+				folderPath: appConfig.sharePoint.folderPath,
+				active: true,
+			},
+		});
+		selectedId.value = created.id;
+		emit('success', 'Publish destination created. Update the fields and save.');
+	}
+	catch(error) {
+		emit('error', getApiErrorMessage(error, 'Failed to create destination'));
+	}
+}
+
 async function save(): Promise<void> {
 	emit('error', null);
 	emit('success', null);
@@ -112,14 +155,27 @@ async function save(): Promise<void> {
 
 <template>
 	<v-card class="pa-4 pb-16">
-		<v-select
-			v-model="selectedId"
-			:items="destinations"
-			item-title="name"
-			item-value="id"
-			label="Publish destination"
-			class="mb-3"
-		/>
+		<div class="d-flex align-end flex-wrap ga-2 mb-3">
+			<v-select
+				v-model="selectedId"
+				:items="destinations"
+				item-title="name"
+				item-value="id"
+				label="Publish destination"
+				class="flex-grow-1"
+				style="min-width: 12rem"
+			/>
+			<v-btn
+				color="primary"
+				variant="tonal"
+				prepend-icon="$plus"
+				:disabled="!canAct"
+				:loading="creating"
+				@click="createDestination"
+			>
+				New destination
+			</v-btn>
+		</div>
 		<v-text-field v-model="form.name" label="Name" class="mb-2" />
 		<v-text-field v-model="form.siteUrl" label="Site URL (HTTPS)" class="mb-2" />
 		<v-text-field v-model="form.libraryName" label="Library" class="mb-2" />

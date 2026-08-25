@@ -188,7 +188,7 @@ watch(
 			/>
 			<v-app-bar-title class="shell-brand-title">
 				<div class="d-flex align-center flex-wrap ga-2">
-					<span class="font-weight-bold text-primary">
+					<span class="font-weight-bold text-primary shell-brand-name">
 						{{ appConfig.brand.name }}
 					</span>
 					<v-chip
@@ -200,7 +200,10 @@ watch(
 						{{ hostChipLabel }}
 					</v-chip>
 				</div>
-				<p class="shell-brand-tagline text-caption text-medium-emphasis mb-0 d-none d-md-block">
+				<p
+					class="shell-brand-tagline text-caption text-medium-emphasis mb-0 d-none d-lg-block"
+					:title="appConfig.brand.tagline"
+				>
 					{{ appConfig.brand.tagline }}
 				</p>
 			</v-app-bar-title>
@@ -324,16 +327,24 @@ watch(
 
 .shell-brand-title :deep(.v-toolbar-title__placeholder),
 .shell-brand-title {
-	overflow: visible;
+	overflow: hidden;
 	flex: 0 1 auto;
-	max-width: min(42rem, 55vw);
+	max-width: min(22rem, 40vw);
+	min-width: 0;
+}
+
+.shell-brand-name {
+	line-height: 1.2;
+	white-space: nowrap;
 }
 
 .shell-brand-tagline {
 	line-height: 1.2;
 	font-weight: 400;
-	max-width: 28rem;
-	white-space: normal;
+	max-width: 100%;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 .shell-nav-btn[aria-current='page'] {
