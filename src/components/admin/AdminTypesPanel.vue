@@ -154,6 +154,25 @@ async function createType(): Promise<void> {
 		}
 	}
 	const id = uniqueSlugId('New document type', types.value.map((type) => type.id), 'type');
+	const seedPool = pools.value[0];
+	const approvalChain: ControlChainStep[] = seedPool
+		? [{
+				order: 1,
+				role: 'Approver',
+				assignmentMode: 'pool',
+				poolKey: seedPool.key,
+				slaHours: 48,
+			}]
+		: [{
+				order: 1,
+				role: 'Approver',
+				assignmentMode: 'named',
+				assignee: {
+					email: 'approver@example.com',
+					displayName: 'Approver',
+				},
+				slaHours: 48,
+			}];
 	try {
 		const created = await createAsync({
 			body: {
@@ -169,7 +188,7 @@ async function createType(): Promise<void> {
 				numberPrefix: id.slice(0, 3).toUpperCase(),
 				numberPattern: '{prefix}-{yyyy}-{seq:5}',
 				nextSequence: 1,
-				approvalChain: [],
+				approvalChain,
 			},
 		});
 		selectedId.value = created.id;
