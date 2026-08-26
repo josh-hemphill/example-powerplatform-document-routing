@@ -159,7 +159,7 @@ describe('identity store', () => {
 		expect(fetchPrincipal).not.toHaveBeenCalled();
 	});
 
-	it('applies local persona roles in DEV when hosted principal lookup fails', async() => {
+	it('applies local persona roles in DEV when hosted UPN matches a demo persona', async() => {
 		getContext.mockResolvedValue({
 			user: {
 				userPrincipalName: 'developer@example.com',
@@ -167,7 +167,12 @@ describe('identity store', () => {
 			},
 			app: { environmentId: 'env-1' },
 		});
-		fetchPrincipal.mockRejectedValue(new Error('network blocked'));
+		// Even if principal would return user-only, matching persona wins in DEV.
+		fetchPrincipal.mockResolvedValue({
+			email: 'developer@example.com',
+			roles: ['user'],
+			securityRoleNames: ['Document Routing User'],
+		});
 
 		const store = useIdentityStore();
 		await store.ensureLoaded();
@@ -176,6 +181,7 @@ describe('identity store', () => {
 		expect(store.email).toBe('developer@example.com');
 		expect(store.hasRole('admin')).toBe(true);
 		expect(store.rolesUnresolved).toBe(false);
+		expect(fetchPrincipal).not.toHaveBeenCalled();
 	});
 
 	it('fails closed when host context has no UPN and DEV fallback is off', async() => {

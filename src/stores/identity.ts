@@ -149,8 +149,10 @@ export const useIdentityStore = defineStore('identity', () => {
 	}
 
 	/**
-	 * DEV Local Play: map host email through the local persona directory when
-	 * GET /principal is unreachable (CORS / local-network blocks).
+	 * DEV Local Play: apply roles from the local persona directory
+	 * (`VITE_LOCAL_DEMO_*` / `LOCAL_DEMO_PERSONAS`) when the host UPN matches.
+	 * Authoritative in DEV so Local Play is not stuck on user-only when
+	 * GET /principal returns least-privilege or is unreachable.
 	 */
 	function applyDevPersonaRolesIfKnown(actorEmail: string): boolean {
 		if (!allowsDemoIdentityFallback()) {
@@ -173,6 +175,7 @@ export const useIdentityStore = defineStore('identity', () => {
 
 	/**
 	 * Loads roles from GET /principal after host context (server-derived, not client headers).
+	 * In DEV, known local-persona emails use `VITE_LOCAL_DEMO_*` roles first.
 	 */
 	async function refreshHostedRoles(): Promise<void> {
 		const actorEmail = identity.value.email;
@@ -180,6 +183,11 @@ export const useIdentityStore = defineStore('identity', () => {
 			return;
 		}
 		hostedRolesStatus.value = 'loading';
+		// Local Play often reports status=hosted with a real UPN. Prefer the
+		// matching demo persona (env override) over a user-only principal payload.
+		if (applyDevPersonaRolesIfKnown(actorEmail)) {
+			return;
+		}
 		try {
 			const principal = await fetchPrincipal(actorEmail);
 			if (principal.securityRoleNames?.length) {
@@ -194,11 +202,6 @@ export const useIdentityStore = defineStore('identity', () => {
 				hostedRolesStatus.value = 'resolved';
 				return;
 			}
-			// Explicit empty mapping still counts as resolved (least-privilege user).
-			// In DEV, prefer the local persona directory when this email is known.
-			if (applyDevPersonaRolesIfKnown(actorEmail)) {
-				return;
-			}
 			identity.value = {
 				...identity.value,
 				roles: resolveHostedRoles(null),
@@ -206,9 +209,6 @@ export const useIdentityStore = defineStore('identity', () => {
 			hostedRolesStatus.value = 'resolved';
 		}
 		catch {
-			if (applyDevPersonaRolesIfKnown(actorEmail)) {
-				return;
-			}
 			hostedRolesStatus.value = 'failed';
 			error.value = 'Could not load security roles from the API';
 		}
