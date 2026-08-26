@@ -135,6 +135,15 @@ describe('phases 20–22 provision artifacts', () => {
 		const flow = readFileSync(join(dir, 'flows/sla-sweeper.json'), 'utf8');
 		expect(flow).toContain('acme_approvalstep');
 		expect(containsLeftoverDefaultPublisherPrefix(flow)).toBe(false);
+		expect(roles.some((role) =>
+			role.tables.some((table) => table.logicalName === 'acme_prioritylevel'),
+		)).toBe(true);
+		expect(roles.some((role) =>
+			role.tables.some((table) => table.logicalName === 'acme_documentsubtype'),
+		)).toBe(true);
+		expect(roles.some((role) =>
+			role.tables.some((table) => table.logicalName === 'acme_reviewcomment'),
+		)).toBe(true);
 		const seed = JSON.parse(readFileSync(join(dir, 'control-seed.json'), 'utf8')) as {
 			sampleIdentityEmails: string[];
 		};

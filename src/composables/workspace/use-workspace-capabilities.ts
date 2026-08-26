@@ -12,6 +12,7 @@ import {
 	canActorSupersedeDocument,
 } from '@/domain/document-access';
 import { canActorPublishDocument } from '@/domain/document-authz';
+import { canSubmitWithOpenComments } from '@/domain/review-comments';
 
 /**
  * Computes which workspace actions the current actor may perform.
@@ -56,6 +57,9 @@ export function useWorkspaceCapabilities(options: {
 		const doc = document.value;
 		const actor = actorEmail.value;
 		if (!canAct.value || !doc || !actor || doc.status !== 'drafting') {
+			return false;
+		}
+		if (!canSubmitWithOpenComments(doc.reviewComments ?? [])) {
 			return false;
 		}
 		return canActorMutateDraft(
@@ -149,6 +153,31 @@ export function useWorkspaceCapabilities(options: {
 		);
 	});
 
+	const canRespondToReview = computed(() => {
+		const doc = document.value;
+		const actor = actorEmail.value;
+		if (!canAct.value || !doc || !actor) {
+			return false;
+		}
+		if (
+			doc.status !== 'requested'
+			&& doc.status !== 'drafting'
+			&& doc.status !== 'in_review'
+			&& doc.status !== 'rejected'
+			&& doc.status !== 'approved'
+		) {
+			return false;
+		}
+		return canActorMutateDraft(
+			{
+				requesterEmail: doc.requesterEmail,
+				authorEmail: doc.authorEmail,
+				collaboratorEmails: doc.collaboratorEmails ?? [],
+			},
+			actor,
+		);
+	});
+
 	const canSupersede = computed(() => {
 		const doc = document.value;
 		if (!doc) {
@@ -180,6 +209,7 @@ export function useWorkspaceCapabilities(options: {
 		canPublish,
 		canProcessSla,
 		canWithdraw,
+		canRespondToReview,
 		canSupersede,
 		canAbandonSupersede,
 	};

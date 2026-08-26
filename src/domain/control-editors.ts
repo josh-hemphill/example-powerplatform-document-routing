@@ -1,7 +1,7 @@
 /**
  * Helpers for Admin structured chain/member editors and JSON escape hatches.
  */
-import type { Approver, ControlChainStep } from '@/client/types.gen';
+import type { Approver, ControlChainStep, DocumentSubtype } from '@/client/types.gen';
 
 let nextEditorRowKey = 1;
 const editorRowKeys = new WeakMap<object, number>();
@@ -30,6 +30,8 @@ export function createEmptyChainStep(order: number): ControlChainStep {
 		role: 'Approver',
 		slaHours: 24,
 		assignee: { email: '', displayName: '' },
+		authorityLevel: 'standard',
+		commentPolicy: 'required_on_reject',
 	};
 }
 
@@ -102,4 +104,23 @@ export function parseMembersJson(raw: string): ParseResult<Approver[]> {
  */
 export function createEmptyMember(): Approver {
 	return { email: '', displayName: '' };
+}
+
+/**
+ * Creates a blank subtype row for the Admin type editor (client-only id until POST).
+ */
+export function createEmptySubtype(documentTypeId: string, key = 'new_subtype'): DocumentSubtype {
+	return {
+		id: `new:${crypto.randomUUID()}`,
+		key,
+		label: 'New subtype',
+		description: '',
+		documentTypeId,
+		active: true,
+		requestHint: null,
+		draftScaffold: null,
+		numberPrefix: null,
+		usesOwnChain: false,
+		approvalChain: [],
+	};
 }

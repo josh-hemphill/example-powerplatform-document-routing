@@ -15,7 +15,7 @@ environment. The Code App gates UI from host identity + mapped roles;
 | **Document Routing Author**    | Read/write draft fields on shared `requested`/`drafting` documents; append history |
 | **Document Routing Approver**  | Update eligible `approvalstep` rows (claim/decide); read case                      |
 | **Document Routing Publisher** | Update publish fields / trigger publish Flow on `approved` documents               |
-| **Document Routing Admin**     | CRUD control tables (`documenttype`, pools, destinations, `appsetting`); Admin UI  |
+| **Document Routing Admin**     | CRUD control tables (`documenttype`, subtypes, pools, destinations, `prioritylevel`, `appsetting`); Admin UI  |
 
 ## Shared-environment assignment
 

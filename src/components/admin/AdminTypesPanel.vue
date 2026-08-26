@@ -3,11 +3,13 @@ import type {
 	ControlApproverPool,
 	ControlChainStep,
 	ControlDocumentType,
+	DocumentSubtype,
 } from '@/client';
 import { useMutation, useQuery, useQueryCache } from '@pinia/colada';
 import { computed, reactive, watch } from 'vue';
 import { getApiErrorMessage } from '@/api/api-error';
 import {
+	createDocumentSubtypeMutation,
 	createDocumentTypeMutation,
 	listApproverPoolsQuery,
 	listApproverPoolsQueryKey,
@@ -15,14 +17,20 @@ import {
 	listDocumentTypesQueryKey,
 	listPublishDestinationsQuery,
 	listPublishDestinationsQueryKey,
+	updateDocumentSubtypeMutation,
 	updateDocumentTypeMutation,
 } from '@/client/@pinia/colada.gen';
 import AdminStickySave from '@/components/admin/AdminStickySave.vue';
+import AdminSubtypesEditor from '@/components/admin/AdminSubtypesEditor.vue';
 import ApprovalChainEditor from '@/components/admin/ApprovalChainEditor.vue';
 import { useAdminDirtyForm } from '@/composables/use-admin-dirty-form';
 import { useAdminSelectionGuard } from '@/composables/use-admin-selection-guard';
 import { useConfirmDialog } from '@/composables/use-confirm-dialog';
 import { appConfig } from '@/config/app.config';
+import {
+	DEFAULT_AUTHORITY_LEVEL,
+	DEFAULT_COMMENT_POLICY,
+} from '@/domain/review-comments';
 import { uniqueLabel, uniqueNumberPrefix, uniqueSlugId } from '@/utils/slugify-id';
 
 defineProps<{
@@ -59,6 +67,7 @@ const form = reactive({
 	numberPattern: '',
 	nextSequence: 1,
 	approvalChain: [] as ControlChainStep[],
+	subtypes: [] as DocumentSubtype[],
 });
 
 function snapshot(): string {
@@ -75,6 +84,7 @@ function snapshot(): string {
 		numberPattern: form.numberPattern,
 		nextSequence: form.nextSequence,
 		approvalChain: form.approvalChain,
+		subtypes: form.subtypes,
 	});
 }
 
@@ -93,6 +103,7 @@ function hydrate(type: ControlDocumentType): void {
 	form.numberPattern = type.numberPattern ?? '{prefix}-{yyyy}-{seq:5}';
 	form.nextSequence = type.nextSequence ?? 1;
 	form.approvalChain = structuredClone(type.approvalChain);
+	form.subtypes = structuredClone(type.subtypes ?? []);
 	captureBaseline();
 }
 
@@ -130,6 +141,14 @@ const { mutateAsync: saveAsync, isLoading: saving } = useMutation({
 	async onSettled() {
 		await invalidateControl();
 	},
+});
+
+const { mutateAsync: createSubtypeAsync } = useMutation({
+	...createDocumentSubtypeMutation(),
+});
+
+const { mutateAsync: updateSubtypeAsync } = useMutation({
+	...updateDocumentSubtypeMutation(),
 });
 
 const { mutateAsync: createAsync, isLoading: creating } = useMutation({
@@ -171,6 +190,8 @@ async function createType(): Promise<void> {
 				assignmentMode: 'pool',
 				poolKey: seedPool.key,
 				slaHours: 48,
+				authorityLevel: DEFAULT_AUTHORITY_LEVEL,
+				commentPolicy: DEFAULT_COMMENT_POLICY,
 			}]
 		: [{
 				order: 1,
@@ -181,6 +202,8 @@ async function createType(): Promise<void> {
 					displayName: 'Approver',
 				},
 				slaHours: 48,
+				authorityLevel: DEFAULT_AUTHORITY_LEVEL,
+				commentPolicy: DEFAULT_COMMENT_POLICY,
 			}];
 	try {
 		const created = await createAsync({
@@ -245,6 +268,30 @@ async function save(): Promise<void> {
 				approvalChain: form.approvalChain,
 			},
 		});
+		for (const subtype of form.subtypes) {
+			const body = {
+				key: subtype.key,
+				label: subtype.label,
+				description: subtype.description,
+				documentTypeId: selectedId.value,
+				active: subtype.active,
+				requestHint: subtype.requestHint,
+				draftScaffold: subtype.draftScaffold,
+				numberPrefix: subtype.numberPrefix,
+				usesOwnChain: subtype.usesOwnChain,
+				approvalChain: subtype.approvalChain,
+			};
+			if (subtype.id.startsWith('new:')) {
+				await createSubtypeAsync({ body });
+			}
+			else {
+				await updateSubtypeAsync({
+					path: { subtypeId: subtype.id },
+					body,
+				});
+			}
+		}
+		await invalidateControl();
 		markClean();
 		emit('success', 'Document type saved. Next submit uses this chain/pools.');
 	}
@@ -333,6 +380,12 @@ async function save(): Promise<void> {
 			v-model="form.approvalChain"
 			:pool-keys="poolSelectItems"
 			class="mb-4"
+		/>
+		<AdminSubtypesEditor
+			v-if="selectedId"
+			v-model="form.subtypes"
+			:document-type-id="selectedId"
+			:pool-keys="poolSelectItems"
 		/>
 		<div class="d-flex justify-end">
 			<v-btn

@@ -93,11 +93,14 @@ Vue DevTools loads automatically with `pnpm dev` (via `vite-plugin-vue-devtools`
 1. Run `pnpm provision` (shared-env safe seed by default). Contoso demo identities require `pnpm provision -- --demo-seed` and must not be imported into shared orgs.
 2. Assign the **Document Routing Admin** security role ([`deploy/SECURITY_ROLES.md`](./deploy/SECURITY_ROLES.md) + generated `security-roles.md`).
 3. Open **Admin** in the Code App and maintain:
-   - Document types + approval chains (`poolKey` references)
+   - Document types + approval chains (`poolKey`, per-step authority / comment policy) and subtypes
+   - Priority catalog (mission-critical and any `requiresReason` row is enforced server-side)
    - Approver pools & members
    - Allowlisted publish destinations
    - Feature flags (`allowApproverOverride`)
 4. Next **submit-for-approval** uses the live pool membership — no app rebuild.
+
+Admin owns **priorities** and **subtypes**. Mission-critical (or any catalog row with `requiresReason`) cannot be stored without a server-validated reason. Review comments survive withdraw & revise and live on the workspace Review feedback panel — History stays a short audit.
 
 Production `GET /principal` must return the Dataverse role **display names** listed in `security-roles.md` (mapping in `src/domain/security-roles.ts`).
 
@@ -129,7 +132,7 @@ pnpm provision:apply -- --into-solution    # optional: apply schema into that so
 # Scratch only: pnpm provision:apply -- --unmanaged-ok
 ```
 
-This scaffolds case tables plus control tables (`documenttype`, `approvalchainstep`, pools, destinations, `appsetting`). Shared orgs should prefer the solution path — see [`deploy/README.md`](./deploy/README.md) and [`deploy/SHARED_ENV.md`](./deploy/SHARED_ENV.md).
+This scaffolds case tables plus control tables (`documenttype`, `approvalchainstep`, `documentsubtype`, `prioritylevel`, `reviewcomment`, pools, destinations, `appsetting`). Shared orgs should prefer the solution path — see [`deploy/README.md`](./deploy/README.md) and [`deploy/SHARED_ENV.md`](./deploy/SHARED_ENV.md).
 
 ### Promote managed
 

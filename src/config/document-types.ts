@@ -7,6 +7,8 @@
  * id is missing from the API response.
  */
 import type { ApproverPerson } from '../domain/approval-queue.ts';
+import type { AuthorityLevel, CommentPolicy } from '../domain/review-comments.ts';
+import { DEFAULT_COMMENT_POLICY, seedAuthorityForRole } from '../domain/review-comments.ts';
 import { localDemoUser } from './local-demo-user.ts';
 
 export type { ApproverPerson };
@@ -19,6 +21,8 @@ export interface NamedApprovalStepTemplate {
 	/** Optional SLA; when set, overdue named steps can elevate into elevationPool. */
 	slaHours?: number;
 	elevationPool?: ApproverPerson[];
+	authorityLevel?: AuthorityLevel;
+	commentPolicy?: CommentPolicy;
 }
 
 export interface PoolApprovalStepTemplate {
@@ -29,6 +33,8 @@ export interface PoolApprovalStepTemplate {
 	slaHours: number;
 	/** Merged into the pool when SLA expires without a claim/decision. */
 	elevationPool?: ApproverPerson[];
+	authorityLevel?: AuthorityLevel;
+	commentPolicy?: CommentPolicy;
 }
 
 export type ApprovalStepTemplate
@@ -40,6 +46,17 @@ export interface ApproverTemplate {
 	displayName: string;
 	email: string;
 	role: string;
+}
+
+export interface DocumentSubtypeDefinition {
+	key: string;
+	label: string;
+	description: string;
+	requestHint?: string;
+	draftScaffold?: string;
+	numberPrefix?: string;
+	usesOwnChain?: boolean;
+	approvalChain?: ApprovalStepTemplate[];
 }
 
 export interface DocumentTypeDefinition {
@@ -55,6 +72,7 @@ export interface DocumentTypeDefinition {
 	 */
 	authorTeamEmails?: string[];
 	approvalChain: ApprovalStepTemplate[];
+	subtypes?: DocumentSubtypeDefinition[];
 }
 
 export const documentTypes: DocumentTypeDefinition[] = [
@@ -89,6 +107,8 @@ Who and what this policy covers.
 				mode: 'pool',
 				poolRole: 'Legal Reviewers',
 				slaHours: 8,
+				authorityLevel: 'authoritative',
+				commentPolicy: 'required_on_reject',
 				pool: [
 					{
 						displayName: 'Jordan Legal',
@@ -113,6 +133,8 @@ Who and what this policy covers.
 				email: 'sam.compliance@contoso.com',
 				role: 'Compliance',
 				slaHours: 24,
+				authorityLevel: 'authoritative',
+				commentPolicy: 'required_on_reject',
 				elevationPool: [
 					{
 						displayName: 'Chris Compliance Lead',
@@ -120,6 +142,18 @@ Who and what this policy covers.
 						role: 'Elevated Compliance',
 					},
 				],
+			},
+		],
+		subtypes: [
+			{
+				key: 'corporate',
+				label: 'Corporate',
+				description: 'Company-wide policy',
+			},
+			{
+				key: 'hr',
+				label: 'HR',
+				description: 'People / HR policy',
 			},
 		],
 	},
@@ -153,6 +187,8 @@ Who and what this policy covers.
 				mode: 'pool',
 				poolRole: 'Operations Reviewers',
 				slaHours: 4,
+				authorityLevel: 'standard',
+				commentPolicy: 'required_on_reject',
 				pool: [
 					{
 						displayName: 'Casey Operations',
@@ -176,6 +212,55 @@ Who and what this policy covers.
 				email: 'riley.qa@contoso.com',
 				role: 'Quality',
 				slaHours: 8,
+				authorityLevel: 'standard',
+				commentPolicy: 'required_on_reject',
+			},
+		],
+		subtypes: [
+			{
+				key: 'operations',
+				label: 'Operations',
+				description: 'Day-to-day operational procedure',
+			},
+			{
+				key: 'safety',
+				label: 'Safety',
+				description: 'Safety-critical SOP with its own QA-first chain',
+				usesOwnChain: true,
+				approvalChain: [
+					{
+						mode: 'named',
+						displayName: 'Riley QA',
+						email: 'riley.qa@contoso.com',
+						role: 'Quality',
+						slaHours: 8,
+						authorityLevel: 'standard',
+						commentPolicy: 'required_on_reject',
+					},
+					{
+						mode: 'pool',
+						poolRole: 'Operations Reviewers',
+						slaHours: 4,
+						authorityLevel: 'standard',
+						commentPolicy: 'required_on_reject',
+						pool: [
+							{
+								displayName: 'Casey Operations',
+								email: 'casey.ops@contoso.com',
+							},
+							{
+								displayName: 'Taylor Ops',
+								email: 'taylor.ops@contoso.com',
+							},
+						],
+						elevationPool: [
+							{
+								displayName: 'Jamie Ops Lead',
+								email: 'jamie.ops@contoso.com',
+							},
+						],
+					},
+				],
 			},
 		],
 	},
@@ -201,6 +286,8 @@ Who and what this policy covers.
 				email: 'morgan.comms@contoso.com',
 				role: 'Communications',
 				slaHours: 12,
+				authorityLevel: 'standard',
+				commentPolicy: 'required_on_reject',
 			},
 		],
 	},
@@ -231,6 +318,35 @@ export function getDocumentType(
 }
 
 /**
+ * Looks up a bundled subtype by type id and subtype key.
+ */
+export function findDocumentSubtype(
+	typeId: string | null | undefined,
+	subtypeId: string | null | undefined,
+): DocumentSubtypeDefinition | undefined {
+	if (!typeId || !subtypeId) {
+		return undefined;
+	}
+	return findDocumentType(typeId)?.subtypes?.find(
+		(subtype) => subtype.key === subtypeId,
+	);
+}
+
+/**
+ * Formats `Policy · HR` when a subtype label is present.
+ */
+export function formatTypeSubtypeLabel(
+	typeLabel: string,
+	subtypeLabel?: string | null,
+): string {
+	const subtype = subtypeLabel?.trim();
+	if (!subtype) {
+		return typeLabel;
+	}
+	return `${typeLabel} · ${subtype}`;
+}
+
+/**
  * Builds a draft Markdown body from the type template.
  */
 export function buildDraftFromTemplate(
@@ -248,11 +364,16 @@ export function buildDraftFromTemplate(
  */
 export function toApprovalStepInputs(chain: ApprovalStepTemplate[]) {
 	return chain.map((step) => {
+		const role = step.mode === 'named' ? step.role : step.poolRole;
+		const authorityLevel = step.authorityLevel ?? seedAuthorityForRole(role);
+		const commentPolicy = step.commentPolicy ?? DEFAULT_COMMENT_POLICY;
 		if (step.mode === 'named') {
 			return {
 				assignmentMode: 'named' as const,
 				role: step.role,
 				slaHours: step.slaHours,
+				authorityLevel,
+				commentPolicy,
 				assignee: {
 					displayName: step.displayName,
 					email: step.email,
@@ -266,6 +387,8 @@ export function toApprovalStepInputs(chain: ApprovalStepTemplate[]) {
 			assignmentMode: 'pool' as const,
 			role: step.poolRole,
 			slaHours: step.slaHours,
+			authorityLevel,
+			commentPolicy,
 			pool: step.pool,
 			elevationPool: step.elevationPool,
 		};

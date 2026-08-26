@@ -2,9 +2,9 @@
 	"$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
 	"metadata": {
 		"flowName": "Document Routing — On submit guard",
-		"description": "Optional guard when status becomes in_review: ensure at least one approval step exists for the document type policy version.",
+		"description": "Optional guard when status becomes in_review: ensure at least one approval step exists for the document type (and subtype when set) policy version.",
 		"trigger": "When dr_document status becomes in_review",
-		"tables": ["dr_document", "dr_approvalstep", "dr_documenttype", "dr_approvalchainstep"]
+		"tables": ["dr_document", "dr_approvalstep", "dr_documenttype", "dr_approvalchainstep", "dr_documentsubtype"]
 	},
 	"definition": {
 		"triggers": {
@@ -26,7 +26,7 @@
 			},
 			"If_empty_chain": {
 				"type": "If",
-				"description": "If no steps: materialize from dr_approvalchainstep for document type policy version, or set status back to drafting and write history error"
+				"description": "If no steps: materialize from dr_approvalchainstep for document type + optional dr_documentsubtype own-chain, or set status back to drafting and write history error"
 			}
 		},
 		"outputs": {}

@@ -1,17 +1,31 @@
 <script setup lang="ts">
 import type { WorkspaceStageId } from '@/domain/workspace-stages';
+import { useQuery } from '@pinia/colada';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import { getApiErrorMessage } from '@/api/api-error';
+import {
+	listDocumentTypesQuery,
+	listPriorityLevelsQuery,
+} from '@/client/@pinia/colada.gen';
 import ApprovalPanel from '@/components/workspace/ApprovalPanel.vue';
 import DraftPanel from '@/components/workspace/DraftPanel.vue';
 import DraftPreviewPanel from '@/components/workspace/DraftPreviewPanel.vue';
 import FreeformRequestPanel from '@/components/workspace/FreeformRequestPanel.vue';
 import HistoryPanel from '@/components/workspace/HistoryPanel.vue';
 import PublishPanel from '@/components/workspace/PublishPanel.vue';
+import ReviewFeedbackPanel from '@/components/workspace/ReviewFeedbackPanel.vue';
 import WorkspaceHeader from '@/components/workspace/WorkspaceHeader.vue';
 import { useConfirmDialog } from '@/composables/use-confirm-dialog';
+import { useDocumentTypeLabel } from '@/composables/use-document-type-label';
 import { useDocumentWorkspace } from '@/composables/use-document-workspace';
+import {
+	isCommentRequired,
+	isReviewFeedbackDefaultExpanded,
+	isReviewFeedbackVisible,
+	openAuthoritativeComments,
+	openStandardComments,
+} from '@/domain/review-comments';
 import { primaryWorkspaceStage } from '@/domain/workspace-stages';
 
 const route = useRoute();
@@ -35,6 +49,7 @@ const {
 	publishForm,
 	approvalForm,
 	decisionForm,
+	reviewResponseDrafts,
 	isDraftDirty,
 	isDirty,
 	hydrateFromDocument,
@@ -45,6 +60,8 @@ const {
 	isReleasing,
 	isProcessingSla,
 	isWithdrawing,
+	isRespondingToReview,
+	isAcknowledgingReview,
 	isSuperseding,
 	isAbandoningSupersede,
 	isPublishingPdf,
@@ -56,6 +73,8 @@ const {
 	onRelease,
 	onProcessSla,
 	onWithdrawAndRevise,
+	onRespondToReview,
+	onAcknowledgeReview,
 	onSupersede,
 	onAbandonSupersede,
 	onDecision,
@@ -68,14 +87,44 @@ const {
 	canPublish,
 	canProcessSla,
 	canWithdraw,
+	canRespondToReview,
 	canSupersede,
 	canAbandonSupersede,
 	publishedLibraryPath,
 } = useDocumentWorkspace(documentId);
 
+const { data: typesData } = useQuery(() => listDocumentTypesQuery());
+const { data: priorityData } = useQuery(() => listPriorityLevelsQuery());
+const { typeAndSubtypeLabel } = useDocumentTypeLabel(
+	() => typesData.value?.items,
+);
+
 const canSubmitCleanApproval = computed(
 	() => canSubmitApproval.value && !isDraftDirty.value,
 );
+
+const typeLabel = computed(() =>
+	document.value
+		? typeAndSubtypeLabel(document.value.documentType, document.value.documentSubtypeId)
+		: documentType.value.label,
+);
+
+const openAuthoritativeCount = computed(() =>
+	openAuthoritativeComments(document.value?.reviewComments).length,
+);
+
+const reviewFeedbackVisible = computed(() =>
+	Boolean(document.value)
+	&& isReviewFeedbackVisible(
+		document.value!.status,
+		document.value!.reviewComments.length,
+	),
+);
+
+const showFeedbackAsRecord = computed(() => {
+	const status = document.value?.status;
+	return status === 'published' || status === 'superseded' || status === 'abandoned';
+});
 
 function onBeforeUnload(event: BeforeUnloadEvent): void {
 	if (!isDirty.value) {
@@ -105,10 +154,28 @@ onBeforeRouteLeave(async() => {
 	});
 });
 
-const typeLabel = computed(() => documentType.value.label);
-
 /** Manual overrides; reset when document status changes. */
 const stageOverrides = ref<Partial<Record<WorkspaceStageId, boolean>> | null>(null);
+const feedbackOverride = ref<boolean | null>(null);
+
+const primaryStage = computed(() =>
+	document.value ? primaryWorkspaceStage(document.value.status) : null,
+);
+
+const stageGuide = computed(() => {
+	switch (primaryStage.value) {
+		case 'freeform':
+			return 'Next: expand Freeform request to review the intake.';
+		case 'draft':
+			return 'Next: expand Author / draft to edit and save, then submit from Approvals.';
+		case 'approval':
+			return 'Next: expand Approval chain to submit, claim, or decide.';
+		case 'publish':
+			return 'Next: expand Publish to choose a destination and publish the PDF.';
+		default:
+			return null;
+	}
+});
 
 const primaryStage = computed(() =>
 	document.value ? primaryWorkspaceStage(document.value.status) : null,
@@ -133,6 +200,7 @@ watch(
 	() => document.value?.status,
 	() => {
 		stageOverrides.value = null;
+		feedbackOverride.value = null;
 	},
 );
 
@@ -141,6 +209,31 @@ function isStageExpanded(stage: WorkspaceStageId): boolean {
 		return Boolean(stageOverrides.value[stage]);
 	}
 	return primaryStage.value === stage;
+}
+
+function isFeedbackExpanded(): boolean {
+	if (feedbackOverride.value !== null) {
+		return feedbackOverride.value;
+	}
+	if (!document.value) {
+		return false;
+	}
+	return isReviewFeedbackDefaultExpanded(
+		document.value.status,
+		openAuthoritativeCount.value,
+	);
+}
+
+function toggleFeedback(): void {
+	feedbackOverride.value = !isFeedbackExpanded();
+}
+
+function scrollToFeedback(): void {
+	feedbackOverride.value = true;
+	window.document.getElementById('review-feedback')?.scrollIntoView({
+		behavior: 'smooth',
+		block: 'start',
+	});
 }
 
 function toggleStage(stage: WorkspaceStageId): void {
@@ -159,10 +252,34 @@ function toggleStage(stage: WorkspaceStageId): void {
 	stageOverrides.value = next;
 }
 
+async function handleSubmit(): Promise<void> {
+	const openStandard = openStandardComments(document.value?.reviewComments);
+	if (openStandard.length > 0) {
+		const ok = await confirm({
+			title: 'Submit with open comments?',
+			message: `${openStandard.length} standard comments are still open. Submit anyway?`,
+			confirmText: 'Submit anyway',
+			color: 'warning',
+		});
+		if (!ok) {
+			return;
+		}
+	}
+	await onSubmitForApproval();
+}
+
 async function handleReject(): Promise<void> {
+	const step = document.value?.approvalSteps.find((item) => item.status === 'pending');
+	if (step && isCommentRequired(step, 'reject') && !decisionForm.comment.trim()) {
+		actionError.value = 'This step requires a reason. It will appear in Review feedback for the authors.';
+		return;
+	}
+	const requiresReason = step ? isCommentRequired(step, 'reject') : false;
 	const ok = await confirm({
 		title: 'Reject this document?',
-		message: 'Rejection ends the current approval chain. Authors can withdraw and revise afterward.',
+		message: requiresReason
+			? 'This step requires a reason. It will appear in Review feedback for the authors.'
+			: 'Rejection ends the current approval chain. Authors can withdraw and revise afterward.',
 		confirmText: 'Reject',
 		color: 'error',
 	});
@@ -175,7 +292,7 @@ async function handleReject(): Promise<void> {
 async function handleWithdraw(): Promise<void> {
 	const ok = await confirm({
 		title: 'Withdraw and revise?',
-		message: 'Approval steps will be cleared and the case returns to drafting.',
+		message: 'Approval steps will be cleared and the case returns to drafting. Review comments stay on the case.',
 		confirmText: 'Withdraw & revise',
 		color: 'warning',
 	});
@@ -298,7 +415,9 @@ async function handleAbandonSupersede(): Promise<void> {
 			<WorkspaceHeader
 				:document="document"
 				:type-label="typeLabel"
+				:priority-catalog="priorityData?.items ?? []"
 				@refresh="() => refetch()"
+				@open-feedback="scrollToFeedback"
 			/>
 
 			<v-alert
@@ -337,6 +456,24 @@ async function handleAbandonSupersede(): Promise<void> {
 
 			<v-row>
 				<v-col cols="12" md="7">
+					<ReviewFeedbackPanel
+						v-if="reviewFeedbackVisible"
+						v-model:drafts="reviewResponseDrafts"
+						:comments="document.reviewComments"
+						:can-respond="Boolean(canRespondToReview)"
+						:can-withdraw="Boolean(canWithdraw)"
+						:is-responding="isRespondingToReview"
+						:is-acknowledging="isAcknowledgingReview"
+						:is-withdrawing="isWithdrawing"
+						:status="document.status"
+						:expanded="isFeedbackExpanded()"
+						:show-as-record="showFeedbackAsRecord"
+						@respond="onRespondToReview"
+						@acknowledge="onAcknowledgeReview"
+						@withdraw="handleWithdraw"
+						@toggle="toggleFeedback"
+					/>
+
 					<FreeformRequestPanel
 						:freeform-request="document.freeformRequest"
 						:expanded="isStageExpanded('freeform')"
@@ -382,8 +519,9 @@ async function handleAbandonSupersede(): Promise<void> {
 						:is-processing-sla="isProcessingSla"
 						:is-withdrawing="isWithdrawing"
 						:expanded="isStageExpanded('approval')"
+						:open-authoritative-count="openAuthoritativeCount"
 						:is-primary="primaryStage === 'approval'"
-						@submit="onSubmitForApproval"
+						@submit="handleSubmit"
 						@claim="onClaim"
 						@release="onRelease"
 						@approve="() => onDecision('approve')"
@@ -391,6 +529,7 @@ async function handleAbandonSupersede(): Promise<void> {
 						@process-sla="onProcessSla"
 						@withdraw="handleWithdraw"
 						@toggle="toggleStage('approval')"
+						@view-feedback="scrollToFeedback"
 					/>
 
 					<PublishPanel

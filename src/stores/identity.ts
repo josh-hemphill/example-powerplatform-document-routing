@@ -209,6 +209,9 @@ export const useIdentityStore = defineStore('identity', () => {
 			hostedRolesStatus.value = 'resolved';
 		}
 		catch {
+			if (applyDevPersonaRolesIfKnown(actorEmail)) {
+				return;
+			}
 			hostedRolesStatus.value = 'failed';
 			error.value = 'Could not load security roles from the API';
 		}

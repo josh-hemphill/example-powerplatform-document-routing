@@ -1,6 +1,7 @@
 import type { MockDocumentRecord } from './seed-documents.ts';
 import { describe, expect, it } from 'vitest';
 import { addHoursIso } from '../domain/approval-queue.ts';
+import { canSubmitWithOpenComments } from '../domain/review-comments.ts';
 import {
 	claimStep,
 	createStepFromInput,
@@ -23,6 +24,9 @@ function baseDocument(
 		requesterEmail: 'alex.requester@contoso.com',
 		collaboratorEmails: ['casey.author@contoso.com'],
 		priority: 'normal',
+		priorityReason: null,
+		documentSubtypeId: null,
+		reviewComments: [],
 		currentApproverEmail: null,
 		currentStepStatus: null,
 		currentStepDueAt: null,
@@ -333,6 +337,67 @@ describe('approval engine', () => {
 		expect(() =>
 			decideStep(document, step, 'sam.compliance@contoso.com', 'approve', clock),
 		).toThrow(/not awaiting approval|Only a claimed/);
+	});
+
+	it('requires a comment on reject when commentPolicy is required_on_reject', () => {
+		const clock = new Date('2020-01-01T00:00:00.000Z');
+		const step = createStepFromInput(
+			{
+				assignmentMode: 'named',
+				role: 'Compliance',
+				authorityLevel: 'authoritative',
+				commentPolicy: 'required_on_reject',
+				assignee: { email: 'sam.compliance@contoso.com', displayName: 'Sam' },
+			},
+			1,
+			clock,
+			true,
+			1,
+		);
+		const document = baseDocument({ approvalSteps: [step] });
+		expect(() =>
+			decideStep(document, step, 'sam.compliance@contoso.com', 'reject', clock),
+		).toThrow(/requires a comment/);
+		try {
+			decideStep(document, step, 'sam.compliance@contoso.com', 'reject', clock);
+		}
+		catch(error) {
+			expect((error as { code?: string }).code).toBe('comment_required');
+		}
+	});
+
+	it('writes a review comment at decide-time and keeps it after withdraw', () => {
+		const clock = new Date('2020-01-01T00:00:00.000Z');
+		const step = createStepFromInput(
+			{
+				assignmentMode: 'named',
+				role: 'Compliance',
+				authorityLevel: 'authoritative',
+				commentPolicy: 'required_on_reject',
+				assignee: { email: 'sam.compliance@contoso.com', displayName: 'Sam' },
+			},
+			1,
+			clock,
+			true,
+			2,
+		);
+		const document = baseDocument({ approvalSteps: [step] });
+		const body = 'Need manager attestation language before approval';
+		decideStep(document, step, 'sam.compliance@contoso.com', 'reject', clock, body);
+		expect(document.status).toBe('rejected');
+		expect(document.reviewComments).toHaveLength(1);
+		expect(document.reviewComments[0]?.body).toBe(body);
+		expect(document.reviewComments[0]?.authorityLevel).toBe('authoritative');
+		expect(step.comment).toBe(body);
+
+		withdrawAndRevise(document, 'alex.requester@contoso.com');
+		expect(document.status).toBe('drafting');
+		expect(document.approvalSteps).toEqual([]);
+		expect(document.reviewComments).toHaveLength(1);
+		expect(document.reviewComments[0]?.body).toBe(body);
+		expect(canSubmitWithOpenComments(document.reviewComments)).toBe(false);
+		document.reviewComments[0]!.status = 'addressed';
+		expect(canSubmitWithOpenComments(document.reviewComments)).toBe(true);
 	});
 });
 

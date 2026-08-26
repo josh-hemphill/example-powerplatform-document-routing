@@ -144,6 +144,8 @@ export async function handlePublishRoutes(context: MockHttpContext): Promise<boo
 		else if (!document.documentNumber) {
 			document.documentNumber = allocateNextDocumentNumber(
 				document.documentType,
+				new Date(),
+				document.documentSubtypeId,
 			);
 			document.documentVersion = 1;
 		}

@@ -82,6 +82,8 @@ export function assertFlowsReferencePrefix(
 		`${prefix}_approvalstep`,
 		`${prefix}_document`,
 		`${prefix}_historyevent`,
+		`${prefix}_documentsubtype`,
+		`${prefix}_reviewcomment`,
 	];
 	for (const token of required) {
 		if (!blob.includes(token)) {

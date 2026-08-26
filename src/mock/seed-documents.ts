@@ -1,10 +1,16 @@
 import type { ApproverPerson } from '../domain/approval-queue.ts';
+import type {
+	AuthorityLevel,
+	CommentPolicy,
+	ReviewCommentRecord,
+} from '../domain/review-comments.ts';
 import { randomUUID } from 'node:crypto';
 import { appConfig } from '../config/app.config.ts';
 import {
 	addHoursIso,
 
 } from '../domain/approval-queue.ts';
+import { DEFAULT_COMMENT_POLICY, seedAuthorityForRole } from '../domain/review-comments.ts';
 import { syncCurrentApprovalFields } from './approval-engine.ts';
 
 export type MockDocumentStatus
@@ -41,6 +47,8 @@ export interface MockApprovalStep {
 	submittedRevision: number | null;
 	/** Set when this step approves. */
 	approvedRevision: number | null;
+	authorityLevel: AuthorityLevel;
+	commentPolicy: CommentPolicy;
 }
 
 export interface MockDocumentRecord {
@@ -51,7 +59,9 @@ export interface MockDocumentRecord {
 	requesterEmail: string;
 	/** Author collaboration team shared for co-editing before submit. */
 	collaboratorEmails: string[];
-	priority: 'low' | 'normal' | 'high';
+	priority: string;
+	priorityReason: string | null;
+	documentSubtypeId: string | null;
 	currentApproverEmail: string | null;
 	currentStepStatus: MockApprovalStep['status'] | null;
 	currentStepDueAt: string | null;
@@ -77,12 +87,14 @@ export interface MockDocumentRecord {
 	supersededByDocumentId: string | null;
 	publishedAt: string | null;
 	approvalSteps: MockApprovalStep[];
+	reviewComments: ReviewCommentRecord[];
 	history: Array<{
 		id: string;
 		at: string;
 		actorEmail: string;
 		action: string;
 		message: string;
+		reviewCommentId?: string | null;
 	}>;
 	publishedPdfUrl: string | null;
 	sharePointItemId: string | null;
@@ -138,7 +150,11 @@ export function createSeedDocuments(): MockDocumentRecord[] {
 		status: 'requested',
 		requesterEmail: 'alex.requester@contoso.com',
 		collaboratorEmails: [...collab],
-		priority: 'high',
+		priority: 'mission_critical',
+		priorityReason:
+			'Executive deadline: board packet depends on this travel policy by Friday.',
+		documentSubtypeId: 'corporate',
+		reviewComments: [],
 		currentApproverEmail: null,
 		currentStepStatus: null,
 		currentStepDueAt: null,
@@ -183,6 +199,9 @@ export function createSeedDocuments(): MockDocumentRecord[] {
 		requesterEmail: 'pat.manager@contoso.com',
 		collaboratorEmails: [...collab],
 		priority: 'normal',
+		priorityReason: null,
+		documentSubtypeId: 'operations',
+		reviewComments: [],
 		currentApproverEmail: null,
 		currentStepStatus: null,
 		currentStepDueAt: null,
@@ -243,6 +262,9 @@ Document the 36-month laptop refresh process for corporate devices.
 		requesterEmail: 'alex.requester@contoso.com',
 		collaboratorEmails: [...collab],
 		priority: 'high',
+		priorityReason: null,
+		documentSubtypeId: 'corporate',
+		reviewComments: [],
 		currentApproverEmail: null,
 		currentStepStatus: 'queued',
 		currentStepDueAt: overdueDueAt,
@@ -285,6 +307,8 @@ Meal caps for customer visits are $75 / person.
 				claimedAt: null,
 				elevated: false,
 				elevatedAt: null,
+				authorityLevel: seedAuthorityForRole('Legal Reviewers'),
+				commentPolicy: DEFAULT_COMMENT_POLICY,
 				comment: null,
 				decidedAt: null,
 				submittedRevision: 2,
@@ -306,6 +330,8 @@ Meal caps for customer visits are $75 / person.
 				claimedAt: null,
 				elevated: false,
 				elevatedAt: null,
+				authorityLevel: seedAuthorityForRole('Legal Reviewers'),
+				commentPolicy: DEFAULT_COMMENT_POLICY,
 				comment: null,
 				decidedAt: null,
 				submittedRevision: 2,
@@ -335,6 +361,9 @@ Meal caps for customer visits are $75 / person.
 		requesterEmail: 'alex.requester@contoso.com',
 		collaboratorEmails: [...collab],
 		priority: 'normal',
+		priorityReason: null,
+		documentSubtypeId: 'operations',
+		reviewComments: [],
 		currentApproverEmail: demoEmail,
 		currentStepStatus: 'pending',
 		currentStepDueAt: futureDueAt,
@@ -381,6 +410,8 @@ Meal caps for customer visits are $75 / person.
 				claimedAt: createdAt,
 				elevated: false,
 				elevatedAt: null,
+				authorityLevel: seedAuthorityForRole('Legal Reviewers'),
+				commentPolicy: DEFAULT_COMMENT_POLICY,
 				comment: null,
 				decidedAt: null,
 				submittedRevision: 2,
@@ -410,6 +441,9 @@ Meal caps for customer visits are $75 / person.
 		requesterEmail: 'alex.requester@contoso.com',
 		collaboratorEmails: [...collab],
 		priority: 'high',
+		priorityReason: null,
+		documentSubtypeId: 'safety',
+		reviewComments: [],
 		currentApproverEmail: null,
 		currentStepStatus: 'queued',
 		currentStepDueAt: overdueDueAt,
@@ -451,6 +485,8 @@ Meal caps for customer visits are $75 / person.
 				claimedAt: null,
 				elevated: true,
 				elevatedAt: createdAt,
+				authorityLevel: seedAuthorityForRole('Legal Reviewers'),
+				commentPolicy: DEFAULT_COMMENT_POLICY,
 				comment: null,
 				decidedAt: null,
 				submittedRevision: 3,
@@ -480,6 +516,9 @@ Meal caps for customer visits are $75 / person.
 		requesterEmail: 'alex.requester@contoso.com',
 		collaboratorEmails: [...collab],
 		priority: 'normal',
+		priorityReason: null,
+		documentSubtypeId: 'corporate',
+		reviewComments: [],
 		currentApproverEmail: null,
 		currentStepStatus: null,
 		currentStepDueAt: null,
@@ -519,6 +558,8 @@ All public sites must meet WCAG 2.2 AA.
 				claimedAt: createdAt,
 				elevated: false,
 				elevatedAt: null,
+				authorityLevel: seedAuthorityForRole('Legal Reviewers'),
+				commentPolicy: DEFAULT_COMMENT_POLICY,
 				comment: 'Looks good',
 				decidedAt: createdAt,
 				submittedRevision: 4,
@@ -548,6 +589,9 @@ All public sites must meet WCAG 2.2 AA.
 		requesterEmail: 'alex.requester@contoso.com',
 		collaboratorEmails: [...collab],
 		priority: 'low',
+		priorityReason: null,
+		documentSubtypeId: 'hr',
+		reviewComments: [],
 		currentApproverEmail: null,
 		currentStepStatus: null,
 		currentStepDueAt: null,
@@ -587,6 +631,8 @@ Threshold raised to $100 without further controls.
 				claimedAt: createdAt,
 				elevated: false,
 				elevatedAt: null,
+				authorityLevel: seedAuthorityForRole('Legal Reviewers'),
+				commentPolicy: DEFAULT_COMMENT_POLICY,
 				comment: 'Need manager attestation language before approval',
 				decidedAt: createdAt,
 				submittedRevision: 2,
@@ -619,6 +665,9 @@ Threshold raised to $100 without further controls.
 		requesterEmail: 'alex.requester@contoso.com',
 		collaboratorEmails: [...collab],
 		priority: 'normal',
+		priorityReason: null,
+		documentSubtypeId: 'corporate',
+		reviewComments: [],
 		currentApproverEmail: null,
 		currentStepStatus: null,
 		currentStepDueAt: null,
@@ -665,6 +714,9 @@ Employees may work remotely up to three days per week with manager approval.
 		requesterEmail: demoEmail,
 		collaboratorEmails: [...collab],
 		priority: 'normal',
+		priorityReason: null,
+		documentSubtypeId: 'corporate',
+		reviewComments: [],
 		currentApproverEmail: null,
 		currentStepStatus: null,
 		currentStepDueAt: null,
@@ -711,6 +763,9 @@ Employees may work remotely up to four days per week with quarterly manager revi
 		requesterEmail: demoEmail,
 		collaboratorEmails: [...collab],
 		priority: 'low',
+		priorityReason: null,
+		documentSubtypeId: 'hr',
+		reviewComments: [],
 		currentApproverEmail: null,
 		currentStepStatus: null,
 		currentStepDueAt: null,
@@ -757,6 +812,9 @@ Draft abandoned.
 		requesterEmail: demoEmail,
 		collaboratorEmails: [demoEmail, 'casey.author@contoso.com'],
 		priority: 'low',
+		priorityReason: null,
+		documentSubtypeId: 'operations',
+		reviewComments: [],
 		currentApproverEmail: null,
 		currentStepStatus: null,
 		currentStepDueAt: null,
@@ -792,13 +850,46 @@ Draft abandoned.
 		requestedLibraryName: publishLibrary,
 	};
 
+	const giftStep = rejected.approvalSteps[0]!;
+	const giftCommentId = randomUUID();
+	const giftCommentBody = 'Need manager attestation language before approval';
+	giftStep.authorityLevel = 'authoritative';
+	giftStep.comment = giftCommentBody;
+	rejected.reviewComments = [
+		{
+			id: giftCommentId,
+			kind: 'decision',
+			authorityLevel: 'authoritative',
+			status: 'open',
+			body: giftCommentBody,
+			actorEmail: 'sam.compliance@contoso.com',
+			actorDisplayName: 'Sam Compliance',
+			role: 'Compliance',
+			sourceStepId: giftStep.id,
+			sourceStepOrder: 1,
+			submittedContentRevision: 2,
+			inReplyTo: null,
+			createdAt,
+		},
+	];
+	rejected.history = [
+		{
+			id: randomUUID(),
+			at: createdAt,
+			actorEmail: 'sam.compliance@contoso.com',
+			action: 'rejected',
+			message: 'Rejected by Compliance',
+			reviewCommentId: giftCommentId,
+		},
+	];
+
 	syncCurrentApprovalFields(queuedPool);
 	syncCurrentApprovalFields(pendingNamed);
 	syncCurrentApprovalFields(elevatedPool);
 	syncCurrentApprovalFields(readyToPublish);
 	syncCurrentApprovalFields(rejected);
 
-	return [
+	const seeded = [
 		requested,
 		drafting,
 		queuedPool,
@@ -811,4 +902,14 @@ Draft abandoned.
 		abandonedSuccessor,
 		myRequest,
 	];
+	for (const document of seeded) {
+		for (const step of document.approvalSteps) {
+			step.authorityLevel = seedAuthorityForRole(step.role);
+			step.commentPolicy = DEFAULT_COMMENT_POLICY;
+		}
+	}
+	// Gift Policy rejection is authoritative Compliance feedback (do not infer-overwrite).
+	rejected.approvalSteps[0]!.authorityLevel = 'authoritative';
+
+	return seeded;
 }

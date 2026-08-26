@@ -48,6 +48,8 @@ export type NamedApprovalStepInput = {
      * Hours until SLA timeout from step activation (not reset on claim)
      */
     slaHours?: number;
+    authorityLevel?: AuthorityLevel;
+    commentPolicy?: CommentPolicy;
     assignee: Approver;
     /**
      * Extra members merged into the pool after SLA timeout (named → elevated pool)
@@ -65,6 +67,8 @@ export type PoolApprovalStepInput = {
      * Hours until SLA timeout from queue activation (not reset on claim)
      */
     slaHours?: number;
+    authorityLevel?: AuthorityLevel;
+    commentPolicy?: CommentPolicy;
     /**
      * Eligible claimers for this pool step
      */
@@ -94,7 +98,11 @@ export type ApprovalActorRequest = {
 export type ApprovalDecisionRequest = {
     decision: 'approve' | 'reject';
     /**
-     * Optional comment; actor is the authenticated principal
+     * Copied to `reviewcomment` (`kind=decision`) at decide-time. Required when
+     * the step’s `commentPolicy` is `required_on_reject` (reject) or
+     * `required_on_decision` (any decision). Missing required comment → 400
+     * `comment_required`. History records a short label only.
+     *
      */
     comment?: string;
 };
@@ -133,7 +141,24 @@ export type CreateDocumentRequest = {
      * Unstructured request text that authors turn into a draft
      */
     freeformRequest: string;
-    priority?: 'low' | 'normal' | 'high';
+    /**
+     * Catalog key from `GET /control/priority-levels` (seed `low`, `normal`,
+     * `high`, `mission_critical`). Unknown/inactive → 400 `unknown_priority`.
+     *
+     */
+    priority?: string;
+    /**
+     * Required when the selected catalog row has `requiresReason`. Too short
+     * → 400 `priority_reason_required`.
+     *
+     */
+    priorityReason?: string;
+    /**
+     * Required when the document type has any active subtype. Unknown/wrong
+     * type → 400 `unknown_subtype`. Missing when required → 400 `subtype_required`.
+     *
+     */
+    documentSubtypeId?: string;
     /**
      * Ignored. Trusted publish uses allowlisted destinations only; do not
      * send free-form SharePoint URLs.
@@ -172,13 +197,28 @@ export type DocumentSummary = {
     id: string;
     title: string;
     documentType: string;
+    /**
+     * Subtype key or id when the type requires one
+     */
+    documentSubtypeId?: string | null;
     status: DocumentStatus;
     requesterEmail: string;
     /**
      * Author collaboration team shared on create for co-editing drafts
      */
     collaboratorEmails?: Array<string>;
-    priority?: 'low' | 'normal' | 'high';
+    /**
+     * Catalog key (not a closed enum)
+     */
+    priority?: string;
+    /**
+     * Count of open authoritative decision comments (blocks resubmit)
+     */
+    openAuthoritativeCommentCount?: number;
+    /**
+     * Truncated newest decision-comment body (~140 chars) for inbox
+     */
+    lastReviewCommentPreview?: string | null;
     currentApproverEmail?: string | null;
     currentStepStatus?: ApprovalStepStatus | null;
     currentStepDueAt?: string | null;
@@ -255,6 +295,8 @@ export type ApprovalStep = {
      * contentRevision recorded when this step approved
      */
     approvedRevision?: number | null;
+    authorityLevel?: AuthorityLevel;
+    commentPolicy?: CommentPolicy;
 };
 
 export type Document = DocumentSummary & {
@@ -265,7 +307,10 @@ export type Document = DocumentSummary & {
     contentRevision: number;
     submittedContentRevision?: number | null;
     publishedContentRevision?: number | null;
+    priorityReason?: string | null;
+    documentSubtypeId?: string | null;
     approvalSteps: Array<ApprovalStep>;
+    reviewComments: Array<ReviewComment>;
     history: Array<HistoryEvent>;
     publishedPdfUrl?: string | null;
     sharePointItemId?: string | null;
@@ -279,6 +324,10 @@ export type HistoryEvent = {
     actorEmail: string;
     action: string;
     message: string;
+    /**
+     * Optional link to the reviewcomment written at the same time
+     */
+    reviewCommentId?: string | null;
 };
 
 export type PublishResult = {
@@ -304,6 +353,8 @@ export type ControlChainStep = {
      */
     poolKey?: string;
     elevationPoolKey?: string;
+    authorityLevel?: AuthorityLevel;
+    commentPolicy?: CommentPolicy;
 };
 
 export type ControlDocumentType = {
@@ -334,6 +385,10 @@ export type ControlDocumentType = {
      */
     sequenceYear?: number;
     approvalChain: Array<ControlChainStep>;
+    /**
+     * Active (or all, for Admin) subtypes belonging to this type
+     */
+    subtypes?: Array<DocumentSubtype>;
 };
 
 export type ControlDocumentTypeWrite = {
@@ -416,12 +471,108 @@ export type ControlFlowRun = {
     message: string;
 };
 
+export type AuthorityLevel = 'advisory' | 'standard' | 'authoritative';
+
+export type CommentPolicy = 'optional' | 'required_on_reject' | 'required_on_decision';
+
+export type ReviewCommentKind = 'decision' | 'submission' | 'author_response' | 'acknowledgement';
+
+export type ReviewCommentStatus = 'open' | 'addressed' | 'acknowledged' | 'voided';
+
+export type ReviewComment = {
+    id: string;
+    kind: ReviewCommentKind;
+    authorityLevel: AuthorityLevel;
+    status: ReviewCommentStatus;
+    body: string;
+    actorEmail: string;
+    actorDisplayName: string;
+    role?: string | null;
+    sourceStepId?: string | null;
+    sourceStepOrder?: number | null;
+    submittedContentRevision?: number | null;
+    inReplyTo?: string | null;
+    createdAt: string;
+};
+
+export type ReviewCommentRespondRequest = {
+    /**
+     * Author reply. Authoritative comments require ≥ 20 non-whitespace characters.
+     */
+    body: string;
+};
+
+export type UpdatePriorityRequest = {
+    priority: string;
+    priorityReason?: string | null;
+};
+
+export type PriorityLevel = {
+    id: string;
+    key: string;
+    label: string;
+    rank: number;
+    color: 'default' | 'info' | 'warning' | 'error';
+    requiresReason: boolean;
+    minReasonLength: number;
+    reasonHint?: string;
+    active: boolean;
+    /**
+     * Stored unused in v1; do not apply to activateDueAt
+     */
+    slaHoursMultiplier?: number | null;
+};
+
+export type PriorityLevelWrite = {
+    key: string;
+    label: string;
+    rank: number;
+    color: 'default' | 'info' | 'warning' | 'error';
+    requiresReason: boolean;
+    minReasonLength?: number;
+    reasonHint?: string;
+    active: boolean;
+    slaHoursMultiplier?: number | null;
+};
+
+export type DocumentSubtype = {
+    id: string;
+    key: string;
+    label: string;
+    description?: string;
+    documentTypeId: string;
+    active: boolean;
+    requestHint?: string | null;
+    draftScaffold?: string | null;
+    numberPrefix?: string | null;
+    usesOwnChain: boolean;
+    /**
+     * Required and non-empty when usesOwnChain is true
+     */
+    approvalChain?: Array<ControlChainStep>;
+};
+
+export type DocumentSubtypeWrite = {
+    key: string;
+    label: string;
+    description?: string;
+    documentTypeId: string;
+    active: boolean;
+    requestHint?: string | null;
+    draftScaffold?: string | null;
+    numberPrefix?: string | null;
+    usesOwnChain: boolean;
+    approvalChain?: Array<ControlChainStep>;
+};
+
 export type Error = {
     message: string;
     code?: string;
 };
 
 export type DocumentId = string;
+
+export type CommentId = string;
 
 export type GetPrincipalData = {
     body?: never;
@@ -737,6 +888,139 @@ export type DecideApprovalStepResponses = {
 };
 
 export type DecideApprovalStepResponse = DecideApprovalStepResponses[keyof DecideApprovalStepResponses];
+
+export type RespondToReviewCommentData = {
+    body: ReviewCommentRespondRequest;
+    path: {
+        documentId: string;
+        commentId: string;
+    };
+    query?: never;
+    url: '/documents/{documentId}/review-comments/{commentId}/respond';
+};
+
+export type RespondToReviewCommentErrors = {
+    /**
+     * Validation error
+     */
+    400: Error;
+    /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
+    /**
+     * Caller is not allowed to perform this action
+     */
+    403: Error;
+    /**
+     * Resource not found
+     */
+    404: Error;
+    /**
+     * Invalid state transition
+     */
+    409: Error;
+};
+
+export type RespondToReviewCommentError = RespondToReviewCommentErrors[keyof RespondToReviewCommentErrors];
+
+export type RespondToReviewCommentResponses = {
+    /**
+     * Document with updated review comments
+     */
+    200: Document;
+};
+
+export type RespondToReviewCommentResponse = RespondToReviewCommentResponses[keyof RespondToReviewCommentResponses];
+
+export type AcknowledgeReviewCommentData = {
+    body?: {
+        comment?: string;
+    };
+    path: {
+        documentId: string;
+        commentId: string;
+    };
+    query?: never;
+    url: '/documents/{documentId}/review-comments/{commentId}/acknowledge';
+};
+
+export type AcknowledgeReviewCommentErrors = {
+    /**
+     * Validation error
+     */
+    400: Error;
+    /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
+    /**
+     * Caller is not allowed to perform this action
+     */
+    403: Error;
+    /**
+     * Resource not found
+     */
+    404: Error;
+    /**
+     * Invalid state transition
+     */
+    409: Error;
+};
+
+export type AcknowledgeReviewCommentError = AcknowledgeReviewCommentErrors[keyof AcknowledgeReviewCommentErrors];
+
+export type AcknowledgeReviewCommentResponses = {
+    /**
+     * Document with updated review comments
+     */
+    200: Document;
+};
+
+export type AcknowledgeReviewCommentResponse = AcknowledgeReviewCommentResponses[keyof AcknowledgeReviewCommentResponses];
+
+export type UpdateDocumentPriorityData = {
+    body: UpdatePriorityRequest;
+    path: {
+        documentId: string;
+    };
+    query?: never;
+    url: '/documents/{documentId}/priority';
+};
+
+export type UpdateDocumentPriorityErrors = {
+    /**
+     * Validation error
+     */
+    400: Error;
+    /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
+    /**
+     * Caller is not allowed to perform this action
+     */
+    403: Error;
+    /**
+     * Resource not found
+     */
+    404: Error;
+    /**
+     * Invalid state transition
+     */
+    409: Error;
+};
+
+export type UpdateDocumentPriorityError = UpdateDocumentPriorityErrors[keyof UpdateDocumentPriorityErrors];
+
+export type UpdateDocumentPriorityResponses = {
+    /**
+     * Document with updated priority
+     */
+    200: Document;
+};
+
+export type UpdateDocumentPriorityResponse = UpdateDocumentPriorityResponses[keyof UpdateDocumentPriorityResponses];
 
 export type ClaimApprovalStepData = {
     body: ApprovalActorRequest;
@@ -1558,3 +1842,241 @@ export type ListFlowRunsResponses = {
 };
 
 export type ListFlowRunsResponse = ListFlowRunsResponses[keyof ListFlowRunsResponses];
+
+export type ListPriorityLevelsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/control/priority-levels';
+};
+
+export type ListPriorityLevelsErrors = {
+    /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
+};
+
+export type ListPriorityLevelsError = ListPriorityLevelsErrors[keyof ListPriorityLevelsErrors];
+
+export type ListPriorityLevelsResponses = {
+    /**
+     * Priority catalog
+     */
+    200: {
+        items: Array<PriorityLevel>;
+    };
+};
+
+export type ListPriorityLevelsResponse = ListPriorityLevelsResponses[keyof ListPriorityLevelsResponses];
+
+export type CreatePriorityLevelData = {
+    body: PriorityLevelWrite;
+    path?: never;
+    query?: never;
+    url: '/control/priority-levels';
+};
+
+export type CreatePriorityLevelErrors = {
+    /**
+     * Validation error
+     */
+    400: Error;
+    /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
+    /**
+     * Caller is not allowed to perform this action
+     */
+    403: Error;
+};
+
+export type CreatePriorityLevelError = CreatePriorityLevelErrors[keyof CreatePriorityLevelErrors];
+
+export type CreatePriorityLevelResponses = {
+    /**
+     * Created
+     */
+    201: PriorityLevel;
+};
+
+export type CreatePriorityLevelResponse = CreatePriorityLevelResponses[keyof CreatePriorityLevelResponses];
+
+export type UpdatePriorityLevelData = {
+    body: PriorityLevelWrite;
+    path: {
+        priorityId: string;
+    };
+    query?: never;
+    url: '/control/priority-levels/{priorityId}';
+};
+
+export type UpdatePriorityLevelErrors = {
+    /**
+     * Validation error
+     */
+    400: Error;
+    /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
+    /**
+     * Caller is not allowed to perform this action
+     */
+    403: Error;
+    /**
+     * Resource not found
+     */
+    404: Error;
+};
+
+export type UpdatePriorityLevelError = UpdatePriorityLevelErrors[keyof UpdatePriorityLevelErrors];
+
+export type UpdatePriorityLevelResponses = {
+    /**
+     * Updated
+     */
+    200: PriorityLevel;
+};
+
+export type UpdatePriorityLevelResponse = UpdatePriorityLevelResponses[keyof UpdatePriorityLevelResponses];
+
+export type ListDocumentSubtypesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Filter by parent document type id
+         */
+        documentType?: string;
+    };
+    url: '/control/document-subtypes';
+};
+
+export type ListDocumentSubtypesErrors = {
+    /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
+};
+
+export type ListDocumentSubtypesError = ListDocumentSubtypesErrors[keyof ListDocumentSubtypesErrors];
+
+export type ListDocumentSubtypesResponses = {
+    /**
+     * Subtype catalog
+     */
+    200: {
+        items: Array<DocumentSubtype>;
+    };
+};
+
+export type ListDocumentSubtypesResponse = ListDocumentSubtypesResponses[keyof ListDocumentSubtypesResponses];
+
+export type CreateDocumentSubtypeData = {
+    body: DocumentSubtypeWrite;
+    path?: never;
+    query?: never;
+    url: '/control/document-subtypes';
+};
+
+export type CreateDocumentSubtypeErrors = {
+    /**
+     * Validation error
+     */
+    400: Error;
+    /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
+    /**
+     * Caller is not allowed to perform this action
+     */
+    403: Error;
+};
+
+export type CreateDocumentSubtypeError = CreateDocumentSubtypeErrors[keyof CreateDocumentSubtypeErrors];
+
+export type CreateDocumentSubtypeResponses = {
+    /**
+     * Created
+     */
+    201: DocumentSubtype;
+};
+
+export type CreateDocumentSubtypeResponse = CreateDocumentSubtypeResponses[keyof CreateDocumentSubtypeResponses];
+
+export type DeactivateDocumentSubtypeData = {
+    body?: never;
+    path: {
+        subtypeId: string;
+    };
+    query?: never;
+    url: '/control/document-subtypes/{subtypeId}';
+};
+
+export type DeactivateDocumentSubtypeErrors = {
+    /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
+    /**
+     * Caller is not allowed to perform this action
+     */
+    403: Error;
+    /**
+     * Resource not found
+     */
+    404: Error;
+};
+
+export type DeactivateDocumentSubtypeError = DeactivateDocumentSubtypeErrors[keyof DeactivateDocumentSubtypeErrors];
+
+export type DeactivateDocumentSubtypeResponses = {
+    /**
+     * Deactivated
+     */
+    200: DocumentSubtype;
+};
+
+export type DeactivateDocumentSubtypeResponse = DeactivateDocumentSubtypeResponses[keyof DeactivateDocumentSubtypeResponses];
+
+export type UpdateDocumentSubtypeData = {
+    body: DocumentSubtypeWrite;
+    path: {
+        subtypeId: string;
+    };
+    query?: never;
+    url: '/control/document-subtypes/{subtypeId}';
+};
+
+export type UpdateDocumentSubtypeErrors = {
+    /**
+     * Validation error
+     */
+    400: Error;
+    /**
+     * Missing or invalid caller principal
+     */
+    401: Error;
+    /**
+     * Caller is not allowed to perform this action
+     */
+    403: Error;
+    /**
+     * Resource not found
+     */
+    404: Error;
+};
+
+export type UpdateDocumentSubtypeError = UpdateDocumentSubtypeErrors[keyof UpdateDocumentSubtypeErrors];
+
+export type UpdateDocumentSubtypeResponses = {
+    /**
+     * Updated
+     */
+    200: DocumentSubtype;
+};
+
+export type UpdateDocumentSubtypeResponse = UpdateDocumentSubtypeResponses[keyof UpdateDocumentSubtypeResponses];

@@ -4,7 +4,7 @@ Example Power Platform **Code App** that routes freeform document requests throu
 
 **Adopting for your org?** Start with [`SETUP.md`](./SETUP.md) — config in `src/config/*`, deploy scaffolding in [`deploy/`](./deploy/README.md).
 
-**Hardening / Dataverse-first roadmap:** see [`docs/remediation-roadmap.md`](./docs/remediation-roadmap.md) (Phases 0–8). Phases **9–13** — [`docs/post-phase-8-review-roadmap.md`](./docs/post-phase-8-review-roadmap.md). Phases **14–17** — [`docs/post-phase-13-review-roadmap.md`](./docs/post-phase-13-review-roadmap.md). **Deploy ALM:** [`docs/provisioning-alm-roadmap.md`](./docs/provisioning-alm-roadmap.md) (Phases **18–22** done: publisher/solution, connection refs, roles, prefix-aware flows, shared-env CI).
+**Hardening / Dataverse-first roadmap:** see [`docs/remediation-roadmap.md`](./docs/remediation-roadmap.md) (Phases 0–8). Phases **9–13** — [`docs/post-phase-8-review-roadmap.md`](./docs/post-phase-8-review-roadmap.md). Phases **14–17** — [`docs/post-phase-13-review-roadmap.md`](./docs/post-phase-13-review-roadmap.md). **Deploy ALM:** [`docs/provisioning-alm-roadmap.md`](./docs/provisioning-alm-roadmap.md) (Phases **18–22** done: publisher/solution, connection refs, roles, prefix-aware flows, shared-env CI). **Next product:** [`docs/review-feedback-and-control-data-roadmap.md`](./docs/review-feedback-and-control-data-roadmap.md) (Phases **23–27** — durable review comments, Review Feedback panel, configurable priorities with mission-critical reasons, subtypes; Typst Doc Studio integration is horizon-only).
 
 Stack:
 
@@ -31,7 +31,7 @@ Freeform request ⇄ Author draft → Approval chain → Approved → Publish PD
 
 Inbox personas: All · Waiting on me · Available in my pool · My requests · Needs draft · Ready to publish.
 
-Approvals support **named** steps and **pool** queues with claim/release, immutable `activateDueAt` SLA, and elevation pools. Live routing is maintained in **Admin** (`#/admin`) / Dataverse control tables — `document-types.ts` is the local seed mirror only. Flow stubs: [`deploy/flows/`](./deploy/flows/README.md).
+Approvals support **named** steps and **pool** queues with claim/release, immutable `activateDueAt` SLA, and elevation pools. Live routing is maintained in **Admin** (`#/admin`) / Dataverse control tables — `document-types.ts` is the local seed mirror only. Admin also owns the **priority catalog** (mission-critical requires a reason) and optional **document subtypes**. Review comments survive withdraw & revise. Flow stubs: [`deploy/flows/`](./deploy/flows/README.md).
 
 ## Quick start (local)
 
@@ -78,6 +78,7 @@ Customize `src/publishing/html-pdf-template.ts`. Run HTML→PDF (or Typst) **ser
 ```text
 SETUP.md                          Adopter checklist (start here)
 docs/remediation-roadmap.md       Phased hardening plan (Dataverse-first)
+docs/review-feedback-and-control-data-roadmap.md  Phases 23–27 + Typst horizon
 deploy/                           Dataverse + SharePoint provision scaffolding
 deploy/SCHEMA.md                  Control + case table model (collaboration / SLA)
 src/config/app.config.ts          Brand + SharePoint defaults (env-overridable)
