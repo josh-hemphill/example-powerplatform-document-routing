@@ -2,7 +2,7 @@
 
 Plan to make **engineering / high-authority review comments first-class, persistent, and actionable**; to treat **priorities, mission-critical reasons, and document subtypes as Admin-configurable control data with server enforcement**; and to record a **later integration path with Typst Doc Studio** (`josh-hemphill/typst-doc-repo`) that this repo **must not implement yet**.
 
-**Status:** Not started. Phases **23–27** are the next product work. Horizon **T0–T6** is design-only.
+**Status:** Phases **23–27** implemented (durable review comments, Review Feedback panel, priority catalog, subtypes, Admin/ALM). Horizon **T0–T6** is design-only.
 
 **Preceding roadmaps:** [`remediation-roadmap.md`](./remediation-roadmap.md) (0–8), [`post-phase-8-review-roadmap.md`](./post-phase-8-review-roadmap.md) (9–13), [`post-phase-13-review-roadmap.md`](./post-phase-13-review-roadmap.md) (14–17), [`provisioning-alm-roadmap.md`](./provisioning-alm-roadmap.md) (18–22, done).
 

@@ -4,6 +4,7 @@ import { onBeforeRouteLeave, useRouter } from 'vue-router';
 import AdminDestinationsPanel from '@/components/admin/AdminDestinationsPanel.vue';
 import AdminFlowsPanel from '@/components/admin/AdminFlowsPanel.vue';
 import AdminPoolsPanel from '@/components/admin/AdminPoolsPanel.vue';
+import AdminPrioritiesPanel from '@/components/admin/AdminPrioritiesPanel.vue';
 import AdminSettingsPanel from '@/components/admin/AdminSettingsPanel.vue';
 import AdminTypesPanel from '@/components/admin/AdminTypesPanel.vue';
 import { useConfirmDialog } from '@/composables/use-confirm-dialog';
@@ -29,9 +30,15 @@ const typeDirty = ref(false);
 const poolDirty = ref(false);
 const destinationDirty = ref(false);
 const settingsDirty = ref(false);
+const priorityDirty = ref(false);
 
 const anyDirty = computed(
-	() => typeDirty.value || poolDirty.value || destinationDirty.value || settingsDirty.value,
+	() =>
+		typeDirty.value
+		|| poolDirty.value
+		|| destinationDirty.value
+		|| settingsDirty.value
+		|| priorityDirty.value,
 );
 
 watch(
@@ -159,6 +166,13 @@ onBeforeRouteLeave(async() => {
 						class="text-caption ms-1"
 					>(unsaved)</span>
 				</v-tab>
+				<v-tab value="priorities">
+					Priorities
+					<span
+						v-if="priorityDirty"
+						class="text-caption ms-1"
+					>(unsaved)</span>
+				</v-tab>
 				<v-tab value="pools">
 					Pools
 					<span
@@ -189,6 +203,15 @@ onBeforeRouteLeave(async() => {
 				<v-tabs-window-item value="types">
 					<AdminTypesPanel
 						v-model:dirty="typeDirty"
+						:can-act="canAct"
+						@error="onError"
+						@success="onSuccess"
+					/>
+				</v-tabs-window-item>
+
+				<v-tabs-window-item value="priorities">
+					<AdminPrioritiesPanel
+						v-model:dirty="priorityDirty"
 						:can-act="canAct"
 						@error="onError"
 						@success="onSuccess"

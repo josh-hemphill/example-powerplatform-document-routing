@@ -24,6 +24,18 @@ const assignmentModes = [
 	{ title: 'Pool', value: 'pool' },
 ];
 
+const authorityLevels = [
+	{ title: 'Advisory', value: 'advisory' },
+	{ title: 'Standard', value: 'standard' },
+	{ title: 'Authoritative', value: 'authoritative' },
+];
+
+const commentPolicies = [
+	{ title: 'Optional', value: 'optional' },
+	{ title: 'Required on reject', value: 'required_on_reject' },
+	{ title: 'Required on any decision', value: 'required_on_decision' },
+];
+
 function addStep(): void {
 	steps.value = normalizeChainOrders([
 		...steps.value,
@@ -209,6 +221,22 @@ function applyJson(): void {
 						:items="poolKeys"
 						label="Elevation pool (optional)"
 						clearable
+						hide-details
+					/>
+				</v-col>
+				<v-col cols="12" md="3">
+					<v-select
+						v-model="step.authorityLevel"
+						:items="authorityLevels"
+						label="Authority"
+						hide-details
+					/>
+				</v-col>
+				<v-col cols="12" md="3">
+					<v-select
+						v-model="step.commentPolicy"
+						:items="commentPolicies"
+						label="Comment policy"
 						hide-details
 					/>
 				</v-col>

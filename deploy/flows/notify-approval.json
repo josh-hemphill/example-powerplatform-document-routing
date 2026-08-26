@@ -2,9 +2,9 @@
 	"$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
 	"metadata": {
 		"flowName": "Document Routing — Notify approval",
-		"description": "Notifies assignees or pool members when a step is queued, elevated, or decided.",
+		"description": "Notifies assignees or pool members when a step is queued, elevated, or decided. Payload includes priority and last review comment preview (no new connectors).",
 		"trigger": "When a row is added, modified or deleted (dr_approvalstep)",
-		"tables": ["dr_approvalstep", "dr_document"]
+		"tables": ["dr_approvalstep", "dr_document", "dr_reviewcomment"]
 	},
 	"definition": {
 		"triggers": {
@@ -22,7 +22,7 @@
 		"actions": {
 			"Get_parent_document": {
 				"type": "OpenApiConnection",
-				"description": "Retrieve dr_document for title and deep link"
+				"description": "Retrieve dr_document for title, priority, last review comment preview, and deep link"
 			},
 			"Branch_on_status": {
 				"type": "Switch",
@@ -30,7 +30,7 @@
 			},
 			"Send_email_or_teams": {
 				"type": "OpenApiConnection",
-				"description": "Office 365 Outlook / Teams post — template with document title, step role, due time"
+				"description": "Office 365 Outlook / Teams post — template with document title, priority, last comment preview, step role, due time"
 			}
 		},
 		"outputs": {}

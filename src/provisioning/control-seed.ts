@@ -1,13 +1,13 @@
 import type { ApprovalStepTemplate, DocumentTypeDefinition } from '../config/document-types.ts';
+import type { AuthorityLevel, CommentPolicy } from '../domain/review-comments.ts';
 /**
  * Builds Dataverse control-table seed rows from the local document-types demo config.
  * Production orgs should replace Contoso sample emails via Admin (Phase 4) or edit this seed.
  */
-import {
-
-	documentTypes,
-} from '../config/document-types.ts';
+import { documentTypes } from '../config/document-types.ts';
+import { SEED_PRIORITY_LEVELS } from '../config/priority-catalog.ts';
 import { isSampleControlEmail } from '../config/sample-identities.ts';
+import { DEFAULT_COMMENT_POLICY, seedAuthorityForRole } from '../domain/review-comments.ts';
 import { looksLikePlaceholder } from './connection-urls.ts';
 
 export interface SeedApproverPool {
@@ -27,6 +27,33 @@ export interface SeedChainStep {
 	poolKey?: string;
 	elevationPoolKey?: string;
 	elevationSemantics: 'convert_to_elevated_pool' | 'reassign_escalation_owner';
+	authorityLevel: AuthorityLevel;
+	commentPolicy: CommentPolicy;
+}
+
+export interface SeedDocumentSubtype {
+	key: string;
+	label: string;
+	description: string;
+	documentTypeId: string;
+	active: boolean;
+	requestHint?: string | null;
+	draftScaffold?: string | null;
+	numberPrefix?: string | null;
+	usesOwnChain: boolean;
+	chain: SeedChainStep[];
+}
+
+export interface SeedPriorityLevel {
+	key: string;
+	label: string;
+	rank: number;
+	color: string;
+	requiresReason: boolean;
+	minReasonLength: number;
+	reasonHint: string;
+	active: boolean;
+	slaHoursMultiplier: number | null;
 }
 
 export interface SeedDocumentType {
@@ -59,6 +86,8 @@ export interface ControlSeedBundle {
 	publishDestinations: SeedPublishDestination[];
 	approverPools: SeedApproverPool[];
 	documentTypes: SeedDocumentType[];
+	documentSubtypes: SeedDocumentSubtype[];
+	priorityLevels: SeedPriorityLevel[];
 	appSettings: SeedAppSetting[];
 	sampleIdentityEmails: string[];
 }
@@ -107,23 +136,29 @@ function collectPools(types: DocumentTypeDefinition[]): SeedApproverPool[] {
 	};
 
 	for (const type of types) {
-		for (const step of type.approvalChain) {
-			if (step.mode === 'pool') {
-				addPool(step.poolRole, step.pool, `Pool for ${step.poolRole}`);
-				if (step.elevationPool?.length) {
+		const chains = [
+			type.approvalChain,
+			...(type.subtypes ?? []).map((subtype) => subtype.approvalChain ?? []),
+		];
+		for (const chain of chains) {
+			for (const step of chain) {
+				if (step.mode === 'pool') {
+					addPool(step.poolRole, step.pool, `Pool for ${step.poolRole}`);
+					if (step.elevationPool?.length) {
+						addPool(
+							`${step.poolRole} Elevation`,
+							step.elevationPool,
+							`Elevation pool for ${step.poolRole}`,
+						);
+					}
+				}
+				else if (step.elevationPool?.length) {
 					addPool(
-						`${step.poolRole} Elevation`,
+						`${step.role} Elevation`,
 						step.elevationPool,
-						`Elevation pool for ${step.poolRole}`,
+						`Elevation pool for named role ${step.role}`,
 					);
 				}
-			}
-			else if (step.elevationPool?.length) {
-				addPool(
-					`${step.role} Elevation`,
-					step.elevationPool,
-					`Elevation pool for named role ${step.role}`,
-				);
 			}
 		}
 	}
@@ -132,6 +167,9 @@ function collectPools(types: DocumentTypeDefinition[]): SeedApproverPool[] {
 }
 
 function mapChainStep(step: ApprovalStepTemplate, order: number): SeedChainStep {
+	const role = step.mode === 'pool' ? step.poolRole : step.role;
+	const authorityLevel = step.authorityLevel ?? seedAuthorityForRole(role);
+	const commentPolicy = step.commentPolicy ?? DEFAULT_COMMENT_POLICY;
 	if (step.mode === 'pool') {
 		return {
 			order,
@@ -143,6 +181,8 @@ function mapChainStep(step: ApprovalStepTemplate, order: number): SeedChainStep 
 				? poolKeyFromRole(`${step.poolRole} Elevation`)
 				: undefined,
 			elevationSemantics: 'convert_to_elevated_pool',
+			authorityLevel,
+			commentPolicy,
 		};
 	}
 	return {
@@ -156,6 +196,8 @@ function mapChainStep(step: ApprovalStepTemplate, order: number): SeedChainStep 
 			? poolKeyFromRole(`${step.role} Elevation`)
 			: undefined,
 		elevationSemantics: 'convert_to_elevated_pool',
+		authorityLevel,
+		commentPolicy,
 	};
 }
 
@@ -223,6 +265,41 @@ export function buildControlSeedBundle(
 					namedApproverDisplayName: undefined,
 				};
 			}),
+		})),
+		documentSubtypes: types.flatMap((type) =>
+			(type.subtypes ?? []).map((subtype) => ({
+				key: subtype.key,
+				label: subtype.label,
+				description: subtype.description,
+				documentTypeId: type.id,
+				active: true,
+				requestHint: subtype.requestHint ?? null,
+				draftScaffold: subtype.draftScaffold ?? null,
+				numberPrefix: subtype.numberPrefix ?? null,
+				usesOwnChain: subtype.usesOwnChain === true,
+				chain: (subtype.approvalChain ?? []).map((step, index) => {
+					const mapped = mapChainStep(step, index + 1);
+					if (includeDemoIdentities) {
+						return mapped;
+					}
+					return {
+						...mapped,
+						namedApproverEmail: undefined,
+						namedApproverDisplayName: undefined,
+					};
+				}),
+			})),
+		),
+		priorityLevels: SEED_PRIORITY_LEVELS.map((row) => ({
+			key: row.key,
+			label: row.label,
+			rank: row.rank,
+			color: row.color,
+			requiresReason: row.requiresReason,
+			minReasonLength: row.minReasonLength,
+			reasonHint: row.reasonHint,
+			active: row.active,
+			slaHoursMultiplier: row.slaHoursMultiplier,
 		})),
 		appSettings: [
 			{
