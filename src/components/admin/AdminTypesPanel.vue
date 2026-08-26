@@ -306,7 +306,7 @@ async function save(): Promise<void> {
 		class="pa-4 pb-16"
 		:loading="typesLoading"
 	>
-		<div class="d-flex align-center flex-wrap ga-2 mb-3">
+		<div class="d-flex align-end flex-wrap ga-2 mb-3">
 			<v-select
 				v-model="selectedId"
 				:items="types"

@@ -170,7 +170,7 @@ async function addPriority(): Promise<void> {
 			Catalog keys are stored on each case. Deactivating a row hides it from New request.
 			<code>requiresReason</code> is enforced server-side (mission-critical cannot be saved without a reason).
 		</p>
-		<div class="d-flex align-center flex-wrap ga-2 mb-3">
+		<div class="d-flex align-end flex-wrap ga-2 mb-3">
 			<v-select
 				v-model="selectedId"
 				:items="items"
