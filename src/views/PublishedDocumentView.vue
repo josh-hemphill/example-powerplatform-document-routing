@@ -30,7 +30,7 @@ const documentNumber = computed(() => String(route.params.documentNumber));
 const actionError = ref<string | null>(null);
 
 const { data: typesData } = useQuery(() => listDocumentTypesQuery());
-const { typeLabel } = useDocumentTypeLabel(() => typesData.value?.items);
+const { typeAndSubtypeLabel } = useDocumentTypeLabel(() => typesData.value?.items);
 
 const { data: document, isPending, error, refetch } = useQuery(() =>
 	getDocumentByNumberQuery({
@@ -134,7 +134,7 @@ async function onSupersede(): Promise<void> {
 							{{ document.title }}
 						</h1>
 						<div class="text-body-2 text-medium-emphasis">
-							{{ typeLabel(document.documentType) }} · Published
+							{{ typeAndSubtypeLabel(document.documentType, document.documentSubtypeId) }} · Published
 							{{ document.publishedAt ? new Date(document.publishedAt).toLocaleString() : '—' }}
 						</div>
 					</div>

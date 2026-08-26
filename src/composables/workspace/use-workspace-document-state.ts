@@ -59,7 +59,17 @@ export function useWorkspaceDocumentState(documentId: Ref<string>) {
 		const type = typesData.value?.items?.find(
 			(item) => item.id === document.value?.documentType,
 		);
-		return type?.approvalChain ?? [];
+		if (!type) {
+			return [];
+		}
+		const subtypeId = document.value?.documentSubtypeId;
+		const subtype = type.subtypes?.find(
+			(item) => item.id === subtypeId || item.key === subtypeId,
+		);
+		if (subtype?.usesOwnChain && subtype.approvalChain && subtype.approvalChain.length > 0) {
+			return subtype.approvalChain;
+		}
+		return type.approvalChain ?? [];
 	});
 
 	const destinationItems = computed(() =>

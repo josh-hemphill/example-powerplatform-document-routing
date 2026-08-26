@@ -1,12 +1,13 @@
 import type { SharePointDefaults } from '@/config/app.config';
 import { appConfig } from '@/config/app.config';
-import { getDocumentType } from '@/config/document-types';
+import { findDocumentSubtype, getDocumentType } from '@/config/document-types';
 
 export interface PublishableDocument {
 	id: string;
 	title: string;
 	status?: string;
 	documentType?: string | null;
+	documentSubtypeId?: string | null;
 	freeformRequest: string;
 	draftBodyMarkdown?: string | null;
 	draftSummary?: string | null;
@@ -63,6 +64,8 @@ export function resolvePublishTargets(
  */
 export function renderDocumentHtml(document: PublishableDocument): string {
 	const type = getDocumentType(document.documentType);
+	const subtype = findDocumentSubtype(document.documentType, document.documentSubtypeId);
+	const typeLine = subtype ? `${type.label} · ${subtype.label}` : type.label;
 	const body = document.draftBodyMarkdown ?? document.freeformRequest;
 	const summary = document.draftSummary
 		? `<p class="summary">${escapeHtml(document.draftSummary)}</p>`
@@ -94,7 +97,7 @@ export function renderDocumentHtml(document: PublishableDocument): string {
   </style>
 </head>
 <body>
-  <div class="eyebrow">${escapeHtml(type.label)} · ${escapeHtml(appConfig.brand.name)}</div>
+  <div class="eyebrow">${escapeHtml(typeLine)} · ${escapeHtml(appConfig.brand.name)}</div>
   <h1>${escapeHtml(document.title)}</h1>
   <div class="meta">
     Requester: ${escapeHtml(document.requesterEmail)}
