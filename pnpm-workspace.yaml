@@ -3,3 +3,5 @@ allowBuilds:
   '@azure/msal-node-runtime': true
   '@parcel/watcher': true
   keytar: true
+minimumReleaseAgeExclude:
+  - vuetify@4.1.12
