@@ -103,6 +103,10 @@ describe('a11y smoke landmarks', () => {
 				<section aria-label="Document type editor">
 					<button type="button">Save document type</button>
 				</section>
+				<section aria-labelledby="review-feedback-heading">
+					<h2 id="review-feedback-heading">Review feedback</h2>
+					<p role="status">Need manager attestation language before approval</p>
+				</section>
 				<section aria-label="Published reader sample">
 					<h2>POL-2026-00001 · Travel policy</h2>
 					<p>Controlled published final — content is read-only.</p>

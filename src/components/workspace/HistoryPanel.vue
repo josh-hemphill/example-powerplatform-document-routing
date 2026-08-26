@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { HistoryEvent } from '@/client/types.gen';
+import { historyActionLabel } from '@/domain/history-actions';
 
 defineProps<{
 	history: HistoryEvent[];
@@ -36,7 +37,7 @@ defineProps<{
 					{{ new Date(event.at).toLocaleString() }}
 				</div>
 				<div class="font-weight-medium">
-					{{ event.action }}
+					{{ historyActionLabel(event.action) }}
 				</div>
 				<div class="text-body-2">
 					{{ event.message }}

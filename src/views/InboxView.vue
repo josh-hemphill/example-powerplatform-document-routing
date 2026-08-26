@@ -6,8 +6,9 @@ import { computed, onUnmounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import { useDisplay } from 'vuetify';
 import { getApiErrorMessage } from '@/api/api-error';
-import { listDocumentsQuery, listDocumentTypesQuery } from '@/client/@pinia/colada.gen';
+import { listDocumentsQuery, listDocumentTypesQuery, listPriorityLevelsQuery } from '@/client/@pinia/colada.gen';
 import DocumentStatusChip from '@/components/DocumentStatusChip.vue';
+import PriorityChip from '@/components/PriorityChip.vue';
 import { useDocumentTypeLabel } from '@/composables/use-document-type-label';
 import { usePowerAppsContext } from '@/composables/use-power-apps-context';
 import {
@@ -16,6 +17,7 @@ import {
 	suggestInboxPersona,
 } from '@/config/inbox-personas';
 import { DOCUMENT_STATUS_LABELS } from '@/domain/document-status';
+import { inboxReviewSecondaryLine } from '@/domain/review-comments';
 import { useIdentityStore } from '@/stores/identity';
 
 const { mdAndUp } = useDisplay();
@@ -64,6 +66,7 @@ const statusFilterItems = computed(() => [
 ]);
 
 const { data: typesData } = useQuery(() => listDocumentTypesQuery());
+const { data: priorityData } = useQuery(() => listPriorityLevelsQuery());
 const typeSelectItems = computed(() => [
 	{ title: 'All types', value: null as string | null },
 	...(typesData.value?.items ?? []).map((item) => ({
@@ -71,7 +74,7 @@ const typeSelectItems = computed(() => [
 		value: item.id,
 	})),
 ]);
-const { typeLabel } = useDocumentTypeLabel(() => typesData.value?.items);
+const { typeAndSubtypeLabel } = useDocumentTypeLabel(() => typesData.value?.items);
 
 const queryInput = computed(() => ({
 	query: {
@@ -320,6 +323,12 @@ watch(
 											{{ item.title }}
 										</span>
 										<span
+											v-if="inboxReviewSecondaryLine(item)"
+											class="text-caption text-medium-emphasis d-block"
+										>
+											{{ inboxReviewSecondaryLine(item) }}
+										</span>
+										<span
 											v-if="item.currentStepStatus === 'queued'"
 											class="text-caption text-medium-emphasis d-block"
 										>
@@ -337,9 +346,15 @@ watch(
 										</span>
 									</RouterLink>
 								</td>
-								<td>{{ typeLabel(item.documentType) }}</td>
+								<td>{{ typeAndSubtypeLabel(item.documentType, item.documentSubtypeId) }}</td>
 								<td>
-									<DocumentStatusChip :status="item.status" />
+									<div class="d-flex flex-wrap align-center ga-2">
+										<DocumentStatusChip :status="item.status" />
+										<PriorityChip
+											:priority-key="item.priority"
+											:catalog="priorityData?.items ?? []"
+										/>
+									</div>
 								</td>
 								<td>{{ item.requesterEmail }}</td>
 								<td>{{ formatDate(item.updatedAt) }}</td>
@@ -394,13 +409,23 @@ watch(
 							</RouterLink>
 							<div class="d-flex flex-wrap align-center ga-2 mb-2">
 								<DocumentStatusChip :status="item.status" />
+								<PriorityChip
+									:priority-key="item.priority"
+									:catalog="priorityData?.items ?? []"
+								/>
 								<span class="text-caption text-medium-emphasis">
-									{{ typeLabel(item.documentType) }}
+									{{ typeAndSubtypeLabel(item.documentType, item.documentSubtypeId) }}
 								</span>
 							</div>
 							<div class="text-caption text-medium-emphasis">
 								{{ item.requesterEmail }}
 								· {{ formatDate(item.updatedAt) }}
+							</div>
+							<div
+								v-if="inboxReviewSecondaryLine(item)"
+								class="text-caption text-medium-emphasis mt-1"
+							>
+								{{ inboxReviewSecondaryLine(item) }}
 							</div>
 							<div
 								v-if="item.currentStepStatus === 'queued'"
@@ -438,13 +463,23 @@ watch(
 						</RouterLink>
 						<div class="d-flex flex-wrap align-center ga-2 mb-2">
 							<DocumentStatusChip :status="item.status" />
+							<PriorityChip
+								:priority-key="item.priority"
+								:catalog="priorityData?.items ?? []"
+							/>
 							<span class="text-caption text-medium-emphasis">
-								{{ typeLabel(item.documentType) }}
+								{{ typeAndSubtypeLabel(item.documentType, item.documentSubtypeId) }}
 							</span>
 						</div>
 						<div class="text-caption text-medium-emphasis">
 							{{ item.requesterEmail }}
 							· {{ formatDate(item.updatedAt) }}
+						</div>
+						<div
+							v-if="inboxReviewSecondaryLine(item)"
+							class="text-caption text-medium-emphasis mt-1"
+						>
+							{{ inboxReviewSecondaryLine(item) }}
 						</div>
 						<div
 							v-if="item.currentStepStatus === 'queued'"
