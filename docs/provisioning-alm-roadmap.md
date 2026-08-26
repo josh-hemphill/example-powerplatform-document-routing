@@ -5,7 +5,7 @@ Plan to close the gaps between today’s **generate → optional Web API apply**
 **Status:** Phases 18–22 implemented.  
 **Context:** Shared-env ALM path is complete: publisher/solution scaffolding, connection refs + env vars, security role templates, prefix-aware flows/seed, and SHARED_ENV + CI validation.
 
-**Preceding app roadmaps:** [`remediation-roadmap.md`](./remediation-roadmap.md) (0–8), [`post-phase-8-review-roadmap.md`](./post-phase-8-review-roadmap.md) (9–13), [`post-phase-13-review-roadmap.md`](./post-phase-13-review-roadmap.md) (14–17).
+**Preceding app roadmaps:** [`remediation-roadmap.md`](./remediation-roadmap.md) (0–8), [`post-phase-8-review-roadmap.md`](./post-phase-8-review-roadmap.md) (9–13), [`post-phase-13-review-roadmap.md`](./post-phase-13-review-roadmap.md) (14–17). **Next product:** [`review-feedback-and-control-data-roadmap.md`](./review-feedback-and-control-data-roadmap.md) (23–27).
 
 **Suggested order:** Phase 18 → 19 → 20 → 21 → 22. Phase 21 (roles) can overlap with 20 after solution scaffolding exists; Phase 22 (flows packaging) trails schema + solution membership.
 

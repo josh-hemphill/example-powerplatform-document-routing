@@ -8,7 +8,7 @@ Findings from the August 2026 **fresh** codebase review (bugs, performance, UI/U
 
 **Status:** Phases **14–17** implemented (see stacked PRs).
 
-**Preceding roadmap:** [`post-phase-8-review-roadmap.md`](./post-phase-8-review-roadmap.md) (Phases 9–13). Historical Phases 0–8: [`remediation-roadmap.md`](./remediation-roadmap.md).
+**Preceding roadmap:** [`post-phase-8-review-roadmap.md`](./post-phase-8-review-roadmap.md) (Phases 9–13). Historical Phases 0–8: [`remediation-roadmap.md`](./remediation-roadmap.md). **Following product roadmap:** [`review-feedback-and-control-data-roadmap.md`](./review-feedback-and-control-data-roadmap.md) (Phases 23–27).
 
 ---
 
