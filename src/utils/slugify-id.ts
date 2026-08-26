@@ -32,3 +32,20 @@ export function uniqueSlugId(
 	}
 	return `${base}-${index}`;
 }
+
+/**
+ * Human label whose slug is unique among existing keys (e.g. approver pool names).
+ */
+export function uniqueLabel(
+	baseLabel: string,
+	existingKeys: Iterable<string>,
+	fallback = 'item',
+): string {
+	const slug = uniqueSlugId(baseLabel, existingKeys, fallback);
+	const base = slugifyId(baseLabel, fallback);
+	if (slug === base) {
+		return baseLabel;
+	}
+	const suffix = slug.slice(base.length + 1);
+	return `${baseLabel} ${suffix}`;
+}

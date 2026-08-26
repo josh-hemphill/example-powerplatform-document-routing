@@ -108,6 +108,9 @@ async function createDestination(): Promise<void> {
 		if (!ok) {
 			return;
 		}
+		// Confirmed discard — clear dirty before selecting the new destination or
+		// the selection guard would prompt a second time on selectedId assignment.
+		markClean();
 	}
 	try {
 		const created = await createAsync({

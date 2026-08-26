@@ -152,6 +152,9 @@ async function createType(): Promise<void> {
 		if (!ok) {
 			return;
 		}
+		// Confirmed discard — clear dirty before selecting the new type or the
+		// selection guard would prompt a second time on selectedId assignment.
+		markClean();
 	}
 	const id = uniqueSlugId('New document type', types.value.map((type) => type.id), 'type');
 	const seedPool = pools.value[0];

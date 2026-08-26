@@ -17,6 +17,7 @@ import { useAdminDirtyForm } from '@/composables/use-admin-dirty-form';
 import { useAdminSelectionGuard } from '@/composables/use-admin-selection-guard';
 import { useConfirmDialog } from '@/composables/use-confirm-dialog';
 import { useIdentityStore } from '@/stores/identity';
+import { uniqueLabel } from '@/utils/slugify-id';
 
 defineProps<{
 	canAct: boolean;
@@ -110,13 +111,21 @@ async function createPool(): Promise<void> {
 		if (!ok) {
 			return;
 		}
+		// Confirmed discard — clear dirty before selecting the new pool or the
+		// selection guard would prompt a second time on selectedId assignment.
+		markClean();
 	}
 	const email = identity.email?.trim() || 'admin@example.com';
 	const displayName = identity.userName?.trim() || email;
+	const name = uniqueLabel(
+		'New approver pool',
+		pools.value.map((pool) => pool.key),
+		'pool',
+	);
 	try {
 		const created = await createAsync({
 			body: {
-				name: 'New approver pool',
+				name,
 				description: '',
 				members: [{ email, displayName, role: 'Approver' }],
 			},
