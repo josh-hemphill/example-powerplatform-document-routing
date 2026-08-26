@@ -16,6 +16,7 @@ import { useAdminDirtyForm } from '@/composables/use-admin-dirty-form';
 import { useAdminSelectionGuard } from '@/composables/use-admin-selection-guard';
 import { useConfirmDialog } from '@/composables/use-confirm-dialog';
 import { appConfig } from '@/config/app.config';
+import { uniqueLabel } from '@/utils/slugify-id';
 
 defineProps<{
 	canAct: boolean;
@@ -108,20 +109,24 @@ async function createDestination(): Promise<void> {
 		if (!ok) {
 			return;
 		}
-		// Confirmed discard — clear dirty before selecting the new destination or
-		// the selection guard would prompt a second time on selectedId assignment.
-		markClean();
 	}
+	const name = uniqueLabel(
+		'New publish destination',
+		destinations.value.map((destination) => destination.name),
+		'destination',
+	);
 	try {
 		const created = await createAsync({
 			body: {
-				name: 'New publish destination',
+				name,
 				siteUrl: appConfig.sharePoint.siteUrl,
 				libraryName: appConfig.sharePoint.libraryName,
 				folderPath: appConfig.sharePoint.folderPath,
 				active: true,
 			},
 		});
+		// Mark clean only after create succeeds so a failed create keeps edits dirty.
+		markClean();
 		selectedId.value = created.id;
 		emit('success', 'Publish destination created. Update the fields and save.');
 	}

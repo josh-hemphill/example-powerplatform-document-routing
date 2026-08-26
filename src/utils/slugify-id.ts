@@ -12,7 +12,7 @@ export function slugifyId(value: string, fallback = 'item'): string {
 }
 
 /**
- * Ensure a candidate id is unique among existing ids.
+ * Ensure a candidate id is unique among existing ids (ids/labels are slug-normalized).
  */
 export function uniqueSlugId(
 	label: string,
@@ -20,7 +20,7 @@ export function uniqueSlugId(
 	fallback = 'item',
 ): string {
 	const taken = new Set(
-		[...existingIds].map((id) => id.trim().toLowerCase()),
+		[...existingIds].map((id) => slugifyId(id, fallback)),
 	);
 	const base = slugifyId(label, fallback);
 	if (!taken.has(base)) {
@@ -34,7 +34,7 @@ export function uniqueSlugId(
 }
 
 /**
- * Human label whose slug is unique among existing keys (e.g. approver pool names).
+ * Human label whose slug is unique among existing keys/labels (e.g. pool names).
  */
 export function uniqueLabel(
 	baseLabel: string,
@@ -48,4 +48,29 @@ export function uniqueLabel(
 	}
 	const suffix = slug.slice(base.length + 1);
 	return `${baseLabel} ${suffix}`;
+}
+
+/**
+ * Short uppercase document-number prefix unique among existing prefixes.
+ */
+export function uniqueNumberPrefix(
+	seed: string,
+	existingPrefixes: Iterable<string>,
+	fallback = 'TYP',
+): string {
+	const taken = new Set(
+		[...existingPrefixes]
+			.map((prefix) => prefix.trim().toUpperCase())
+			.filter(Boolean),
+	);
+	const compact = seed.replace(/[^a-z0-9]/gi, '').toUpperCase();
+	const base = (compact.slice(0, 3) || fallback).toUpperCase();
+	if (!taken.has(base)) {
+		return base;
+	}
+	let index = 2;
+	while (taken.has(`${base}${index}`)) {
+		index += 1;
+	}
+	return `${base}${index}`;
 }
