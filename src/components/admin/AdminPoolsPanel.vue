@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryCache } from '@pinia/colada';
 import { computed, reactive, watch } from 'vue';
 import { getApiErrorMessage } from '@/api/api-error';
 import {
+	createApproverPoolMutation,
 	listApproverPoolsQuery,
 	listApproverPoolsQueryKey,
 	listDocumentTypesQueryKey,
@@ -14,6 +15,9 @@ import AdminStickySave from '@/components/admin/AdminStickySave.vue';
 import PoolMembersEditor from '@/components/admin/PoolMembersEditor.vue';
 import { useAdminDirtyForm } from '@/composables/use-admin-dirty-form';
 import { useAdminSelectionGuard } from '@/composables/use-admin-selection-guard';
+import { useConfirmDialog } from '@/composables/use-confirm-dialog';
+import { useIdentityStore } from '@/stores/identity';
+import { uniqueLabel } from '@/utils/slugify-id';
 
 defineProps<{
 	canAct: boolean;
@@ -26,6 +30,8 @@ const emit = defineEmits<{
 
 const dirtyModel = defineModel<boolean>('dirty', { required: true });
 const queryCache = useQueryCache();
+const { confirm } = useConfirmDialog();
+const identity = useIdentityStore();
 
 const { data: poolsData, isPending: poolsLoading } = useQuery(() => listApproverPoolsQuery());
 const pools = computed(() => poolsData.value?.items ?? []);
@@ -85,6 +91,53 @@ const { mutateAsync: saveAsync, isLoading: saving } = useMutation({
 	},
 });
 
+const { mutateAsync: createAsync, isLoading: creating } = useMutation({
+	...createApproverPoolMutation(),
+	async onSettled() {
+		await invalidateControl();
+	},
+});
+
+async function createPool(): Promise<void> {
+	emit('error', null);
+	emit('success', null);
+	if (dirty.value) {
+		const ok = await confirm({
+			title: 'Discard unsaved pool changes?',
+			message: 'Creating a new pool will lose edits that have not been saved.',
+			confirmText: 'Discard',
+			color: 'warning',
+		});
+		if (!ok) {
+			return;
+		}
+		// Confirmed discard — clear dirty before selecting the new pool or the
+		// selection guard would prompt a second time on selectedId assignment.
+		markClean();
+	}
+	const email = identity.email?.trim() || 'admin@example.com';
+	const displayName = identity.userName?.trim() || email;
+	const name = uniqueLabel(
+		'New approver pool',
+		pools.value.map((pool) => pool.key),
+		'pool',
+	);
+	try {
+		const created = await createAsync({
+			body: {
+				name,
+				description: '',
+				members: [{ email, displayName, role: 'Approver' }],
+			},
+		});
+		selectedId.value = created.id;
+		emit('success', 'Approver pool created. Update members and save.');
+	}
+	catch(error) {
+		emit('error', getApiErrorMessage(error, 'Failed to create pool'));
+	}
+}
+
 async function save(): Promise<void> {
 	emit('error', null);
 	emit('success', null);
@@ -114,14 +167,27 @@ async function save(): Promise<void> {
 		class="pa-4 pb-16"
 		:loading="poolsLoading"
 	>
-		<v-select
-			v-model="selectedId"
-			:items="pools"
-			item-title="name"
-			item-value="id"
-			label="Approver pool"
-			class="mb-3"
-		/>
+		<div class="d-flex align-end flex-wrap ga-2 mb-3">
+			<v-select
+				v-model="selectedId"
+				:items="pools"
+				item-title="name"
+				item-value="id"
+				label="Approver pool"
+				class="flex-grow-1"
+				style="min-width: 12rem"
+			/>
+			<v-btn
+				color="primary"
+				variant="tonal"
+				prepend-icon="$plus"
+				:disabled="!canAct"
+				:loading="creating"
+				@click="createPool"
+			>
+				New pool
+			</v-btn>
+		</div>
 		<v-text-field v-model="form.name" label="Name" class="mb-2" />
 		<v-text-field v-model="form.description" label="Description" class="mb-4" />
 		<PoolMembersEditor

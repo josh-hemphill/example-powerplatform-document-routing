@@ -144,6 +144,56 @@ describe('identity store', () => {
 		expect(fetchPrincipal).not.toHaveBeenCalled();
 	});
 
+	it('falls back to demo identity when host context has no UPN in DEV', async() => {
+		getContext.mockResolvedValue({
+			user: { fullName: 'Incomplete Host' },
+			app: { environmentId: 'env-1' },
+		});
+
+		const store = useIdentityStore();
+		await store.ensureLoaded();
+
+		expect(store.status).toBe('standalone');
+		expect(store.email).toBeTruthy();
+		expect(store.hasRole('admin')).toBe(true);
+		expect(fetchPrincipal).not.toHaveBeenCalled();
+	});
+
+	it('applies local persona roles in DEV when hosted principal lookup fails', async() => {
+		getContext.mockResolvedValue({
+			user: {
+				userPrincipalName: 'developer@example.com',
+				fullName: 'Local Developer',
+			},
+			app: { environmentId: 'env-1' },
+		});
+		fetchPrincipal.mockRejectedValue(new Error('network blocked'));
+
+		const store = useIdentityStore();
+		await store.ensureLoaded();
+
+		expect(store.status).toBe('hosted');
+		expect(store.email).toBe('developer@example.com');
+		expect(store.hasRole('admin')).toBe(true);
+		expect(store.rolesUnresolved).toBe(false);
+	});
+
+	it('fails closed when host context has no UPN and DEV fallback is off', async() => {
+		vi.stubEnv('DEV', false);
+		getContext.mockResolvedValue({
+			user: { fullName: 'Incomplete Host' },
+			app: { environmentId: 'env-1' },
+		});
+
+		const store = useIdentityStore();
+		await store.ensureLoaded();
+
+		expect(store.status).toBe('failed');
+		expect(store.error).toMatch(/user principal/i);
+		expect(store.identity.email).toBeUndefined();
+		vi.unstubAllEnvs();
+	});
+
 	it('does not install demo identity on timeout when DEV fallback is off', async() => {
 		vi.stubEnv('DEV', false);
 		vi.useFakeTimers();

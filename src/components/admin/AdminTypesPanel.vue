@@ -8,6 +8,7 @@ import { useMutation, useQuery, useQueryCache } from '@pinia/colada';
 import { computed, reactive, watch } from 'vue';
 import { getApiErrorMessage } from '@/api/api-error';
 import {
+	createDocumentTypeMutation,
 	listApproverPoolsQuery,
 	listApproverPoolsQueryKey,
 	listDocumentTypesQuery,
@@ -20,6 +21,9 @@ import AdminStickySave from '@/components/admin/AdminStickySave.vue';
 import ApprovalChainEditor from '@/components/admin/ApprovalChainEditor.vue';
 import { useAdminDirtyForm } from '@/composables/use-admin-dirty-form';
 import { useAdminSelectionGuard } from '@/composables/use-admin-selection-guard';
+import { useConfirmDialog } from '@/composables/use-confirm-dialog';
+import { appConfig } from '@/config/app.config';
+import { uniqueSlugId } from '@/utils/slugify-id';
 
 defineProps<{
 	canAct: boolean;
@@ -32,6 +36,7 @@ const emit = defineEmits<{
 
 const dirtyModel = defineModel<boolean>('dirty', { required: true });
 const queryCache = useQueryCache();
+const { confirm } = useConfirmDialog();
 
 const { data: typesData, isPending: typesLoading } = useQuery(() => listDocumentTypesQuery());
 const { data: poolsData } = useQuery(() => listApproverPoolsQuery());
@@ -127,6 +132,76 @@ const { mutateAsync: saveAsync, isLoading: saving } = useMutation({
 	},
 });
 
+const { mutateAsync: createAsync, isLoading: creating } = useMutation({
+	...createDocumentTypeMutation(),
+	async onSettled() {
+		await invalidateControl();
+	},
+});
+
+async function createType(): Promise<void> {
+	emit('error', null);
+	emit('success', null);
+	if (dirty.value) {
+		const ok = await confirm({
+			title: 'Discard unsaved document type changes?',
+			message: 'Creating a new type will lose edits that have not been saved.',
+			confirmText: 'Discard',
+			color: 'warning',
+		});
+		if (!ok) {
+			return;
+		}
+		// Confirmed discard — clear dirty before selecting the new type or the
+		// selection guard would prompt a second time on selectedId assignment.
+		markClean();
+	}
+	const id = uniqueSlugId('New document type', types.value.map((type) => type.id), 'type');
+	const seedPool = pools.value[0];
+	const approvalChain: ControlChainStep[] = seedPool
+		? [{
+				order: 1,
+				role: 'Approver',
+				assignmentMode: 'pool',
+				poolKey: seedPool.key,
+				slaHours: 48,
+			}]
+		: [{
+				order: 1,
+				role: 'Approver',
+				assignmentMode: 'named',
+				assignee: {
+					email: 'approver@example.com',
+					displayName: 'Approver',
+				},
+				slaHours: 48,
+			}];
+	try {
+		const created = await createAsync({
+			body: {
+				id,
+				label: 'New document type',
+				description: '',
+				requestHint: 'Describe what you need.',
+				draftTemplate: '# Title\n\n## Purpose\n\n',
+				folderPath: appConfig.sharePoint.folderPath,
+				authorTeamEmails: [],
+				active: true,
+				defaultDestinationId: destinations.value[0]?.id ?? null,
+				numberPrefix: id.slice(0, 3).toUpperCase(),
+				numberPattern: '{prefix}-{yyyy}-{seq:5}',
+				nextSequence: 1,
+				approvalChain,
+			},
+		});
+		selectedId.value = created.id;
+		emit('success', 'Document type created. Update the fields and save.');
+	}
+	catch(error) {
+		emit('error', getApiErrorMessage(error, 'Failed to create type'));
+	}
+}
+
 async function save(): Promise<void> {
 	emit('error', null);
 	emit('success', null);
@@ -176,14 +251,27 @@ async function save(): Promise<void> {
 		class="pa-4 pb-16"
 		:loading="typesLoading"
 	>
-		<v-select
-			v-model="selectedId"
-			:items="types"
-			item-title="label"
-			item-value="id"
-			label="Document type"
-			class="mb-3"
-		/>
+		<div class="d-flex align-end flex-wrap ga-2 mb-3">
+			<v-select
+				v-model="selectedId"
+				:items="types"
+				item-title="label"
+				item-value="id"
+				label="Document type"
+				class="flex-grow-1"
+				style="min-width: 12rem"
+			/>
+			<v-btn
+				color="primary"
+				variant="tonal"
+				prepend-icon="$plus"
+				:disabled="!canAct"
+				:loading="creating"
+				@click="createType"
+			>
+				New type
+			</v-btn>
+		</div>
 		<v-text-field v-model="form.label" label="Label" class="mb-2" />
 		<v-text-field v-model="form.description" label="Description" class="mb-2" />
 		<v-text-field v-model="form.requestHint" label="Request hint" class="mb-2" />

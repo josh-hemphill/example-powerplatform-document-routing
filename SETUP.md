@@ -67,9 +67,20 @@ cp .env.example .env.local
 # VITE_LOCAL_DEMO_ROLES=user,author,approver,publisher,admin
 ```
 
-`VITE_LOCAL_DEMO_*` is ignored when the app is hosted in Power Apps. Without `admin` in `VITE_LOCAL_DEMO_ROLES`, `#/admin` stays hidden and returns you to Inbox.
+Restart `pnpm dev` after creating or editing `.env.local` (Vite only loads env files at startup).
+
+`VITE_LOCAL_DEMO_*` drives standalone Vite play and mock seeds. Without `admin` in `VITE_LOCAL_DEMO_ROLES`, `#/admin` stays hidden and returns you to Inbox.
+
+**Power Apps Local Play** (the Dev link URL printed by `@microsoft/power-apps-vite`):
+
+1. Run `pa app init` / ensure `power.config.json` exists so the Local Play URL is printed.
+2. Open Local Play in the **same browser profile** signed into your Power Platform tenant.
+3. Set `VITE_LOCAL_DEMO_EMAIL` to that **same Power Apps sign-in UPN** so mock seeds, author teams, and Admin roles line up with the host user.
+4. If host context has no UPN (or `/api/principal` is blocked), DEV falls back to the primary local persona from `VITE_LOCAL_DEMO_*`.
 
 In standalone Vite, missing/slow Power Apps host context falls back to the local demo persona (DEV only). Production builds never install that fallback on host timeout. The same `VITE_LOCAL_DEMO_EMAIL` is used for mock seeds and bundled document-type `authorTeamEmails` (co-edit / needs-draft collaborators).
+
+Vue DevTools loads automatically with `pnpm dev` (via `vite-plugin-vue-devtools`).
 
 ## 3. Document types, pools, destinations
 

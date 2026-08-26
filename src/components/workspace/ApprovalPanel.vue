@@ -21,6 +21,7 @@ defineProps<{
 	isProcessingSla: boolean;
 	isWithdrawing: boolean;
 	expanded: boolean;
+	isPrimary?: boolean;
 }>();
 const emit = defineEmits<{
 	submit: [];
@@ -53,7 +54,10 @@ function hasSteps(steps: ApprovalStep[]): boolean {
 </script>
 
 <template>
-	<v-card class="pa-4 mb-4">
+	<v-card
+		class="pa-4 mb-4 stage-card"
+		:class="{ 'stage-card--primary': isPrimary && !expanded }"
+	>
 		<div class="d-flex align-center justify-space-between ga-2 mb-3">
 			<button
 				type="button"
@@ -63,20 +67,38 @@ function hasSteps(steps: ApprovalStep[]): boolean {
 			>
 				3. Approval chain
 			</button>
-			<v-btn
-				variant="text"
-				size="small"
-				:icon="expanded ? '$chevronUp' : '$chevronDown'"
-				:aria-label="expanded ? 'Collapse approval' : 'Expand approval'"
-				:aria-expanded="expanded"
-				@click="emit('toggle')"
-			/>
+			<div class="d-flex align-center ga-2">
+				<v-chip
+					v-if="!expanded && isPrimary"
+					size="small"
+					color="primary"
+					variant="tonal"
+				>
+					Open to continue
+				</v-chip>
+				<v-btn
+					variant="text"
+					size="small"
+					:icon="expanded ? '$chevronUp' : '$chevronDown'"
+					:aria-label="expanded ? 'Collapse approval' : 'Expand approval'"
+					:aria-expanded="expanded"
+					@click="emit('toggle')"
+				/>
+			</div>
 		</div>
 		<p
 			v-if="!expanded"
 			class="text-body-2 text-medium-emphasis mb-0"
 		>
-			{{ hasSteps(document.approvalSteps) ? `${document.approvalSteps.length} steps · ${DOCUMENT_STATUS_LABELS[document.status]}` : 'Not submitted yet' }}
+			{{
+				isPrimary
+					? (hasSteps(document.approvalSteps)
+						? 'Open this section to claim, approve, or reject.'
+						: 'Open this section to submit for approval.')
+					: (hasSteps(document.approvalSteps)
+						? `${document.approvalSteps.length} steps · ${DOCUMENT_STATUS_LABELS[document.status]}`
+						: 'Not submitted yet')
+			}}
 		</p>
 		<v-expand-transition>
 			<div v-if="expanded">
