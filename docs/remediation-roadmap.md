@@ -7,7 +7,8 @@ This is intentional scaffolding evolution for an example Code App — not a rewr
 > **Phases 0–8 status:** Implemented on `main`.  
 > **Post–Phase 8:** Phases **9–13** implemented (identity/authz → workflow concurrency → approval UX → nav/responsive → admin/a11y). See [`post-phase-8-review-roadmap.md`](./post-phase-8-review-roadmap.md).  
 > **Post–Phase 13:** Phases **14–17** implemented (dirty-state/races → AuthZ fidelity → list performance → UI/a11y polish). See [`post-phase-13-review-roadmap.md`](./post-phase-13-review-roadmap.md).  
-> **Next (deploy):** [`provisioning-alm-roadmap.md`](./provisioning-alm-roadmap.md) (Phases 18–22: publisher/solution ALM → connection refs → security roles → prefix-aware flows → shared-env CI).
+> **Next (deploy):** [`provisioning-alm-roadmap.md`](./provisioning-alm-roadmap.md) (Phases 18–22: publisher/solution ALM → connection refs → security roles → prefix-aware flows → shared-env CI).  
+> **Next (product):** [`review-feedback-and-control-data-roadmap.md`](./review-feedback-and-control-data-roadmap.md) (Phases 23–27: durable review comments, Review Feedback panel, configurable priorities / mission-critical reasons, subtypes; Typst Doc Studio is horizon-only).
 
 ---
 
