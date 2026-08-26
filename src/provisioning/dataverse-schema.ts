@@ -91,6 +91,11 @@ function buildChoiceSets(optionValuePrefix: number): {
 	assignmentModes: DataverseChoiceOption[];
 	elevationSemantics: DataverseChoiceOption[];
 	chainStepModes: DataverseChoiceOption[];
+	authorityLevels: DataverseChoiceOption[];
+	commentPolicies: DataverseChoiceOption[];
+	reviewCommentKinds: DataverseChoiceOption[];
+	reviewCommentStatuses: DataverseChoiceOption[];
+	priorityColors: DataverseChoiceOption[];
 } {
 	return {
 		documentStatuses: choiceOptionsFromPrefix(optionValuePrefix, [
@@ -106,6 +111,7 @@ function buildChoiceSets(optionValuePrefix: number): {
 			{ offset: 10, label: 'low' },
 			{ offset: 11, label: 'normal' },
 			{ offset: 12, label: 'high' },
+			{ offset: 13, label: 'mission_critical' },
 		]),
 		stepStatuses: choiceOptionsFromPrefix(optionValuePrefix, [
 			{ offset: 20, label: 'waiting' },
@@ -127,6 +133,34 @@ function buildChoiceSets(optionValuePrefix: number): {
 			{ offset: 50, label: 'named' },
 			{ offset: 51, label: 'pool' },
 		]),
+		authorityLevels: choiceOptionsFromPrefix(optionValuePrefix, [
+			{ offset: 60, label: 'advisory' },
+			{ offset: 61, label: 'standard' },
+			{ offset: 62, label: 'authoritative' },
+		]),
+		commentPolicies: choiceOptionsFromPrefix(optionValuePrefix, [
+			{ offset: 70, label: 'optional' },
+			{ offset: 71, label: 'required_on_reject' },
+			{ offset: 72, label: 'required_on_decision' },
+		]),
+		reviewCommentKinds: choiceOptionsFromPrefix(optionValuePrefix, [
+			{ offset: 80, label: 'decision' },
+			{ offset: 81, label: 'submission' },
+			{ offset: 82, label: 'author_response' },
+			{ offset: 83, label: 'acknowledgement' },
+		]),
+		reviewCommentStatuses: choiceOptionsFromPrefix(optionValuePrefix, [
+			{ offset: 90, label: 'open' },
+			{ offset: 91, label: 'addressed' },
+			{ offset: 92, label: 'acknowledged' },
+			{ offset: 93, label: 'voided' },
+		]),
+		priorityColors: choiceOptionsFromPrefix(optionValuePrefix, [
+			{ offset: 100, label: 'default' },
+			{ offset: 101, label: 'info' },
+			{ offset: 102, label: 'warning' },
+			{ offset: 103, label: 'error' },
+		]),
 	};
 }
 
@@ -140,11 +174,15 @@ export function buildDataverseSchema(
 	const p = prefix.toLowerCase();
 	const {
 		documentStatuses,
-		priorities,
 		stepStatuses,
 		assignmentModes,
 		elevationSemantics,
 		chainStepModes,
+		authorityLevels,
+		commentPolicies,
+		reviewCommentKinds,
+		reviewCommentStatuses,
+		priorityColors,
 	} = buildChoiceSets(optionValuePrefix);
 
 	const tables: DataverseTableDefinition[] = [
@@ -452,6 +490,29 @@ export function buildDataverseSchema(
 					type: 'choice',
 					options: elevationSemantics,
 				},
+				{
+					schemaName: 'authoritylevel',
+					displayName: 'Authority Level',
+					description: 'Frozen onto runtime steps and review comments at submit',
+					type: 'choice',
+					required: true,
+					options: authorityLevels,
+				},
+				{
+					schemaName: 'commentpolicy',
+					displayName: 'Comment Policy',
+					description: 'When a decision comment is required (enforced server-side)',
+					type: 'choice',
+					required: true,
+					options: commentPolicies,
+				},
+				{
+					schemaName: 'documentsubtype',
+					displayName: 'Document Subtype',
+					description: 'When set, this template step belongs to a subtype-owned chain',
+					type: 'lookup',
+					targetTable: 'documentsubtype',
+				},
 			],
 		},
 		{
@@ -531,8 +592,30 @@ export function buildDataverseSchema(
 				{
 					schemaName: 'priority',
 					displayName: 'Priority',
-					type: 'choice',
-					options: priorities,
+					description:
+						'Catalog key matching prioritylevel.key (string, not a closed choice). Existing orgs with a choice column should dual-read until migrated.',
+					type: 'string',
+					maxLength: 64,
+				},
+				{
+					schemaName: 'priorityreason',
+					displayName: 'Priority Reason',
+					description: 'Required when the catalog row requiresReason (e.g. mission_critical)',
+					type: 'memo',
+					maxLength: 10_000,
+				},
+				{
+					schemaName: 'documentsubtypeid',
+					displayName: 'Document Subtype Id',
+					description: 'Stable subtype key (mirrors documentsubtype.key)',
+					type: 'string',
+					maxLength: 100,
+				},
+				{
+					schemaName: 'typedocumentsubtype',
+					displayName: 'Document Subtype',
+					type: 'lookup',
+					targetTable: 'documentsubtype',
 				},
 				{
 					schemaName: 'requesteremail',
@@ -827,6 +910,26 @@ export function buildDataverseSchema(
 					displayName: 'Decided At',
 					type: 'datetime',
 				},
+				{
+					schemaName: 'submittedrevision',
+					displayName: 'Submitted Content Revision',
+					description: 'Document contentRevision frozen at submit for this step',
+					type: 'integer',
+				},
+				{
+					schemaName: 'authoritylevel',
+					displayName: 'Authority Level',
+					type: 'choice',
+					required: true,
+					options: authorityLevels,
+				},
+				{
+					schemaName: 'commentpolicy',
+					displayName: 'Comment Policy',
+					type: 'choice',
+					required: true,
+					options: commentPolicies,
+				},
 			],
 		},
 		{
@@ -875,6 +978,243 @@ export function buildDataverseSchema(
 					displayName: 'Message',
 					type: 'memo',
 					maxLength: 10_000,
+				},
+				{
+					schemaName: 'reviewcomment',
+					displayName: 'Review Comment',
+					description: 'Optional link to the reviewcomment written with this audit row',
+					type: 'lookup',
+					targetTable: 'reviewcomment',
+				},
+			],
+		},
+		{
+			schemaName: 'prioritylevel',
+			displayName: 'Document Routing Priority Level',
+			displayNamePlural: 'Document Routing Priority Levels',
+			description: 'Admin-owned priority catalog (key, rank, reason policy)',
+			ownership: 'organization',
+			columns: [
+				{
+					schemaName: 'name',
+					displayName: 'Key',
+					type: 'string',
+					required: true,
+					maxLength: 64,
+					isPrimaryName: true,
+				},
+				{
+					schemaName: 'label',
+					displayName: 'Label',
+					type: 'string',
+					required: true,
+					maxLength: 200,
+				},
+				{
+					schemaName: 'rank',
+					displayName: 'Rank',
+					description: 'Higher is more urgent; inbox secondary-sorts by rank descending',
+					type: 'integer',
+					required: true,
+				},
+				{
+					schemaName: 'color',
+					displayName: 'Color',
+					type: 'choice',
+					required: true,
+					options: priorityColors,
+				},
+				{
+					schemaName: 'requiresreason',
+					displayName: 'Requires Reason',
+					type: 'boolean',
+					required: true,
+				},
+				{
+					schemaName: 'minreasonlength',
+					displayName: 'Min Reason Length',
+					type: 'integer',
+				},
+				{
+					schemaName: 'reasonhint',
+					displayName: 'Reason Hint',
+					type: 'memo',
+					maxLength: 2000,
+				},
+				{
+					schemaName: 'active',
+					displayName: 'Active',
+					type: 'boolean',
+					required: true,
+				},
+				{
+					schemaName: 'slahoursmultiplier',
+					displayName: 'SLA Hours Multiplier',
+					description: 'Stored unused in v1; do not apply to activatedueat',
+					type: 'decimal',
+					precision: 2,
+				},
+			],
+		},
+		{
+			schemaName: 'documentsubtype',
+			displayName: 'Document Routing Document Subtype',
+			displayNamePlural: 'Document Routing Document Subtypes',
+			description: 'Optional subtype of a document type (chain/scaffold/hint overrides)',
+			ownership: 'organization',
+			columns: [
+				{
+					schemaName: 'name',
+					displayName: 'Key',
+					type: 'string',
+					required: true,
+					maxLength: 64,
+					isPrimaryName: true,
+				},
+				{
+					schemaName: 'label',
+					displayName: 'Label',
+					type: 'string',
+					required: true,
+					maxLength: 200,
+				},
+				{
+					schemaName: 'description',
+					displayName: 'Description',
+					type: 'memo',
+					maxLength: 4000,
+				},
+				{
+					schemaName: 'documenttype',
+					displayName: 'Document Type',
+					type: 'lookup',
+					required: true,
+					targetTable: 'documenttype',
+				},
+				{
+					schemaName: 'active',
+					displayName: 'Active',
+					type: 'boolean',
+					required: true,
+				},
+				{
+					schemaName: 'requesthint',
+					displayName: 'Request Hint Override',
+					type: 'memo',
+					maxLength: 4000,
+				},
+				{
+					schemaName: 'draftscaffold',
+					displayName: 'Draft Scaffold Override',
+					type: 'memo',
+					maxLength: 50_000,
+				},
+				{
+					schemaName: 'numberprefix',
+					displayName: 'Number Prefix Override',
+					type: 'string',
+					maxLength: 20,
+				},
+				{
+					schemaName: 'usesownchain',
+					displayName: 'Uses Own Chain',
+					type: 'boolean',
+					required: true,
+				},
+			],
+		},
+		{
+			schemaName: 'reviewcomment',
+			displayName: 'Document Routing Review Comment',
+			displayNamePlural: 'Document Routing Review Comments',
+			description:
+				'Human-feedback store for decision/submission/author responses. Survives withdraw/revise.',
+			ownership: 'user',
+			columns: [
+				{
+					schemaName: 'name',
+					displayName: 'Name',
+					type: 'string',
+					required: true,
+					maxLength: 400,
+					isPrimaryName: true,
+				},
+				{
+					schemaName: 'document',
+					displayName: 'Document',
+					type: 'lookup',
+					required: true,
+					targetTable: 'document',
+				},
+				{
+					schemaName: 'kind',
+					displayName: 'Kind',
+					type: 'choice',
+					required: true,
+					options: reviewCommentKinds,
+				},
+				{
+					schemaName: 'authoritylevel',
+					displayName: 'Authority Level',
+					type: 'choice',
+					required: true,
+					options: authorityLevels,
+				},
+				{
+					schemaName: 'status',
+					displayName: 'Status',
+					type: 'choice',
+					required: true,
+					options: reviewCommentStatuses,
+				},
+				{
+					schemaName: 'body',
+					displayName: 'Body',
+					type: 'memo',
+					required: true,
+					maxLength: 10_000,
+				},
+				{
+					schemaName: 'actoremail',
+					displayName: 'Actor Email',
+					type: 'string',
+					required: true,
+					maxLength: 320,
+				},
+				{
+					schemaName: 'actordisplayname',
+					displayName: 'Actor Display Name',
+					type: 'string',
+					maxLength: 400,
+				},
+				{
+					schemaName: 'role',
+					displayName: 'Role',
+					type: 'string',
+					maxLength: 200,
+				},
+				{
+					schemaName: 'sourcestepid',
+					displayName: 'Source Step Id',
+					description: 'Runtime approvalstep id at decide-time (may later be deleted)',
+					type: 'string',
+					maxLength: 100,
+				},
+				{
+					schemaName: 'sourcesteporder',
+					displayName: 'Source Step Order',
+					type: 'integer',
+				},
+				{
+					schemaName: 'submittedcontentrevision',
+					displayName: 'Submitted Content Revision',
+					type: 'integer',
+				},
+				{
+					schemaName: 'inreplyto',
+					displayName: 'In Reply To',
+					type: 'lookup',
+					targetTable: 'reviewcomment',
 				},
 			],
 		},

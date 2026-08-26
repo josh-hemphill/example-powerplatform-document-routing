@@ -18,6 +18,7 @@ function makeDocument(overrides: Partial<Document> = {}): Document {
 		draftSummary: 'Server summary',
 		contentRevision: 1,
 		approvalSteps: [],
+		reviewComments: [],
 		history: [],
 		...overrides,
 	};
@@ -101,5 +102,24 @@ describe('useDocumentFormState', () => {
 		await nextTick();
 		expect(state.approvalForm.comment).toBe('Please review');
 		expect(state.draftForm.title).toBe('Refetched title');
+	});
+
+	it('preserves in-progress review response drafts across soft refetch', async() => {
+		const document = ref<Document | undefined>(makeDocument());
+		const state = useDocumentFormState({
+			document,
+			documentId: ref(document.value!.id),
+			types: ref(undefined),
+			activeDestinationIds: ref([]),
+			fallbackType: getDocumentType,
+		});
+		state.reviewResponseDrafts['comment-1'] = 'Added manager attestation language here.';
+		document.value = makeDocument({ title: 'Refetched title' });
+		await nextTick();
+		expect(state.reviewResponseDrafts['comment-1']).toBe(
+			'Added manager attestation language here.',
+		);
+		state.hydrateFromDocument(true);
+		expect(state.reviewResponseDrafts['comment-1']).toBeUndefined();
 	});
 });

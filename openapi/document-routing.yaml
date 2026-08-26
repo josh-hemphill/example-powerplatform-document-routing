@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Document Routing API
-  version: 1.7.0
+  version: 1.8.0
   description: |
     Routes freeform document requests through drafting and a chain of approvals,
     then publishes an approved PDF to SharePoint. In Power Platform, this API is
@@ -11,6 +11,21 @@ info:
     security context in production. The local Vite mock accepts
     `X-Document-Routing-Actor` (and optional `X-Document-Routing-Roles`) as a
     stand-in. Request bodies must not carry spoofable `actorEmail` / requester identity.
+
+    **Review comments (Phase 23):** `reviewcomment` is the human-feedback store.
+    Decision comments are written at decide-time and **survive** withdraw/revise.
+    `historyevent` stays a short machine audit (`Rejected by Compliance`) and is
+    not a substitute body. Authoritative open comments block resubmit.
+    Authors `POST …/review-comments/{id}/respond` or `/acknowledge`.
+
+    **Priorities (Phase 25):** `priority` is a catalog **key** (`GET /control/priority-levels`),
+    not a hardcoded enum. Rows with `requiresReason` must include `priorityReason`
+    of at least `minReasonLength` (seed mission-critical: 20). Unknown/inactive keys
+    return 400 `unknown_priority`.
+
+    **Subtypes (Phase 26):** Optional per document type. If a type has any active
+    subtype, create requires `documentSubtypeId`. Submit materializes the subtype
+    chain when `usesOwnChain` is true.
 
     **Workflow (Phase 3 / 10):** Submit materializes approval steps from document-type
     control data sorted by `order` (contiguous `1..n`). Client step override only when
@@ -253,10 +268,10 @@ paths:
       tags: [Approvals]
       summary: Withdraw review and return to drafting
       description: |
-        Clears approval steps and returns the case to `drafting` so authors can
-        revise content. Allowed from `in_review`, `rejected`, or `approved`
-        for the requester, author, or collaborators. Not allowed from
-        `published` or `superseded` (use supersede instead).
+        Clears runtime approval steps and returns the case to `drafting` so authors
+        can revise content. **Review comments are not deleted.** Allowed from
+        `in_review`, `rejected`, or `approved` for the requester, author, or
+        collaborators. Not allowed from `published` or `superseded` (use supersede).
       parameters:
         - $ref: '#/components/parameters/DocumentId'
       requestBody:
@@ -302,6 +317,113 @@ paths:
       responses:
         '200':
           description: Updated document after decision
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /documents/{documentId}/review-comments/{commentId}/respond:
+    post:
+      operationId: respondToReviewComment
+      tags: [Approvals]
+      summary: Author response that addresses an open review comment
+      description: |
+        Allowed for requester, author, or collaborators (same as withdraw).
+        Sets the parent comment `status=addressed` and inserts a child
+        `kind=author_response`. Authoritative comments require a non-whitespace
+        body of at least 20 characters (`AUTHORITATIVE_RESPONSE_MIN_LENGTH`).
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+        - $ref: '#/components/parameters/CommentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewCommentRespondRequest'
+      responses:
+        '200':
+          description: Document with updated review comments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /documents/{documentId}/review-comments/{commentId}/acknowledge:
+    post:
+      operationId: acknowledgeReviewComment
+      tags: [Approvals]
+      summary: Acknowledge an open standard review comment without a long reply
+      description: |
+        Allowed for requester, author, or collaborators. Standard (and advisory)
+        open decision comments may be acknowledged. Authoritative comments must
+        be responded to, not acknowledged.
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+        - $ref: '#/components/parameters/CommentId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                comment:
+                  type: string
+      responses:
+        '200':
+          description: Document with updated review comments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /documents/{documentId}/priority:
+    put:
+      operationId: updateDocumentPriority
+      tags: [Documents]
+      summary: Change priority on a requested or drafting case
+      description: |
+        Same catalog rules as create. Allowed for requester, author, or
+        collaborators while the case is `requested` or `drafting`.
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePriorityRequest'
+      responses:
+        '200':
+          description: Document with updated priority
           content:
             application/json:
               schema:
@@ -940,6 +1062,179 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+  /control/priority-levels:
+    get:
+      operationId: listPriorityLevels
+      tags: [Control]
+      summary: List priority catalog (active for users; all for admins)
+      responses:
+        '200':
+          description: Priority catalog
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PriorityLevel'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      operationId: createPriorityLevel
+      tags: [Control]
+      summary: Create a priority catalog row (Admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PriorityLevelWrite'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PriorityLevel'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /control/priority-levels/{priorityId}:
+    parameters:
+      - name: priorityId
+        in: path
+        required: true
+        schema:
+          type: string
+    put:
+      operationId: updatePriorityLevel
+      tags: [Control]
+      summary: Update a priority catalog row (Admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PriorityLevelWrite'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PriorityLevel'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /control/document-subtypes:
+    get:
+      operationId: listDocumentSubtypes
+      tags: [Control]
+      summary: List document subtypes (active for users; all for admins)
+      parameters:
+        - name: documentType
+          in: query
+          schema:
+            type: string
+          description: Filter by parent document type id
+      responses:
+        '200':
+          description: Subtype catalog
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DocumentSubtype'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      operationId: createDocumentSubtype
+      tags: [Control]
+      summary: Create a document subtype (Admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentSubtypeWrite'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentSubtype'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /control/document-subtypes/{subtypeId}:
+    parameters:
+      - name: subtypeId
+        in: path
+        required: true
+        schema:
+          type: string
+    put:
+      operationId: updateDocumentSubtype
+      tags: [Control]
+      summary: Update a document subtype including optional own chain (Admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentSubtypeWrite'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentSubtype'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deactivateDocumentSubtype
+      tags: [Control]
+      summary: Deactivate a document subtype (Admin)
+      responses:
+        '200':
+          description: Deactivated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentSubtype'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
 components:
   securitySchemes:
     PrincipalHeader:
@@ -962,6 +1257,13 @@ components:
   parameters:
     DocumentId:
       name: documentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CommentId:
+      name: commentId
       in: path
       required: true
       schema:
@@ -1076,6 +1378,10 @@ components:
           type: number
           exclusiveMinimum: 0
           description: Hours until SLA timeout from step activation (not reset on claim)
+        authorityLevel:
+          $ref: '#/components/schemas/AuthorityLevel'
+        commentPolicy:
+          $ref: '#/components/schemas/CommentPolicy'
         assignee:
           $ref: '#/components/schemas/Approver'
         elevationPool:
@@ -1097,6 +1403,10 @@ components:
           type: number
           exclusiveMinimum: 0
           description: Hours until SLA timeout from queue activation (not reset on claim)
+        authorityLevel:
+          $ref: '#/components/schemas/AuthorityLevel'
+        commentPolicy:
+          $ref: '#/components/schemas/CommentPolicy'
         pool:
           type: array
           minItems: 1
@@ -1135,7 +1445,11 @@ components:
           enum: [approve, reject]
         comment:
           type: string
-          description: Optional comment; actor is the authenticated principal
+          description: |
+            Copied to `reviewcomment` (`kind=decision`) at decide-time. Required when
+            the step’s `commentPolicy` is `required_on_reject` (reject) or
+            `required_on_decision` (any decision). Missing required comment → 400
+            `comment_required`. History records a short label only.
     ProcessSlaRequest:
       type: object
       properties:
@@ -1176,8 +1490,20 @@ components:
           description: Unstructured request text that authors turn into a draft
         priority:
           type: string
-          enum: [low, normal, high]
           default: normal
+          description: |
+            Catalog key from `GET /control/priority-levels` (seed `low`, `normal`,
+            `high`, `mission_critical`). Unknown/inactive → 400 `unknown_priority`.
+        priorityReason:
+          type: string
+          description: |
+            Required when the selected catalog row has `requiresReason`. Too short
+            → 400 `priority_reason_required`.
+        documentSubtypeId:
+          type: string
+          description: |
+            Required when the document type has any active subtype. Unknown/wrong
+            type → 400 `unknown_subtype`. Missing when required → 400 `subtype_required`.
         requestedPublishSiteUrl:
           type: string
           format: uri
@@ -1229,6 +1555,9 @@ components:
           type: string
         documentType:
           type: string
+        documentSubtypeId:
+          type: [string, 'null']
+          description: Subtype key or id when the type requires one
         status:
           $ref: '#/components/schemas/DocumentStatus'
         requesterEmail:
@@ -1242,7 +1571,14 @@ components:
           description: Author collaboration team shared on create for co-editing drafts
         priority:
           type: string
-          enum: [low, normal, high]
+          description: Catalog key (not a closed enum)
+        openAuthoritativeCommentCount:
+          type: integer
+          minimum: 0
+          description: Count of open authoritative decision comments (blocks resubmit)
+        lastReviewCommentPreview:
+          type: [string, 'null']
+          description: Truncated newest decision-comment body (~140 chars) for inbox
         currentApproverEmail:
           type: [string, 'null']
           format: email
@@ -1361,6 +1697,10 @@ components:
         approvedRevision:
           type: [integer, 'null']
           description: contentRevision recorded when this step approved
+        authorityLevel:
+          $ref: '#/components/schemas/AuthorityLevel'
+        commentPolicy:
+          $ref: '#/components/schemas/CommentPolicy'
     Document:
       allOf:
         - $ref: '#/components/schemas/DocumentSummary'
@@ -1370,6 +1710,7 @@ components:
             - approvalSteps
             - history
             - contentRevision
+            - reviewComments
           properties:
             freeformRequest:
               type: string
@@ -1387,10 +1728,18 @@ components:
               type: [integer, 'null']
             publishedContentRevision:
               type: [integer, 'null']
+            priorityReason:
+              type: [string, 'null']
+            documentSubtypeId:
+              type: [string, 'null']
             approvalSteps:
               type: array
               items:
                 $ref: '#/components/schemas/ApprovalStep'
+            reviewComments:
+              type: array
+              items:
+                $ref: '#/components/schemas/ReviewComment'
             history:
               type: array
               items:
@@ -1422,6 +1771,10 @@ components:
           type: string
         message:
           type: string
+        reviewCommentId:
+          type: [string, 'null']
+          format: uuid
+          description: Optional link to the reviewcomment written at the same time
     PublishResult:
       type: object
       required:
@@ -1466,6 +1819,10 @@ components:
           description: Key of an approver pool for pool steps
         elevationPoolKey:
           type: string
+        authorityLevel:
+          $ref: '#/components/schemas/AuthorityLevel'
+        commentPolicy:
+          $ref: '#/components/schemas/CommentPolicy'
     ControlDocumentType:
       type: object
       required:
@@ -1523,6 +1880,11 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ControlChainStep'
+        subtypes:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentSubtype'
+          description: Active (or all, for Admin) subtypes belonging to this type
     ControlDocumentTypeWrite:
       type: object
       required:
@@ -1674,6 +2036,189 @@ components:
           format: date-time
         message:
           type: string
+    AuthorityLevel:
+      type: string
+      enum: [advisory, standard, authoritative]
+      default: standard
+    CommentPolicy:
+      type: string
+      enum: [optional, required_on_reject, required_on_decision]
+      default: required_on_reject
+    ReviewCommentKind:
+      type: string
+      enum: [decision, submission, author_response, acknowledgement]
+    ReviewCommentStatus:
+      type: string
+      enum: [open, addressed, acknowledged, voided]
+    ReviewComment:
+      type: object
+      required:
+        - id
+        - kind
+        - authorityLevel
+        - status
+        - body
+        - actorEmail
+        - actorDisplayName
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          $ref: '#/components/schemas/ReviewCommentKind'
+        authorityLevel:
+          $ref: '#/components/schemas/AuthorityLevel'
+        status:
+          $ref: '#/components/schemas/ReviewCommentStatus'
+        body:
+          type: string
+        actorEmail:
+          type: string
+          format: email
+        actorDisplayName:
+          type: string
+        role:
+          type: [string, 'null']
+        sourceStepId:
+          type: [string, 'null']
+          format: uuid
+        sourceStepOrder:
+          type: [integer, 'null']
+        submittedContentRevision:
+          type: [integer, 'null']
+        inReplyTo:
+          type: [string, 'null']
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+    ReviewCommentRespondRequest:
+      type: object
+      required: [body]
+      properties:
+        body:
+          type: string
+          minLength: 1
+          description: Author reply. Authoritative comments require ≥ 20 non-whitespace characters.
+    UpdatePriorityRequest:
+      type: object
+      required: [priority]
+      properties:
+        priority:
+          type: string
+        priorityReason:
+          type: [string, 'null']
+    PriorityLevel:
+      type: object
+      required: [id, key, label, rank, color, requiresReason, minReasonLength, active]
+      properties:
+        id:
+          type: string
+        key:
+          type: string
+        label:
+          type: string
+        rank:
+          type: integer
+        color:
+          type: string
+          enum: [default, info, warning, error]
+        requiresReason:
+          type: boolean
+        minReasonLength:
+          type: integer
+          minimum: 0
+        reasonHint:
+          type: string
+        active:
+          type: boolean
+        slaHoursMultiplier:
+          type: [number, 'null']
+          description: Stored unused in v1; do not apply to activateDueAt
+    PriorityLevelWrite:
+      type: object
+      required: [key, label, rank, color, requiresReason, active]
+      properties:
+        key:
+          type: string
+          minLength: 2
+          maxLength: 64
+        label:
+          type: string
+        rank:
+          type: integer
+        color:
+          type: string
+          enum: [default, info, warning, error]
+        requiresReason:
+          type: boolean
+        minReasonLength:
+          type: integer
+          minimum: 0
+        reasonHint:
+          type: string
+        active:
+          type: boolean
+        slaHoursMultiplier:
+          type: [number, 'null']
+    DocumentSubtype:
+      type: object
+      required: [id, key, label, documentTypeId, active, usesOwnChain]
+      properties:
+        id:
+          type: string
+        key:
+          type: string
+        label:
+          type: string
+        description:
+          type: string
+        documentTypeId:
+          type: string
+        active:
+          type: boolean
+        requestHint:
+          type: [string, 'null']
+        draftScaffold:
+          type: [string, 'null']
+        numberPrefix:
+          type: [string, 'null']
+        usesOwnChain:
+          type: boolean
+        approvalChain:
+          type: array
+          items:
+            $ref: '#/components/schemas/ControlChainStep'
+          description: Required and non-empty when usesOwnChain is true
+    DocumentSubtypeWrite:
+      type: object
+      required: [key, label, documentTypeId, active, usesOwnChain]
+      properties:
+        key:
+          type: string
+          minLength: 2
+          maxLength: 64
+        label:
+          type: string
+        description:
+          type: string
+        documentTypeId:
+          type: string
+        active:
+          type: boolean
+        requestHint:
+          type: [string, 'null']
+        draftScaffold:
+          type: [string, 'null']
+        numberPrefix:
+          type: [string, 'null']
+        usesOwnChain:
+          type: boolean
+        approvalChain:
+          type: array
+          items:
+            $ref: '#/components/schemas/ControlChainStep'
     Error:
       type: object
       required: [message]

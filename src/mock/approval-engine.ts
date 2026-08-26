@@ -7,11 +7,24 @@ import {
 	isSlaOverdue,
 	mergeApproverPools,
 } from '../domain/approval-queue.ts';
+import { shortDecisionHistoryMessage } from '../domain/history-actions.ts';
+import {
+	DEFAULT_AUTHORITY_LEVEL,
+	DEFAULT_COMMENT_POLICY,
+	isCommentRequired,
+	seedAuthorityForRole,
+} from '../domain/review-comments.ts';
 
 const nowIso = (clock?: Date): string => (clock ?? new Date()).toISOString();
 
 export interface EngineError extends Error {
-	code: 'invalid_state' | 'forbidden' | 'validation_error';
+	code:
+		| 'invalid_state'
+		| 'forbidden'
+		| 'validation_error'
+		| 'comment_required'
+		| 'open_authoritative_comments'
+		| 'response_required';
 }
 
 /**
@@ -55,6 +68,8 @@ export function createStepFromInput(
 		assignee?: ApproverPerson;
 		pool?: ApproverPerson[];
 		elevationPool?: ApproverPerson[];
+		authorityLevel?: MockApprovalStep['authorityLevel'];
+		commentPolicy?: MockApprovalStep['commentPolicy'];
 	},
 	order: number,
 	clock: Date,
@@ -65,6 +80,9 @@ export function createStepFromInput(
 	if (slaHours !== null && slaHours <= 0) {
 		throw engineError('slaHours must be greater than 0', 'validation_error');
 	}
+	const role = input.role ?? input.assignee?.role ?? null;
+	const authorityLevel = input.authorityLevel ?? seedAuthorityForRole(role);
+	const commentPolicy = input.commentPolicy ?? DEFAULT_COMMENT_POLICY;
 	if (input.assignmentMode === 'named') {
 		if (!input.assignee) {
 			throw engineError('Named approval steps require an assignee', 'validation_error');
@@ -75,7 +93,7 @@ export function createStepFromInput(
 			assignmentMode: 'named',
 			approverEmail: input.assignee.email,
 			approverDisplayName: input.assignee.displayName,
-			role: input.role ?? input.assignee.role ?? null,
+			role,
 			status: isActive ? 'pending' : 'waiting',
 			pool: [input.assignee],
 			elevationPool: input.elevationPool ?? [],
@@ -89,6 +107,8 @@ export function createStepFromInput(
 			decidedAt: null,
 			approvedRevision: null,
 			submittedRevision,
+			authorityLevel,
+			commentPolicy,
 		};
 		if (isActive) {
 			setActivateDeadline(step, clock);
@@ -106,7 +126,7 @@ export function createStepFromInput(
 		assignmentMode: 'pool',
 		approverEmail: null,
 		approverDisplayName: null,
-		role: input.role ?? null,
+		role,
 		status: isActive ? 'queued' : 'waiting',
 		pool: input.pool,
 		elevationPool: input.elevationPool ?? [],
@@ -120,6 +140,8 @@ export function createStepFromInput(
 		decidedAt: null,
 		approvedRevision: null,
 		submittedRevision,
+		authorityLevel,
+		commentPolicy,
 	};
 	if (isActive) {
 		setActivateDeadline(step, clock);
@@ -254,6 +276,52 @@ export function processStepSla(
 const ALLOWED_DECISIONS = new Set(['approve', 'reject']);
 
 /**
+ * Builds a display name from an email local-part when none is supplied.
+ */
+export function displayNameFromEmail(email: string): string {
+	const local = email.split('@')[0] ?? email;
+	return local
+		.split(/[._-]/)
+		.filter(Boolean)
+		.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+		.join(' ') || email;
+}
+
+/**
+ * Inserts a decision review comment and returns its id, or null when there is no body.
+ */
+export function insertDecisionReviewComment(
+	document: MockDocumentRecord,
+	step: MockApprovalStep,
+	actorEmail: string,
+	clock: Date,
+	body: string | undefined,
+): string | null {
+	const trimmed = body?.trim() ?? '';
+	if (!trimmed) {
+		return null;
+	}
+	const id = randomUUID();
+	document.reviewComments ??= [];
+	document.reviewComments.push({
+		id,
+		kind: 'decision',
+		authorityLevel: step.authorityLevel ?? DEFAULT_AUTHORITY_LEVEL,
+		status: 'open',
+		body: trimmed,
+		actorEmail,
+		actorDisplayName: step.approverDisplayName ?? displayNameFromEmail(actorEmail),
+		role: step.role,
+		sourceStepId: step.id,
+		sourceStepOrder: step.order,
+		submittedContentRevision: step.submittedRevision ?? document.submittedContentRevision,
+		inReplyTo: null,
+		createdAt: nowIso(clock),
+	});
+	return id;
+}
+
+/**
  * Records an approve/reject decision for the active pending assignee.
  */
 export function decideStep(
@@ -263,7 +331,7 @@ export function decideStep(
 	decision: string,
 	clock: Date,
 	comment?: string,
-): void {
+): string | null {
 	if (!ALLOWED_DECISIONS.has(decision)) {
 		throw engineError('decision must be approve or reject', 'validation_error');
 	}
@@ -277,14 +345,29 @@ export function decideStep(
 		throw engineError('Only the assigned/claimed approver can decide this step', 'forbidden');
 	}
 
-	step.comment = comment ?? null;
+	const typedDecision = decision as 'approve' | 'reject';
+	if (isCommentRequired(step, typedDecision) && !(comment ?? '').trim()) {
+		throw engineError(
+			'This step requires a comment for the selected decision',
+			'comment_required',
+		);
+	}
+
+	const reviewCommentId = insertDecisionReviewComment(
+		document,
+		step,
+		actorEmail,
+		clock,
+		comment,
+	);
+	step.comment = comment?.trim() ? comment.trim() : null;
 	step.decidedAt = nowIso(clock);
 
-	if (decision === 'reject') {
+	if (typedDecision === 'reject') {
 		step.status = 'rejected';
 		document.status = 'rejected';
 		syncCurrentApprovalFields(document);
-		return;
+		return reviewCommentId;
 	}
 
 	step.status = 'approved';
@@ -297,10 +380,12 @@ export function decideStep(
 		document.status = 'approved';
 	}
 	syncCurrentApprovalFields(document);
+	return reviewCommentId;
 }
 
 /**
  * Withdraws an in-flight or rejected/approved review back to drafting and clears steps.
+ * Review comments are retained.
  */
 export function withdrawAndRevise(
 	document: MockDocumentRecord,
@@ -328,3 +413,5 @@ export function withdrawAndRevise(
 	document.submittedContentRevision = null;
 	syncCurrentApprovalFields(document);
 }
+
+export { shortDecisionHistoryMessage };

@@ -40,6 +40,15 @@ describe('form-rules', () => {
 		expect(bodyMarkdownRules()[0](' \n\t ')).not.toBe(true);
 	});
 
+	it('re-exports named min-length constants used by mock and UI', async() => {
+		const { AUTHORITATIVE_RESPONSE_MIN_LENGTH, MISSION_CRITICAL_REASON_MIN_LENGTH, minLengthRule }
+			= await import('@/api/form-rules');
+		expect(AUTHORITATIVE_RESPONSE_MIN_LENGTH).toBe(20);
+		expect(MISSION_CRITICAL_REASON_MIN_LENGTH).toBe(20);
+		expect(minLengthRule(20, 'Reason')('too short')).not.toBe(true);
+		expect(minLengthRule(20, 'Reason')('x'.repeat(20))).toBe(true);
+	});
+
 	it('enforces summary max length', () => {
 		expect(validateSummary(undefined)).toBeNull();
 		expect(validateSummary('ok')).toBeNull();

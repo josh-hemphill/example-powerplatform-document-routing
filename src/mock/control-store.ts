@@ -4,16 +4,23 @@ import type { ApprovalStepTemplate, DocumentTypeDefinition } from '../config/doc
  * Admin CRUD mutates this store; create/submit read from it (not static TS).
  */
 import type { ApproverPerson } from '../domain/approval-queue.ts';
+import type { PriorityLevelRecord } from '../domain/priority-catalog.ts';
+import type { AuthorityLevel, CommentPolicy } from '../domain/review-comments.ts';
 import { randomUUID } from 'node:crypto';
 import { appConfig } from '../config/app.config.ts';
 import {
 	documentTypes as seedDocumentTypes,
 	toApprovalStepInputs,
 } from '../config/document-types.ts';
+import { SEED_PRIORITY_LEVELS } from '../config/priority-catalog.ts';
 import {
 	allocateDocumentNumber,
 	DEFAULT_NUMBER_PATTERN,
 } from '../domain/document-number.ts';
+import {
+	DEFAULT_COMMENT_POLICY,
+	seedAuthorityForRole,
+} from '../domain/review-comments.ts';
 
 export interface ControlApproverPool {
 	id: string;
@@ -31,6 +38,26 @@ export interface ControlChainStep {
 	assignee?: ApproverPerson;
 	poolKey?: string;
 	elevationPoolKey?: string;
+	authorityLevel?: AuthorityLevel;
+	commentPolicy?: CommentPolicy;
+}
+
+export interface ControlPriorityLevel extends PriorityLevelRecord {
+	id: string;
+}
+
+export interface ControlDocumentSubtype {
+	id: string;
+	key: string;
+	label: string;
+	description: string;
+	documentTypeId: string;
+	active: boolean;
+	requestHint: string | null;
+	draftScaffold: string | null;
+	numberPrefix: string | null;
+	usesOwnChain: boolean;
+	approvalChain: ControlChainStep[];
 }
 
 export interface ControlDocumentType {
@@ -77,6 +104,8 @@ export interface ControlFlowRun {
 
 export interface ControlStoreSnapshot {
 	documentTypes: ControlDocumentType[];
+	documentSubtypes: ControlDocumentSubtype[];
+	priorityLevels: ControlPriorityLevel[];
 	approverPools: ControlApproverPool[];
 	publishDestinations: ControlPublishDestination[];
 	settings: ControlSettings;
@@ -142,6 +171,8 @@ function mapSeedChain(
 				role: step.role,
 			},
 			elevationPoolKey,
+			authorityLevel: step.authorityLevel ?? seedAuthorityForRole(step.role),
+			commentPolicy: step.commentPolicy ?? DEFAULT_COMMENT_POLICY,
 		};
 	}
 
@@ -161,6 +192,8 @@ function mapSeedChain(
 		slaHours: step.slaHours,
 		poolKey,
 		elevationPoolKey,
+		authorityLevel: step.authorityLevel ?? seedAuthorityForRole(step.poolRole),
+		commentPolicy: step.commentPolicy ?? DEFAULT_COMMENT_POLICY,
 	};
 }
 
@@ -190,9 +223,35 @@ function buildSeedSnapshot(): ControlStoreSnapshot {
 		),
 	}));
 
+	const documentSubtypes: ControlDocumentSubtype[] = [];
+	for (const type of seedDocumentTypes) {
+		for (const subtype of type.subtypes ?? []) {
+			documentSubtypes.push({
+				id: randomUUID(),
+				key: subtype.key,
+				label: subtype.label,
+				description: subtype.description,
+				documentTypeId: type.id,
+				active: true,
+				requestHint: subtype.requestHint ?? null,
+				draftScaffold: subtype.draftScaffold ?? null,
+				numberPrefix: subtype.numberPrefix ?? null,
+				usesOwnChain: subtype.usesOwnChain === true,
+				approvalChain: (subtype.approvalChain ?? []).map((step, index) =>
+					mapSeedChain(step, index + 1, pools),
+				),
+			});
+		}
+	}
+
 	const now = new Date().toISOString();
 	return {
 		documentTypes: types,
+		documentSubtypes,
+		priorityLevels: SEED_PRIORITY_LEVELS.map((row) => ({
+			...row,
+			id: randomUUID(),
+		})),
 		approverPools: [...pools.values()],
 		publishDestinations: [
 			{
@@ -287,6 +346,8 @@ export function toDocumentTypeDefinition(
 					role: step.role,
 					slaHours: step.slaHours,
 					elevationPool: elevation,
+					authorityLevel: step.authorityLevel ?? seedAuthorityForRole(step.role),
+					commentPolicy: step.commentPolicy ?? DEFAULT_COMMENT_POLICY,
 				};
 			}
 			const pool = step.poolKey ? pools.get(step.poolKey) : undefined;
@@ -302,6 +363,8 @@ export function toDocumentTypeDefinition(
 				slaHours: step.slaHours ?? 8,
 				pool: pool.members,
 				elevationPool: elevation,
+				authorityLevel: step.authorityLevel ?? seedAuthorityForRole(step.role),
+				commentPolicy: step.commentPolicy ?? DEFAULT_COMMENT_POLICY,
 			};
 		});
 
@@ -318,14 +381,63 @@ export function toDocumentTypeDefinition(
 }
 
 /**
- * Materializes OpenAPI submit step payloads from the live control type + pools.
+ * Looks up a subtype by key or id, optionally scoped to a document type.
  */
-export function materializeApprovalSteps(typeId: string) {
+export function findControlDocumentSubtype(
+	idOrKey: string,
+	documentTypeId?: string,
+): ControlDocumentSubtype | undefined {
+	const value = idOrKey.trim();
+	return getControlStore().documentSubtypes.find((subtype) => {
+		if (documentTypeId && subtype.documentTypeId !== documentTypeId) {
+			return false;
+		}
+		return subtype.id === value || subtype.key === value;
+	});
+}
+
+/**
+ * Active subtypes for a document type.
+ */
+export function activeSubtypesForType(typeId: string): ControlDocumentSubtype[] {
+	return getControlStore().documentSubtypes.filter(
+		(subtype) => subtype.documentTypeId === typeId && subtype.active,
+	);
+}
+
+/**
+ * Materializes OpenAPI submit step payloads from the live control type + optional subtype.
+ */
+export function materializeApprovalSteps(typeId: string, subtypeId?: string | null) {
 	const type = findControlDocumentType(typeId);
 	if (!type || !type.active) {
 		return null;
 	}
+	if (subtypeId) {
+		const subtype = findControlDocumentSubtype(subtypeId, typeId);
+		if (subtype?.usesOwnChain) {
+			if (!subtype.approvalChain.length) {
+				return [];
+			}
+			return toApprovalStepInputs(
+				toDocumentTypeDefinition({
+					...type,
+					approvalChain: subtype.approvalChain,
+				}).approvalChain,
+			);
+		}
+	}
 	return toApprovalStepInputs(toDocumentTypeDefinition(type).approvalChain);
+}
+
+/**
+ * Looks up a priority catalog row by key or id.
+ */
+export function findPriorityLevel(keyOrId: string): ControlPriorityLevel | undefined {
+	const value = keyOrId.trim();
+	return getControlStore().priorityLevels.find(
+		(item) => item.key === value || item.id === value,
+	);
 }
 
 /**
@@ -334,14 +446,21 @@ export function materializeApprovalSteps(typeId: string) {
 export function allocateNextDocumentNumber(
 	typeId: string,
 	clock: Date = new Date(),
+	subtypeId?: string | null,
 ): string {
 	const type = findControlDocumentType(typeId);
 	if (!type) {
 		throw new Error(`Unknown document type: ${typeId}`);
 	}
+	const subtype = subtypeId
+		? findControlDocumentSubtype(subtypeId, typeId)
+		: undefined;
 	const allocated = allocateDocumentNumber(
 		{
-			numberPrefix: type.numberPrefix || type.id.slice(0, 3).toUpperCase(),
+			numberPrefix:
+				subtype?.numberPrefix?.trim()
+				|| type.numberPrefix
+				|| type.id.slice(0, 3).toUpperCase(),
 			numberPattern: type.numberPattern || DEFAULT_NUMBER_PATTERN,
 			nextSequence: type.nextSequence || 1,
 			sequenceYear: type.sequenceYear,
