@@ -177,25 +177,6 @@ const stageGuide = computed(() => {
 	}
 });
 
-const primaryStage = computed(() =>
-	document.value ? primaryWorkspaceStage(document.value.status) : null,
-);
-
-const stageGuide = computed(() => {
-	switch (primaryStage.value) {
-		case 'freeform':
-			return 'Next: expand Freeform request to review the intake.';
-		case 'draft':
-			return 'Next: expand Author / draft to edit and save, then submit from Approvals.';
-		case 'approval':
-			return 'Next: expand Approval chain to submit, claim, or decide.';
-		case 'publish':
-			return 'Next: expand Publish to choose a destination and publish the PDF.';
-		default:
-			return null;
-	}
-});
-
 watch(
 	() => document.value?.status,
 	() => {
@@ -240,7 +221,7 @@ function toggleStage(stage: WorkspaceStageId): void {
 	const currentlyOpen = isStageExpanded(stage);
 	const primary = primaryStage.value;
 	const next: Partial<Record<WorkspaceStageId, boolean>> = {
-		...(stageOverrides.value ?? {}),
+		...stageOverrides.value,
 	};
 	// Ensure primary stays as baseline when first toggling.
 	if (!stageOverrides.value && primary) {

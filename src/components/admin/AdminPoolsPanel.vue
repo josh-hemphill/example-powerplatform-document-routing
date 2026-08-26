@@ -166,13 +166,14 @@ async function save(): Promise<void> {
 		class="pa-4 pb-16"
 		:loading="poolsLoading"
 	>
-		<div class="d-flex align-end flex-wrap ga-2 mb-3">
+		<div class="d-flex align-center flex-wrap ga-2 mb-3">
 			<v-select
 				v-model="selectedId"
 				:items="pools"
 				item-title="name"
 				item-value="id"
 				label="Approver pool"
+				hide-details
 				class="flex-grow-1"
 				style="min-width: 12rem"
 			/>

@@ -166,15 +166,25 @@ async function addPriority(): Promise<void> {
 		class="pa-4 pb-16"
 		:loading="isPending"
 	>
-		<div class="d-flex align-center justify-space-between flex-wrap ga-2 mb-3">
-			<p class="text-body-2 text-medium-emphasis mb-0">
-				Catalog keys are stored on each case. Deactivating a row hides it from New request.
-				<code>requiresReason</code> is enforced server-side (mission-critical cannot be saved without a reason).
-			</p>
+		<p class="text-body-2 text-medium-emphasis mb-3">
+			Catalog keys are stored on each case. Deactivating a row hides it from New request.
+			<code>requiresReason</code> is enforced server-side (mission-critical cannot be saved without a reason).
+		</p>
+		<div class="d-flex align-center flex-wrap ga-2 mb-3">
+			<v-select
+				v-model="selectedId"
+				:items="items"
+				item-title="label"
+				item-value="id"
+				label="Priority level"
+				hide-details
+				class="flex-grow-1"
+				style="min-width: 12rem"
+			/>
 			<v-btn
-				size="small"
 				color="primary"
 				variant="tonal"
+				prepend-icon="$plus"
 				:disabled="!canAct"
 				:loading="creating"
 				@click="addPriority"
@@ -182,14 +192,6 @@ async function addPriority(): Promise<void> {
 				Add priority
 			</v-btn>
 		</div>
-		<v-select
-			v-model="selectedId"
-			:items="items"
-			item-title="label"
-			item-value="id"
-			label="Priority level"
-			class="mb-3"
-		/>
 		<v-text-field
 			v-model="form.key"
 			label="Key"
