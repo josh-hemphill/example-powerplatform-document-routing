@@ -17,6 +17,10 @@ defineProps<{
 	}>;
 }>();
 
+const emit = defineEmits<{
+	viewFeedback: [];
+}>();
+
 const statusIcon: Record<string, string> = {
 	waiting: '$timerSand',
 	queued: '$accountMultipleOutline',
@@ -35,6 +39,8 @@ const statusColor: Record<string, string> = {
 	skipped: 'default',
 };
 
+const COMMENT_EXCERPT_MAX = 80;
+
 function formatDue(dueAt: string | null | undefined): string {
 	if (!dueAt) {
 		return '';
@@ -42,6 +48,14 @@ function formatDue(dueAt: string | null | undefined): string {
 	const due = new Date(dueAt);
 	const overdue = due.getTime() < Date.now();
 	return `${overdue ? 'Overdue' : 'Due'} ${due.toLocaleString()}`;
+}
+
+function commentExcerpt(comment: string): string {
+	const trimmed = comment.trim();
+	if (trimmed.length <= COMMENT_EXCERPT_MAX) {
+		return trimmed;
+	}
+	return `${trimmed.slice(0, COMMENT_EXCERPT_MAX - 1).trimEnd()}…`;
 }
 </script>
 
@@ -99,8 +113,36 @@ function formatDue(dueAt: string | null | undefined): string {
 			</v-list-item-subtitle>
 			<v-list-item-subtitle v-if="step.dueAt || step.comment">
 				<span v-if="step.dueAt">{{ formatDue(step.dueAt) }}</span>
-				<span v-if="step.comment"> · “{{ step.comment }}”</span>
+				<template v-if="step.comment">
+					<span v-if="step.dueAt"> · </span>
+					“{{ commentExcerpt(step.comment) }}”
+					<button
+						type="button"
+						class="feedback-link"
+						@click="emit('viewFeedback')"
+					>
+						View in Review feedback
+					</button>
+				</template>
 			</v-list-item-subtitle>
 		</v-list-item>
 	</v-list>
 </template>
+
+<style scoped>
+.feedback-link {
+	background: none;
+	border: 0;
+	padding: 0;
+	margin-left: 0.35rem;
+	cursor: pointer;
+	color: rgb(var(--v-theme-primary));
+	font: inherit;
+	text-decoration: underline;
+}
+
+.feedback-link:focus-visible {
+	outline: 2px solid rgb(var(--v-theme-primary));
+	outline-offset: 2px;
+}
+</style>

@@ -33,6 +33,8 @@ queue, merge elevation members, start a new activate window once. See
 | `documenttype`                        | Type metadata, draft scaffold, policy version, author team id  |
 | `approvalchainstep`                   | Ordered template steps (named or pool + SLA + elevation)       |
 | `appsetting`                          | Feature flags (`allowApproverOverride`, collaboration mode, …) |
+| `prioritylevel`                       | Admin catalog of priority keys (`low`/`normal`/`high`/`mission_critical`) |
+| `documentsubtype`                     | Optional subtypes per document type (own chain / scaffold / prefix) |
 
 ## Case tables
 
@@ -40,7 +42,8 @@ queue, merge elevation members, start a new activate window once. See
 | -------------- | --------------------------------------------------------------------- |
 | `document`     | Request + draft + denormalized inbox/SLA + publish destination lookup |
 | `approvalstep` | Runtime chain instance with activate SLA + approved revision          |
-| `historyevent` | Audit trail                                                           |
+| `historyevent` | Audit trail (short machine message; not the comment body)             |
+| `reviewcomment` | Durable reviewer/author feedback; survives withdraw & revise         |
 
 ## Lookups
 
@@ -110,3 +113,9 @@ becomes `superseded` when the successor publishes (same `documentnumber`,
 
 Library (`GET /library`) and reader (`GET /documents/by-number/{number}`) are visible to
 authenticated Document Routing users. Number allocation is server/Flow only.
+
+## Review comments, priorities, and subtypes (Phases 23–27)
+
+- **`reviewcomment`** is the human-feedback store. `historyevent.message` stays a short audit line (`Rejected by Compliance`). Comments are written at decide-time so withdraw cannot lose them.
+- **`document.priority`** is a **string key** matching `prioritylevel.key` (not a closed choice). Existing orgs that still have a Dataverse choice column should **dual-read** until migrated; new provision uses string. `document.priorityreason` is required when the catalog row has `requiresReason`.
+- **`documentsubtype`** is optional per type. If a type has any active subtype, create requires one. Chain/scaffold/hint/number-prefix may override per subtype; otherwise inherit the type. In-flight cases keep the chain captured at submit.

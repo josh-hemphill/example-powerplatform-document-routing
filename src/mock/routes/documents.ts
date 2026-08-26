@@ -16,9 +16,14 @@ import {
 	isDraftEditableStatus,
 } from '../../domain/document-access.ts';
 import {
+	findControlDocumentSubtype,
 	findControlDocumentType,
+	findPriorityLevel,
+	getControlStore,
 	toDocumentTypeDefinition,
 } from '../control-store.ts';
+import { validatePrioritySelection } from '../../domain/priority-catalog.ts';
+import { DEFAULT_PRIORITY_KEY } from '../../domain/priority-catalog.ts';
 import { pushHistory, toSummary } from '../document-http.ts';
 import { getDocumentStore } from '../document-store.ts';
 import { paginateItems, parseListPagination } from '../list-pagination.ts';
@@ -82,7 +87,13 @@ export async function handleDocumentRoutes(context: MockHttpContext): Promise<bo
 				matchesInboxPersona(toSummary(document), persona, actor, roles));
 		}
 
-		records.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+		records.sort((a, b) => {
+			const rankDelta = priorityRank(b.priority) - priorityRank(a.priority);
+			if (rankDelta !== 0) {
+				return rankDelta;
+			}
+			return b.updatedAt.localeCompare(a.updatedAt);
+		});
 		const page = paginateItems(records.map(toSummary), offset, limit);
 		sendJson(res, 200, page);
 		return true;
@@ -93,7 +104,9 @@ export async function handleDocumentRoutes(context: MockHttpContext): Promise<bo
 			title: string;
 			documentType: string;
 			freeformRequest: string;
-			priority?: 'low' | 'normal' | 'high';
+			priority?: string;
+			priorityReason?: string | null;
+			documentSubtypeId?: string | null;
 			requestedPublishSiteUrl?: string;
 			requestedLibraryName?: string;
 		}>(req);
@@ -118,6 +131,45 @@ export async function handleDocumentRoutes(context: MockHttpContext): Promise<bo
 			return true;
 		}
 		const type = toDocumentTypeDefinition(typeRow);
+		const subtypes = getControlStore().documentSubtypes.filter(
+			(item) => item.documentTypeId === type.id && item.active,
+		);
+		let documentSubtypeId: string | null = null;
+		if (subtypes.length > 0) {
+			const requested = body.documentSubtypeId?.trim() ?? '';
+			if (!requested) {
+				sendJson(res, 400, {
+					message: `Document type ${type.id} requires a subtype`,
+					code: 'subtype_required',
+				});
+				return true;
+			}
+			const subtype = findControlDocumentSubtype(requested, type.id);
+			if (!subtype || !subtype.active) {
+				sendJson(res, 400, {
+					message: `Unknown subtype: ${requested}`,
+					code: 'unknown_subtype',
+				});
+				return true;
+			}
+			documentSubtypeId = subtype.key;
+		}
+
+		const priorityKey = (body.priority ?? DEFAULT_PRIORITY_KEY).trim();
+		const priorityError = validatePrioritySelection(
+			priorityKey,
+			body.priorityReason,
+			getControlStore().priorityLevels,
+		);
+		if (priorityError) {
+			sendJson(res, 400, {
+				message: priorityError.message,
+				code: priorityError.code,
+			});
+			return true;
+		}
+		const priorityRow = findPriorityLevel(priorityKey);
+
 		const id = randomUUID();
 		const createdAt = stamp();
 		const collaboratorEmails = uniqueEmails([
@@ -131,7 +183,12 @@ export async function handleDocumentRoutes(context: MockHttpContext): Promise<bo
 			status: 'requested',
 			requesterEmail: actor,
 			collaboratorEmails,
-			priority: body.priority ?? 'normal',
+			priority: priorityRow?.key ?? priorityKey,
+			priorityReason: priorityRow?.requiresReason
+				? (body.priorityReason ?? '').trim()
+				: (body.priorityReason?.trim() || null),
+			documentSubtypeId,
+			reviewComments: [],
 			currentApproverEmail: null,
 			currentStepStatus: null,
 			currentStepDueAt: null,
@@ -185,6 +242,55 @@ export async function handleDocumentRoutes(context: MockHttpContext): Promise<bo
 			});
 			return true;
 		}
+		sendJson(res, 200, document);
+		return true;
+	}
+
+	const priorityMatch = matchRoute(path, /^\/api\/documents\/([^/]+)\/priority$/);
+	if (method === 'PUT' && priorityMatch) {
+		const document = getDocumentStore().get(priorityMatch[1]);
+		if (!document) {
+			sendJson(res, 404, { message: 'Document not found', code: 'not_found' });
+			return true;
+		}
+		if (!canActorMutateDraft(document, actor)) {
+			sendJson(res, 403, {
+				message: 'Only shared authors/requesters can change priority',
+				code: 'forbidden',
+			});
+			return true;
+		}
+		if (document.status !== 'requested' && document.status !== 'drafting') {
+			sendJson(res, 409, {
+				message: 'Priority can only be changed while requested or drafting',
+				code: 'invalid_state',
+			});
+			return true;
+		}
+		const body = await readJson<{ priority: string; priorityReason?: string | null }>(req);
+		const priorityError = validatePrioritySelection(
+			body.priority,
+			body.priorityReason,
+			getControlStore().priorityLevels,
+		);
+		if (priorityError) {
+			sendJson(res, 400, {
+				message: priorityError.message,
+				code: priorityError.code,
+			});
+			return true;
+		}
+		const priorityRow = findPriorityLevel(body.priority);
+		document.priority = priorityRow?.key ?? body.priority.trim();
+		document.priorityReason = priorityRow?.requiresReason
+			? (body.priorityReason ?? '').trim()
+			: (body.priorityReason?.trim() || null);
+		pushHistory(
+			document,
+			actor,
+			'priority_changed',
+			`Priority set to ${document.priority}`,
+		);
 		sendJson(res, 200, document);
 		return true;
 	}
@@ -272,4 +378,8 @@ export async function handleDocumentRoutes(context: MockHttpContext): Promise<bo
 	}
 
 	return false;
+}
+
+function priorityRank(key: string): number {
+	return findPriorityLevel(key)?.rank ?? 0;
 }

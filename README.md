@@ -31,7 +31,7 @@ Freeform request ⇄ Author draft → Approval chain → Approved → Publish PD
 
 Inbox personas: All · Waiting on me · Available in my pool · My requests · Needs draft · Ready to publish.
 
-Approvals support **named** steps and **pool** queues with claim/release, immutable `activateDueAt` SLA, and elevation pools. Live routing is maintained in **Admin** (`#/admin`) / Dataverse control tables — `document-types.ts` is the local seed mirror only. Flow stubs: [`deploy/flows/`](./deploy/flows/README.md).
+Approvals support **named** steps and **pool** queues with claim/release, immutable `activateDueAt` SLA, and elevation pools. Live routing is maintained in **Admin** (`#/admin`) / Dataverse control tables — `document-types.ts` is the local seed mirror only. Admin also owns the **priority catalog** (mission-critical requires a reason) and optional **document subtypes**. Review comments survive withdraw & revise. Flow stubs: [`deploy/flows/`](./deploy/flows/README.md).
 
 ## Quick start (local)
 

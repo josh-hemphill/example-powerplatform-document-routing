@@ -54,7 +54,7 @@ const typeFilterItems = computed(() => [
 		value: item.id,
 	})),
 ]);
-const { typeLabel } = useDocumentTypeLabel(() => typesData.value?.items);
+const { typeAndSubtypeLabel } = useDocumentTypeLabel(() => typesData.value?.items);
 
 const queryInput = computed(() => ({
 	query: {
@@ -240,7 +240,7 @@ function isOpenable(item: { documentNumber?: string | null; status: string }): b
 									</template>
 								</td>
 								<td>{{ item.title }}</td>
-								<td>{{ typeLabel(item.documentType) }}</td>
+								<td>{{ typeAndSubtypeLabel(item.documentType, item.documentSubtypeId) }}</td>
 								<td>{{ item.documentVersion ?? '—' }}</td>
 								<td>
 									<DocumentStatusChip :status="item.status" />
@@ -295,7 +295,7 @@ function isOpenable(item: { documentNumber?: string | null; status: string }): b
 							<div class="d-flex flex-wrap align-center ga-2 mb-1">
 								<DocumentStatusChip :status="item.status" />
 								<span class="text-caption text-medium-emphasis">
-									{{ typeLabel(item.documentType) }}
+									{{ typeAndSubtypeLabel(item.documentType, item.documentSubtypeId) }}
 									· v{{ item.documentVersion ?? '—' }}
 								</span>
 							</div>
@@ -335,7 +335,7 @@ function isOpenable(item: { documentNumber?: string | null; status: string }): b
 						<div class="d-flex flex-wrap align-center ga-2 mb-1">
 							<DocumentStatusChip :status="item.status" />
 							<span class="text-caption text-medium-emphasis">
-								{{ typeLabel(item.documentType) }}
+								{{ typeAndSubtypeLabel(item.documentType, item.documentSubtypeId) }}
 								· v{{ item.documentVersion ?? '—' }}
 							</span>
 						</div>

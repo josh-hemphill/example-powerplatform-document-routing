@@ -23,6 +23,10 @@ export interface DecisionFormState {
 	comment: string;
 }
 
+export interface ReviewResponseDrafts {
+	[commentId: string]: string;
+}
+
 interface FormSnapshot {
 	draft: DraftFormState;
 	publish: PublishFormState;
@@ -50,6 +54,7 @@ export function useDocumentFormState(input: {
 	});
 	const approvalForm = reactive<ApprovalFormState>({ comment: '' });
 	const decisionForm = reactive<DecisionFormState>({ comment: '' });
+	const reviewResponseDrafts = reactive<ReviewResponseDrafts>({});
 
 	const hydratedDocumentId = ref<string | null>(null);
 	const snapshot = ref<FormSnapshot | null>(null);
@@ -133,6 +138,10 @@ export function useDocumentFormState(input: {
 		decisionForm.comment = '';
 	}
 
+	function clearReviewResponseDraft(commentId: string): void {
+		delete reviewResponseDrafts[commentId];
+	}
+
 	/**
 	 * Hydrates forms from the server document (load, document switch, or discard).
 	 * Soft refetch of the same document never clears in-progress action comments.
@@ -155,6 +164,9 @@ export function useDocumentFormState(input: {
 		// Only clear comments when switching documents (or forced discard/reload).
 		if (!sameDocument || force) {
 			clearActionComments();
+			for (const key of Object.keys(reviewResponseDrafts)) {
+				delete reviewResponseDrafts[key];
+			}
 		}
 	}
 
@@ -205,6 +217,7 @@ export function useDocumentFormState(input: {
 		publishForm,
 		approvalForm,
 		decisionForm,
+		reviewResponseDrafts,
 		isDraftDirty,
 		isPublishDirty,
 		isDirty,
@@ -212,5 +225,6 @@ export function useDocumentFormState(input: {
 		markDraftClean,
 		markPublishClean,
 		clearActionComments,
+		clearReviewResponseDraft,
 	};
 }

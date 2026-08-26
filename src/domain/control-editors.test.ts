@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	createEmptyChainStep,
+	createEmptySubtype,
 	editorRowKey,
 	moveChainStep,
 	normalizeChainOrders,
@@ -29,6 +30,19 @@ describe('control editors helpers', () => {
 		expect(moved.map((step) => step.order)).toEqual([1, 2, 3]);
 		expect(moved[1]).toBe(a);
 		expect(editorRowKey(moved[1])).toBe(keyA);
+	});
+
+	it('defaults new steps to standard authority and required_on_reject', () => {
+		const step = createEmptyChainStep(1);
+		expect(step.authorityLevel).toBe('standard');
+		expect(step.commentPolicy).toBe('required_on_reject');
+	});
+
+	it('creates a client-only subtype id until POST', () => {
+		const subtype = createEmptySubtype('policy', 'hr');
+		expect(subtype.id.startsWith('new:')).toBe(true);
+		expect(subtype.documentTypeId).toBe('policy');
+		expect(subtype.usesOwnChain).toBe(false);
 	});
 
 	it('parses valid chain JSON', () => {

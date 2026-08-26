@@ -59,4 +59,16 @@ describe('createSeedDocuments', () => {
 			),
 		).toBe(true);
 	});
+
+	it('keeps Gift Policy Amendment reviewer body on reviewComments and a short history message', () => {
+		const gift = createSeedDocuments().find(
+			(document) => document.title === 'Gift Policy Amendment',
+		);
+		expect(gift).toBeTruthy();
+		const body = 'Need manager attestation language before approval';
+		expect(gift!.approvalSteps[0]?.comment).toBe(body);
+		expect(gift!.reviewComments.some((comment) => comment.body === body)).toBe(true);
+		expect(gift!.history[0]?.message).toBe('Rejected by Compliance');
+		expect(gift!.reviewComments[0]?.authorityLevel).toBe('authoritative');
+	});
 });

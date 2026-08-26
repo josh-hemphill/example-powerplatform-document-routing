@@ -4,8 +4,8 @@ import { type _JSONValue, defineQueryOptions, type UseMutationOptions } from '@p
 
 import { serializeQueryKeyValue } from '../client';
 import { client } from '../client.gen';
-import { abandonSupersede, claimApprovalStep, createApproverPool, createDocumentRequest, createDocumentType, createPublishDestination, deactivateDocumentType, deactivatePublishDestination, decideApprovalStep, deleteApproverPool, getControlSettings, getDocument, getDocumentByNumber, getDocumentTypeConfig, getPrincipal, listApproverPools, listDocuments, listDocumentTypes, listFlowRuns, listLibraryDocuments, listPublishDestinations, type Options, processApprovalSla, publishDocumentPdf, releaseApprovalStep, submitForApproval, supersedeDocument, updateApproverPool, updateControlSettings, updateDocumentDraft, updateDocumentType, updatePublishDestination, withdrawAndRevise } from '../sdk.gen';
-import type { AbandonSupersedeData, AbandonSupersedeError, AbandonSupersedeResponse, ClaimApprovalStepData, ClaimApprovalStepError, ClaimApprovalStepResponse, CreateApproverPoolData, CreateApproverPoolError, CreateApproverPoolResponse, CreateDocumentRequestData, CreateDocumentRequestError, CreateDocumentRequestResponse, CreateDocumentTypeData, CreateDocumentTypeError, CreateDocumentTypeResponse, CreatePublishDestinationData, CreatePublishDestinationError, CreatePublishDestinationResponse, DeactivateDocumentTypeData, DeactivateDocumentTypeError, DeactivateDocumentTypeResponse, DeactivatePublishDestinationData, DeactivatePublishDestinationError, DeactivatePublishDestinationResponse, DecideApprovalStepData, DecideApprovalStepError, DecideApprovalStepResponse, DeleteApproverPoolData, DeleteApproverPoolError, DeleteApproverPoolResponse, GetControlSettingsData, GetControlSettingsError, GetControlSettingsResponse, GetDocumentByNumberData, GetDocumentByNumberError, GetDocumentByNumberResponse, GetDocumentData, GetDocumentError, GetDocumentResponse, GetDocumentTypeConfigData, GetDocumentTypeConfigError, GetDocumentTypeConfigResponse, GetPrincipalData, GetPrincipalError, GetPrincipalResponse, ListApproverPoolsData, ListApproverPoolsError, ListApproverPoolsResponse, ListDocumentsData, ListDocumentsError, ListDocumentsResponse, ListDocumentTypesData, ListDocumentTypesResponse, ListFlowRunsData, ListFlowRunsError, ListFlowRunsResponse, ListLibraryDocumentsData, ListLibraryDocumentsError, ListLibraryDocumentsResponse, ListPublishDestinationsData, ListPublishDestinationsResponse, ProcessApprovalSlaData, ProcessApprovalSlaError, ProcessApprovalSlaResponse, PublishDocumentPdfData, PublishDocumentPdfError, PublishDocumentPdfResponse, ReleaseApprovalStepData, ReleaseApprovalStepError, ReleaseApprovalStepResponse, SubmitForApprovalData, SubmitForApprovalError, SubmitForApprovalResponse, SupersedeDocumentData, SupersedeDocumentError, SupersedeDocumentResponse, UpdateApproverPoolData, UpdateApproverPoolError, UpdateApproverPoolResponse, UpdateControlSettingsData, UpdateControlSettingsError, UpdateControlSettingsResponse, UpdateDocumentDraftData, UpdateDocumentDraftError, UpdateDocumentDraftResponse, UpdateDocumentTypeData, UpdateDocumentTypeError, UpdateDocumentTypeResponse, UpdatePublishDestinationData, UpdatePublishDestinationError, UpdatePublishDestinationResponse, WithdrawAndReviseData, WithdrawAndReviseError, WithdrawAndReviseResponse } from '../types.gen';
+import { abandonSupersede, acknowledgeReviewComment, claimApprovalStep, createApproverPool, createDocumentRequest, createDocumentSubtype, createDocumentType, createPriorityLevel, createPublishDestination, deactivateDocumentSubtype, deactivateDocumentType, deactivatePublishDestination, decideApprovalStep, deleteApproverPool, getControlSettings, getDocument, getDocumentByNumber, getDocumentTypeConfig, getPrincipal, listApproverPools, listDocuments, listDocumentSubtypes, listDocumentTypes, listFlowRuns, listLibraryDocuments, listPriorityLevels, listPublishDestinations, type Options, processApprovalSla, publishDocumentPdf, releaseApprovalStep, respondToReviewComment, submitForApproval, supersedeDocument, updateApproverPool, updateControlSettings, updateDocumentDraft, updateDocumentPriority, updateDocumentSubtype, updateDocumentType, updatePriorityLevel, updatePublishDestination, withdrawAndRevise } from '../sdk.gen';
+import type { AbandonSupersedeData, AbandonSupersedeError, AbandonSupersedeResponse, AcknowledgeReviewCommentData, AcknowledgeReviewCommentError, AcknowledgeReviewCommentResponse, ClaimApprovalStepData, ClaimApprovalStepError, ClaimApprovalStepResponse, CreateApproverPoolData, CreateApproverPoolError, CreateApproverPoolResponse, CreateDocumentRequestData, CreateDocumentRequestError, CreateDocumentRequestResponse, CreateDocumentSubtypeData, CreateDocumentSubtypeError, CreateDocumentSubtypeResponse, CreateDocumentTypeData, CreateDocumentTypeError, CreateDocumentTypeResponse, CreatePriorityLevelData, CreatePriorityLevelError, CreatePriorityLevelResponse, CreatePublishDestinationData, CreatePublishDestinationError, CreatePublishDestinationResponse, DeactivateDocumentSubtypeData, DeactivateDocumentSubtypeError, DeactivateDocumentSubtypeResponse, DeactivateDocumentTypeData, DeactivateDocumentTypeError, DeactivateDocumentTypeResponse, DeactivatePublishDestinationData, DeactivatePublishDestinationError, DeactivatePublishDestinationResponse, DecideApprovalStepData, DecideApprovalStepError, DecideApprovalStepResponse, DeleteApproverPoolData, DeleteApproverPoolError, DeleteApproverPoolResponse, GetControlSettingsData, GetControlSettingsError, GetControlSettingsResponse, GetDocumentByNumberData, GetDocumentByNumberError, GetDocumentByNumberResponse, GetDocumentData, GetDocumentError, GetDocumentResponse, GetDocumentTypeConfigData, GetDocumentTypeConfigError, GetDocumentTypeConfigResponse, GetPrincipalData, GetPrincipalError, GetPrincipalResponse, ListApproverPoolsData, ListApproverPoolsError, ListApproverPoolsResponse, ListDocumentsData, ListDocumentsError, ListDocumentsResponse, ListDocumentSubtypesData, ListDocumentSubtypesError, ListDocumentSubtypesResponse, ListDocumentTypesData, ListDocumentTypesResponse, ListFlowRunsData, ListFlowRunsError, ListFlowRunsResponse, ListLibraryDocumentsData, ListLibraryDocumentsError, ListLibraryDocumentsResponse, ListPriorityLevelsData, ListPriorityLevelsError, ListPriorityLevelsResponse, ListPublishDestinationsData, ListPublishDestinationsResponse, ProcessApprovalSlaData, ProcessApprovalSlaError, ProcessApprovalSlaResponse, PublishDocumentPdfData, PublishDocumentPdfError, PublishDocumentPdfResponse, ReleaseApprovalStepData, ReleaseApprovalStepError, ReleaseApprovalStepResponse, RespondToReviewCommentData, RespondToReviewCommentError, RespondToReviewCommentResponse, SubmitForApprovalData, SubmitForApprovalError, SubmitForApprovalResponse, SupersedeDocumentData, SupersedeDocumentError, SupersedeDocumentResponse, UpdateApproverPoolData, UpdateApproverPoolError, UpdateApproverPoolResponse, UpdateControlSettingsData, UpdateControlSettingsError, UpdateControlSettingsResponse, UpdateDocumentDraftData, UpdateDocumentDraftError, UpdateDocumentDraftResponse, UpdateDocumentPriorityData, UpdateDocumentPriorityError, UpdateDocumentPriorityResponse, UpdateDocumentSubtypeData, UpdateDocumentSubtypeError, UpdateDocumentSubtypeResponse, UpdateDocumentTypeData, UpdateDocumentTypeError, UpdateDocumentTypeResponse, UpdatePriorityLevelData, UpdatePriorityLevelError, UpdatePriorityLevelResponse, UpdatePublishDestinationData, UpdatePublishDestinationError, UpdatePublishDestinationResponse, WithdrawAndReviseData, WithdrawAndReviseError, WithdrawAndReviseResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'path'> & {
@@ -151,10 +151,10 @@ export const submitForApprovalMutation = (options?: Partial<Options<SubmitForApp
 /**
  * Withdraw review and return to drafting
  *
- * Clears approval steps and returns the case to `drafting` so authors can
- * revise content. Allowed from `in_review`, `rejected`, or `approved`
- * for the requester, author, or collaborators. Not allowed from
- * `published` or `superseded` (use supersede instead).
+ * Clears runtime approval steps and returns the case to `drafting` so authors
+ * can revise content. **Review comments are not deleted.** Allowed from
+ * `in_review`, `rejected`, or `approved` for the requester, author, or
+ * collaborators. Not allowed from `published` or `superseded` (use supersede).
  *
  */
 export const withdrawAndReviseMutation = (options?: Partial<Options<WithdrawAndReviseData>>): UseMutationOptions<WithdrawAndReviseResponse, Options<WithdrawAndReviseData>, WithdrawAndReviseError> => ({
@@ -174,6 +174,63 @@ export const withdrawAndReviseMutation = (options?: Partial<Options<WithdrawAndR
 export const decideApprovalStepMutation = (options?: Partial<Options<DecideApprovalStepData>>): UseMutationOptions<DecideApprovalStepResponse, Options<DecideApprovalStepData>, DecideApprovalStepError> => ({
     mutation: async (vars) => {
         const { data } = await decideApprovalStep({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+/**
+ * Author response that addresses an open review comment
+ *
+ * Allowed for requester, author, or collaborators (same as withdraw).
+ * Sets the parent comment `status=addressed` and inserts a child
+ * `kind=author_response`. Authoritative comments require a non-whitespace
+ * body of at least 20 characters (`AUTHORITATIVE_RESPONSE_MIN_LENGTH`).
+ *
+ */
+export const respondToReviewCommentMutation = (options?: Partial<Options<RespondToReviewCommentData>>): UseMutationOptions<RespondToReviewCommentResponse, Options<RespondToReviewCommentData>, RespondToReviewCommentError> => ({
+    mutation: async (vars) => {
+        const { data } = await respondToReviewComment({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+/**
+ * Acknowledge an open standard review comment without a long reply
+ *
+ * Allowed for requester, author, or collaborators. Standard (and advisory)
+ * open decision comments may be acknowledged. Authoritative comments must
+ * be responded to, not acknowledged.
+ *
+ */
+export const acknowledgeReviewCommentMutation = (options?: Partial<Options<AcknowledgeReviewCommentData>>): UseMutationOptions<AcknowledgeReviewCommentResponse, Options<AcknowledgeReviewCommentData>, AcknowledgeReviewCommentError> => ({
+    mutation: async (vars) => {
+        const { data } = await acknowledgeReviewComment({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+/**
+ * Change priority on a requested or drafting case
+ *
+ * Same catalog rules as create. Allowed for requester, author, or
+ * collaborators while the case is `requested` or `drafting`.
+ *
+ */
+export const updateDocumentPriorityMutation = (options?: Partial<Options<UpdateDocumentPriorityData>>): UseMutationOptions<UpdateDocumentPriorityResponse, Options<UpdateDocumentPriorityData>, UpdateDocumentPriorityError> => ({
+    mutation: async (vars) => {
+        const { data } = await updateDocumentPriority({
             ...options,
             ...vars,
             throwOnError: true
@@ -565,3 +622,107 @@ export const listFlowRunsQuery = defineQueryOptions<Options<ListFlowRunsData>, L
         return data;
     }
 }));
+
+export const listPriorityLevelsQueryKey = (options?: Options<ListPriorityLevelsData>) => createQueryKey('listPriorityLevels', options, ['Control']);
+
+/**
+ * List priority catalog (active for users; all for admins)
+ */
+export const listPriorityLevelsQuery = defineQueryOptions<Options<ListPriorityLevelsData>, ListPriorityLevelsResponse, ListPriorityLevelsError>((options?: Options<ListPriorityLevelsData>) => ({
+    key: listPriorityLevelsQueryKey(options),
+    query: async (context) => {
+        const { data } = await listPriorityLevels({
+            ...options,
+            ...context,
+            throwOnError: true
+        });
+        return data;
+    }
+}));
+
+/**
+ * Create a priority catalog row (Admin)
+ */
+export const createPriorityLevelMutation = (options?: Partial<Options<CreatePriorityLevelData>>): UseMutationOptions<CreatePriorityLevelResponse, Options<CreatePriorityLevelData>, CreatePriorityLevelError> => ({
+    mutation: async (vars) => {
+        const { data } = await createPriorityLevel({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+/**
+ * Update a priority catalog row (Admin)
+ */
+export const updatePriorityLevelMutation = (options?: Partial<Options<UpdatePriorityLevelData>>): UseMutationOptions<UpdatePriorityLevelResponse, Options<UpdatePriorityLevelData>, UpdatePriorityLevelError> => ({
+    mutation: async (vars) => {
+        const { data } = await updatePriorityLevel({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+export const listDocumentSubtypesQueryKey = (options?: Options<ListDocumentSubtypesData>) => createQueryKey('listDocumentSubtypes', options, ['Control']);
+
+/**
+ * List document subtypes (active for users; all for admins)
+ */
+export const listDocumentSubtypesQuery = defineQueryOptions<Options<ListDocumentSubtypesData>, ListDocumentSubtypesResponse, ListDocumentSubtypesError>((options?: Options<ListDocumentSubtypesData>) => ({
+    key: listDocumentSubtypesQueryKey(options),
+    query: async (context) => {
+        const { data } = await listDocumentSubtypes({
+            ...options,
+            ...context,
+            throwOnError: true
+        });
+        return data;
+    }
+}));
+
+/**
+ * Create a document subtype (Admin)
+ */
+export const createDocumentSubtypeMutation = (options?: Partial<Options<CreateDocumentSubtypeData>>): UseMutationOptions<CreateDocumentSubtypeResponse, Options<CreateDocumentSubtypeData>, CreateDocumentSubtypeError> => ({
+    mutation: async (vars) => {
+        const { data } = await createDocumentSubtype({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+/**
+ * Deactivate a document subtype (Admin)
+ */
+export const deactivateDocumentSubtypeMutation = (options?: Partial<Options<DeactivateDocumentSubtypeData>>): UseMutationOptions<DeactivateDocumentSubtypeResponse, Options<DeactivateDocumentSubtypeData>, DeactivateDocumentSubtypeError> => ({
+    mutation: async (vars) => {
+        const { data } = await deactivateDocumentSubtype({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});
+
+/**
+ * Update a document subtype including optional own chain (Admin)
+ */
+export const updateDocumentSubtypeMutation = (options?: Partial<Options<UpdateDocumentSubtypeData>>): UseMutationOptions<UpdateDocumentSubtypeResponse, Options<UpdateDocumentSubtypeData>, UpdateDocumentSubtypeError> => ({
+    mutation: async (vars) => {
+        const { data } = await updateDocumentSubtype({
+            ...options,
+            ...vars,
+            throwOnError: true
+        });
+        return data;
+    }
+});

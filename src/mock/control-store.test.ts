@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+	activeSubtypesForType,
 	findControlDocumentType,
 	getControlStore,
 	materializeApprovalSteps,
@@ -36,6 +37,35 @@ describe('control store', () => {
 				(member) => member.email.toLowerCase() === 'new.reviewer@contoso.com',
 			),
 		).toBe(true);
+	});
+
+	it('materializes safety SOP own-chain as Quality then Operations', () => {
+		const safety = materializeApprovalSteps('sop', 'safety');
+		expect(safety?.map((step) => step.role)).toEqual([
+			'Quality',
+			'Operations Reviewers',
+		]);
+		const inherited = materializeApprovalSteps('sop', 'operations');
+		expect(inherited?.map((step) => step.role)).toEqual([
+			'Operations Reviewers',
+			'Quality',
+		]);
+	});
+
+	it('seeds mission-critical in the priority catalog', () => {
+		const mission = getControlStore().priorityLevels.find(
+			(item) => item.key === 'mission_critical',
+		);
+		expect(mission?.requiresReason).toBe(true);
+		expect(mission?.minReasonLength).toBe(20);
+	});
+
+	it('requires subtypes for policy but not announcement', () => {
+		expect(activeSubtypesForType('policy').map((item) => item.key)).toEqual([
+			'corporate',
+			'hr',
+		]);
+		expect(activeSubtypesForType('announcement')).toEqual([]);
 	});
 
 	it('finds control document types by id', () => {

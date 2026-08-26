@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AbandonSupersedeData, AbandonSupersedeErrors, AbandonSupersedeResponses, ClaimApprovalStepData, ClaimApprovalStepErrors, ClaimApprovalStepResponses, CreateApproverPoolData, CreateApproverPoolErrors, CreateApproverPoolResponses, CreateDocumentRequestData, CreateDocumentRequestErrors, CreateDocumentRequestResponses, CreateDocumentTypeData, CreateDocumentTypeErrors, CreateDocumentTypeResponses, CreatePublishDestinationData, CreatePublishDestinationErrors, CreatePublishDestinationResponses, DeactivateDocumentTypeData, DeactivateDocumentTypeErrors, DeactivateDocumentTypeResponses, DeactivatePublishDestinationData, DeactivatePublishDestinationErrors, DeactivatePublishDestinationResponses, DecideApprovalStepData, DecideApprovalStepErrors, DecideApprovalStepResponses, DeleteApproverPoolData, DeleteApproverPoolErrors, DeleteApproverPoolResponses, GetControlSettingsData, GetControlSettingsErrors, GetControlSettingsResponses, GetDocumentByNumberData, GetDocumentByNumberErrors, GetDocumentByNumberResponses, GetDocumentData, GetDocumentErrors, GetDocumentResponses, GetDocumentTypeConfigData, GetDocumentTypeConfigErrors, GetDocumentTypeConfigResponses, GetPrincipalData, GetPrincipalErrors, GetPrincipalResponses, ListApproverPoolsData, ListApproverPoolsErrors, ListApproverPoolsResponses, ListDocumentsData, ListDocumentsErrors, ListDocumentsResponses, ListDocumentTypesData, ListDocumentTypesResponses, ListFlowRunsData, ListFlowRunsErrors, ListFlowRunsResponses, ListLibraryDocumentsData, ListLibraryDocumentsErrors, ListLibraryDocumentsResponses, ListPublishDestinationsData, ListPublishDestinationsResponses, ProcessApprovalSlaData, ProcessApprovalSlaErrors, ProcessApprovalSlaResponses, PublishDocumentPdfData, PublishDocumentPdfErrors, PublishDocumentPdfResponses, ReleaseApprovalStepData, ReleaseApprovalStepErrors, ReleaseApprovalStepResponses, SubmitForApprovalData, SubmitForApprovalErrors, SubmitForApprovalResponses, SupersedeDocumentData, SupersedeDocumentErrors, SupersedeDocumentResponses, UpdateApproverPoolData, UpdateApproverPoolErrors, UpdateApproverPoolResponses, UpdateControlSettingsData, UpdateControlSettingsErrors, UpdateControlSettingsResponses, UpdateDocumentDraftData, UpdateDocumentDraftErrors, UpdateDocumentDraftResponses, UpdateDocumentTypeData, UpdateDocumentTypeErrors, UpdateDocumentTypeResponses, UpdatePublishDestinationData, UpdatePublishDestinationErrors, UpdatePublishDestinationResponses, WithdrawAndReviseData, WithdrawAndReviseErrors, WithdrawAndReviseResponses } from './types.gen';
+import type { AbandonSupersedeData, AbandonSupersedeErrors, AbandonSupersedeResponses, AcknowledgeReviewCommentData, AcknowledgeReviewCommentErrors, AcknowledgeReviewCommentResponses, ClaimApprovalStepData, ClaimApprovalStepErrors, ClaimApprovalStepResponses, CreateApproverPoolData, CreateApproverPoolErrors, CreateApproverPoolResponses, CreateDocumentRequestData, CreateDocumentRequestErrors, CreateDocumentRequestResponses, CreateDocumentSubtypeData, CreateDocumentSubtypeErrors, CreateDocumentSubtypeResponses, CreateDocumentTypeData, CreateDocumentTypeErrors, CreateDocumentTypeResponses, CreatePriorityLevelData, CreatePriorityLevelErrors, CreatePriorityLevelResponses, CreatePublishDestinationData, CreatePublishDestinationErrors, CreatePublishDestinationResponses, DeactivateDocumentSubtypeData, DeactivateDocumentSubtypeErrors, DeactivateDocumentSubtypeResponses, DeactivateDocumentTypeData, DeactivateDocumentTypeErrors, DeactivateDocumentTypeResponses, DeactivatePublishDestinationData, DeactivatePublishDestinationErrors, DeactivatePublishDestinationResponses, DecideApprovalStepData, DecideApprovalStepErrors, DecideApprovalStepResponses, DeleteApproverPoolData, DeleteApproverPoolErrors, DeleteApproverPoolResponses, GetControlSettingsData, GetControlSettingsErrors, GetControlSettingsResponses, GetDocumentByNumberData, GetDocumentByNumberErrors, GetDocumentByNumberResponses, GetDocumentData, GetDocumentErrors, GetDocumentResponses, GetDocumentTypeConfigData, GetDocumentTypeConfigErrors, GetDocumentTypeConfigResponses, GetPrincipalData, GetPrincipalErrors, GetPrincipalResponses, ListApproverPoolsData, ListApproverPoolsErrors, ListApproverPoolsResponses, ListDocumentsData, ListDocumentsErrors, ListDocumentsResponses, ListDocumentSubtypesData, ListDocumentSubtypesErrors, ListDocumentSubtypesResponses, ListDocumentTypesData, ListDocumentTypesResponses, ListFlowRunsData, ListFlowRunsErrors, ListFlowRunsResponses, ListLibraryDocumentsData, ListLibraryDocumentsErrors, ListLibraryDocumentsResponses, ListPriorityLevelsData, ListPriorityLevelsErrors, ListPriorityLevelsResponses, ListPublishDestinationsData, ListPublishDestinationsResponses, ProcessApprovalSlaData, ProcessApprovalSlaErrors, ProcessApprovalSlaResponses, PublishDocumentPdfData, PublishDocumentPdfErrors, PublishDocumentPdfResponses, ReleaseApprovalStepData, ReleaseApprovalStepErrors, ReleaseApprovalStepResponses, RespondToReviewCommentData, RespondToReviewCommentErrors, RespondToReviewCommentResponses, SubmitForApprovalData, SubmitForApprovalErrors, SubmitForApprovalResponses, SupersedeDocumentData, SupersedeDocumentErrors, SupersedeDocumentResponses, UpdateApproverPoolData, UpdateApproverPoolErrors, UpdateApproverPoolResponses, UpdateControlSettingsData, UpdateControlSettingsErrors, UpdateControlSettingsResponses, UpdateDocumentDraftData, UpdateDocumentDraftErrors, UpdateDocumentDraftResponses, UpdateDocumentPriorityData, UpdateDocumentPriorityErrors, UpdateDocumentPriorityResponses, UpdateDocumentSubtypeData, UpdateDocumentSubtypeErrors, UpdateDocumentSubtypeResponses, UpdateDocumentTypeData, UpdateDocumentTypeErrors, UpdateDocumentTypeResponses, UpdatePriorityLevelData, UpdatePriorityLevelErrors, UpdatePriorityLevelResponses, UpdatePublishDestinationData, UpdatePublishDestinationErrors, UpdatePublishDestinationResponses, WithdrawAndReviseData, WithdrawAndReviseErrors, WithdrawAndReviseResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -100,10 +100,10 @@ export const submitForApproval = <ThrowOnError extends boolean = false>(options:
 /**
  * Withdraw review and return to drafting
  *
- * Clears approval steps and returns the case to `drafting` so authors can
- * revise content. Allowed from `in_review`, `rejected`, or `approved`
- * for the requester, author, or collaborators. Not allowed from
- * `published` or `superseded` (use supersede instead).
+ * Clears runtime approval steps and returns the case to `drafting` so authors
+ * can revise content. **Review comments are not deleted.** Allowed from
+ * `in_review`, `rejected`, or `approved` for the requester, author, or
+ * collaborators. Not allowed from `published` or `superseded` (use supersede).
  *
  */
 export const withdrawAndRevise = <ThrowOnError extends boolean = false>(options: Options<WithdrawAndReviseData, ThrowOnError>): RequestResult<WithdrawAndReviseResponses, WithdrawAndReviseErrors, ThrowOnError> => (options.client ?? client).post<WithdrawAndReviseResponses, WithdrawAndReviseErrors, ThrowOnError>({
@@ -122,6 +122,60 @@ export const withdrawAndRevise = <ThrowOnError extends boolean = false>(options:
 export const decideApprovalStep = <ThrowOnError extends boolean = false>(options: Options<DecideApprovalStepData, ThrowOnError>): RequestResult<DecideApprovalStepResponses, DecideApprovalStepErrors, ThrowOnError> => (options.client ?? client).post<DecideApprovalStepResponses, DecideApprovalStepErrors, ThrowOnError>({
     security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }, { name: 'X-Document-Routing-Roles', type: 'apiKey' }],
     url: '/documents/{documentId}/approvals/{stepId}/decision',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Author response that addresses an open review comment
+ *
+ * Allowed for requester, author, or collaborators (same as withdraw).
+ * Sets the parent comment `status=addressed` and inserts a child
+ * `kind=author_response`. Authoritative comments require a non-whitespace
+ * body of at least 20 characters (`AUTHORITATIVE_RESPONSE_MIN_LENGTH`).
+ *
+ */
+export const respondToReviewComment = <ThrowOnError extends boolean = false>(options: Options<RespondToReviewCommentData, ThrowOnError>): RequestResult<RespondToReviewCommentResponses, RespondToReviewCommentErrors, ThrowOnError> => (options.client ?? client).post<RespondToReviewCommentResponses, RespondToReviewCommentErrors, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }, { name: 'X-Document-Routing-Roles', type: 'apiKey' }],
+    url: '/documents/{documentId}/review-comments/{commentId}/respond',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Acknowledge an open standard review comment without a long reply
+ *
+ * Allowed for requester, author, or collaborators. Standard (and advisory)
+ * open decision comments may be acknowledged. Authoritative comments must
+ * be responded to, not acknowledged.
+ *
+ */
+export const acknowledgeReviewComment = <ThrowOnError extends boolean = false>(options: Options<AcknowledgeReviewCommentData, ThrowOnError>): RequestResult<AcknowledgeReviewCommentResponses, AcknowledgeReviewCommentErrors, ThrowOnError> => (options.client ?? client).post<AcknowledgeReviewCommentResponses, AcknowledgeReviewCommentErrors, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }, { name: 'X-Document-Routing-Roles', type: 'apiKey' }],
+    url: '/documents/{documentId}/review-comments/{commentId}/acknowledge',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Change priority on a requested or drafting case
+ *
+ * Same catalog rules as create. Allowed for requester, author, or
+ * collaborators while the case is `requested` or `drafting`.
+ *
+ */
+export const updateDocumentPriority = <ThrowOnError extends boolean = false>(options: Options<UpdateDocumentPriorityData, ThrowOnError>): RequestResult<UpdateDocumentPriorityResponses, UpdateDocumentPriorityErrors, ThrowOnError> => (options.client ?? client).put<UpdateDocumentPriorityResponses, UpdateDocumentPriorityErrors, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }, { name: 'X-Document-Routing-Roles', type: 'apiKey' }],
+    url: '/documents/{documentId}/priority',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -419,4 +473,83 @@ export const listFlowRuns = <ThrowOnError extends boolean = false>(options?: Opt
     security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }, { name: 'X-Document-Routing-Roles', type: 'apiKey' }],
     url: '/control/flow-runs',
     ...options
+});
+
+/**
+ * List priority catalog (active for users; all for admins)
+ */
+export const listPriorityLevels = <ThrowOnError extends boolean = false>(options?: Options<ListPriorityLevelsData, ThrowOnError>): RequestResult<ListPriorityLevelsResponses, ListPriorityLevelsErrors, ThrowOnError> => (options?.client ?? client).get<ListPriorityLevelsResponses, ListPriorityLevelsErrors, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }, { name: 'X-Document-Routing-Roles', type: 'apiKey' }],
+    url: '/control/priority-levels',
+    ...options
+});
+
+/**
+ * Create a priority catalog row (Admin)
+ */
+export const createPriorityLevel = <ThrowOnError extends boolean = false>(options: Options<CreatePriorityLevelData, ThrowOnError>): RequestResult<CreatePriorityLevelResponses, CreatePriorityLevelErrors, ThrowOnError> => (options.client ?? client).post<CreatePriorityLevelResponses, CreatePriorityLevelErrors, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }, { name: 'X-Document-Routing-Roles', type: 'apiKey' }],
+    url: '/control/priority-levels',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Update a priority catalog row (Admin)
+ */
+export const updatePriorityLevel = <ThrowOnError extends boolean = false>(options: Options<UpdatePriorityLevelData, ThrowOnError>): RequestResult<UpdatePriorityLevelResponses, UpdatePriorityLevelErrors, ThrowOnError> => (options.client ?? client).put<UpdatePriorityLevelResponses, UpdatePriorityLevelErrors, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }, { name: 'X-Document-Routing-Roles', type: 'apiKey' }],
+    url: '/control/priority-levels/{priorityId}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * List document subtypes (active for users; all for admins)
+ */
+export const listDocumentSubtypes = <ThrowOnError extends boolean = false>(options?: Options<ListDocumentSubtypesData, ThrowOnError>): RequestResult<ListDocumentSubtypesResponses, ListDocumentSubtypesErrors, ThrowOnError> => (options?.client ?? client).get<ListDocumentSubtypesResponses, ListDocumentSubtypesErrors, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }, { name: 'X-Document-Routing-Roles', type: 'apiKey' }],
+    url: '/control/document-subtypes',
+    ...options
+});
+
+/**
+ * Create a document subtype (Admin)
+ */
+export const createDocumentSubtype = <ThrowOnError extends boolean = false>(options: Options<CreateDocumentSubtypeData, ThrowOnError>): RequestResult<CreateDocumentSubtypeResponses, CreateDocumentSubtypeErrors, ThrowOnError> => (options.client ?? client).post<CreateDocumentSubtypeResponses, CreateDocumentSubtypeErrors, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }, { name: 'X-Document-Routing-Roles', type: 'apiKey' }],
+    url: '/control/document-subtypes',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Deactivate a document subtype (Admin)
+ */
+export const deactivateDocumentSubtype = <ThrowOnError extends boolean = false>(options: Options<DeactivateDocumentSubtypeData, ThrowOnError>): RequestResult<DeactivateDocumentSubtypeResponses, DeactivateDocumentSubtypeErrors, ThrowOnError> => (options.client ?? client).delete<DeactivateDocumentSubtypeResponses, DeactivateDocumentSubtypeErrors, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }, { name: 'X-Document-Routing-Roles', type: 'apiKey' }],
+    url: '/control/document-subtypes/{subtypeId}',
+    ...options
+});
+
+/**
+ * Update a document subtype including optional own chain (Admin)
+ */
+export const updateDocumentSubtype = <ThrowOnError extends boolean = false>(options: Options<UpdateDocumentSubtypeData, ThrowOnError>): RequestResult<UpdateDocumentSubtypeResponses, UpdateDocumentSubtypeErrors, ThrowOnError> => (options.client ?? client).put<UpdateDocumentSubtypeResponses, UpdateDocumentSubtypeErrors, ThrowOnError>({
+    security: [{ name: 'X-Document-Routing-Actor', type: 'apiKey' }, { name: 'X-Document-Routing-Roles', type: 'apiKey' }],
+    url: '/control/document-subtypes/{subtypeId}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });

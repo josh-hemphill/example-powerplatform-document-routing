@@ -8,6 +8,13 @@ export const FREEFORM_MIN_LENGTH = 10;
 export const SUMMARY_MAX_LENGTH = 500;
 export const BODY_MARKDOWN_MIN_LENGTH = 1;
 
+export {
+	AUTHORITATIVE_RESPONSE_MIN_LENGTH,
+} from '../domain/review-comments.ts';
+export {
+	MISSION_CRITICAL_REASON_MIN_LENGTH,
+} from '../domain/priority-catalog.ts';
+
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@](?:[^\s.@]*\.[^\s\d\-.\x40-\x5A])*[^\s.@]*\.[\d\-.A-Z]+(?:[^\s\d\-.\x40-\x5A](?:[^\s.@]*\.[^\s\d\-.\x40-\x5A])*[^\s.@]*\.[\d\-.A-Z]+)*$/i;
 
 export type FieldRule = (value: unknown) => true | string;
@@ -24,6 +31,19 @@ export function requiredRule(label = 'This field'): FieldRule {
 			return true;
 		}
 		return `${label} is required`;
+	};
+}
+
+/**
+ * Minimum trimmed length (empty fails when minLength > 0).
+ */
+export function minLengthRule(minLength: number, label = 'This field'): FieldRule {
+	return (value) => {
+		const text = typeof value === 'string' ? value.trim() : '';
+		if (text.length < minLength) {
+			return `${label} must be at least ${minLength} characters`;
+		}
+		return true;
 	};
 }
 

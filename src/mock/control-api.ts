@@ -2,12 +2,20 @@
  * HTTP handlers for `/api/control/*` (Dataverse control-table mirror).
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { ControlChainStep, ControlDocumentType, ControlSettings } from './control-store.ts';
+import type {
+	ControlChainStep,
+	ControlDocumentSubtype,
+	ControlDocumentType,
+	ControlPriorityLevel,
+	ControlSettings,
+} from './control-store.ts';
 import { randomUUID } from 'node:crypto';
+import { DEFAULT_COMMENT_POLICY, seedAuthorityForRole } from '../domain/review-comments.ts';
 import {
-
+	findControlDocumentSubtype,
 	findDestinationById,
 	findPoolById,
+	findPriorityLevel,
 	getControlStore,
 } from './control-store.ts';
 
@@ -75,6 +83,8 @@ function validateChain(chain: ControlChainStep[]): string | null {
 		if (step.slaHours !== undefined && step.slaHours <= 0) {
 			return `Step ${step.order} slaHours must be greater than 0`;
 		}
+		step.authorityLevel ??= seedAuthorityForRole(step.role);
+		step.commentPolicy ??= DEFAULT_COMMENT_POLICY;
 	}
 	for (let expected = 1; expected <= chain.length; expected += 1) {
 		if (!seenOrders.has(expected)) {
@@ -119,9 +129,9 @@ export function handleControlApiRequest(options: {
 
 	return (async() => {
 		if (method === 'GET' && path === '/api/control/document-types') {
-			const items = getControlStore().documentTypes.filter(
-				(type) => isAdmin || type.active,
-			);
+			const items = getControlStore().documentTypes
+				.filter((type) => isAdmin || type.active)
+				.map((type) => typeWithSubtypes(type, isAdmin));
 			sendJson(res, 200, { items });
 			return true;
 		}
@@ -182,7 +192,7 @@ export function handleControlApiRequest(options: {
 					sendJson(res, 404, { message: 'Document type not found', code: 'not_found' });
 					return true;
 				}
-				sendJson(res, 200, type);
+				sendJson(res, 200, typeWithSubtypes(type, isAdmin));
 				return true;
 			}
 			if (method === 'PUT') {
@@ -439,6 +449,138 @@ export function handleControlApiRequest(options: {
 			return true;
 		}
 
+		if (method === 'GET' && path === '/api/control/priority-levels') {
+			const items = getControlStore().priorityLevels.filter(
+				(item) => isAdmin || item.active,
+			);
+			sendJson(res, 200, { items });
+			return true;
+		}
+
+		if (method === 'POST' && path === '/api/control/priority-levels') {
+			if (!requireAdmin()) {
+				return true;
+			}
+			const body = await readJson<ControlPriorityLevel>(req);
+			if (!body.key?.trim() || !body.label?.trim()) {
+				sendJson(res, 400, { message: 'key and label are required', code: 'validation_error' });
+				return true;
+			}
+			if (findPriorityLevel(body.key.trim())) {
+				sendJson(res, 400, { message: 'Priority key already exists', code: 'validation_error' });
+				return true;
+			}
+			const created: ControlPriorityLevel = {
+				id: randomUUID(),
+				key: body.key.trim(),
+				label: body.label.trim(),
+				rank: Number.isFinite(body.rank) ? body.rank : 0,
+				color: body.color ?? 'default',
+				requiresReason: Boolean(body.requiresReason),
+				minReasonLength: body.minReasonLength ?? 0,
+				reasonHint: body.reasonHint ?? '',
+				active: body.active ?? true,
+				slaHoursMultiplier: body.slaHoursMultiplier ?? null,
+			};
+			getControlStore().priorityLevels.push(created);
+			sendJson(res, 201, created);
+			return true;
+		}
+
+		const priorityMatch = matchRoute(path, /^\/api\/control\/priority-levels\/([^/]+)$/);
+		if (priorityMatch && method === 'PUT') {
+			if (!requireAdmin()) {
+				return true;
+			}
+			const row = findPriorityLevel(decodeURIComponent(priorityMatch[1]));
+			if (!row) {
+				sendJson(res, 404, { message: 'Priority level not found', code: 'not_found' });
+				return true;
+			}
+			const body = await readJson<Partial<ControlPriorityLevel>>(req);
+			Object.assign(row, {
+				label: body.label ?? row.label,
+				rank: body.rank ?? row.rank,
+				color: body.color ?? row.color,
+				requiresReason: body.requiresReason ?? row.requiresReason,
+				minReasonLength: body.minReasonLength ?? row.minReasonLength,
+				reasonHint: body.reasonHint ?? row.reasonHint,
+				active: body.active ?? row.active,
+				slaHoursMultiplier:
+					body.slaHoursMultiplier === undefined
+						? row.slaHoursMultiplier
+						: body.slaHoursMultiplier,
+			});
+			sendJson(res, 200, row);
+			return true;
+		}
+
+		if (method === 'GET' && path === '/api/control/document-subtypes') {
+			const typeFilter = new URL(req.url ?? '', 'http://localhost').searchParams.get(
+				'documentType',
+			);
+			const items = getControlStore().documentSubtypes.filter((subtype) => {
+				if (!isAdmin && !subtype.active) {
+					return false;
+				}
+				if (typeFilter && subtype.documentTypeId !== typeFilter) {
+					return false;
+				}
+				return true;
+			});
+			sendJson(res, 200, { items });
+			return true;
+		}
+
+		if (method === 'POST' && path === '/api/control/document-subtypes') {
+			if (!requireAdmin()) {
+				return true;
+			}
+			const body = await readJson<ControlDocumentSubtype>(req);
+			const createdOrError = createOrUpdateSubtype(body, null);
+			if ('error' in createdOrError) {
+				sendJson(res, 400, { message: createdOrError.error, code: 'validation_error' });
+				return true;
+			}
+			getControlStore().documentSubtypes.push(createdOrError);
+			sendJson(res, 201, createdOrError);
+			return true;
+		}
+
+		const subtypeMatch = matchRoute(path, /^\/api\/control\/document-subtypes\/([^/]+)$/);
+		if (subtypeMatch) {
+			const subtype = findControlDocumentSubtype(decodeURIComponent(subtypeMatch[1]));
+			if (!subtype) {
+				sendJson(res, 404, { message: 'Document subtype not found', code: 'not_found' });
+				return true;
+			}
+			if (method === 'PUT') {
+				if (!requireAdmin()) {
+					return true;
+				}
+				const body = await readJson<ControlDocumentSubtype>(req);
+				const updated = createOrUpdateSubtype(
+					{ ...body, documentTypeId: body.documentTypeId || subtype.documentTypeId },
+					subtype,
+				);
+				if ('error' in updated) {
+					sendJson(res, 400, { message: updated.error, code: 'validation_error' });
+					return true;
+				}
+				Object.assign(subtype, updated, { id: subtype.id, key: subtype.key });
+				sendJson(res, 200, subtype);
+				return true;
+			}
+			if (method === 'DELETE') {
+				if (!requireAdmin()) {
+					return true;
+				}
+				subtype.active = false;
+				sendJson(res, 200, subtype);
+				return true;
+			}
+		}
+
 		sendJson(res, 404, { message: 'Not found', code: 'not_found' });
 		return true;
 	})();
@@ -446,4 +588,60 @@ export function handleControlApiRequest(options: {
 
 function findControlType(id: string) {
 	return getControlStore().documentTypes.find((type) => type.id === id);
+}
+
+function typeWithSubtypes(type: ControlDocumentType, isAdmin: boolean) {
+	const subtypes = getControlStore().documentSubtypes.filter(
+		(subtype) =>
+			subtype.documentTypeId === type.id && (isAdmin || subtype.active),
+	);
+	return { ...type, subtypes };
+}
+
+function createOrUpdateSubtype(
+	body: Partial<ControlDocumentSubtype> & { key?: string; label?: string; documentTypeId?: string },
+	existing: ControlDocumentSubtype | null,
+): ControlDocumentSubtype | { error: string } {
+	const key = (body.key ?? existing?.key ?? '').trim();
+	const label = (body.label ?? existing?.label ?? '').trim();
+	const documentTypeId = (body.documentTypeId ?? existing?.documentTypeId ?? '').trim();
+	if (!key || !label || !documentTypeId) {
+		return { error: 'key, label, and documentTypeId are required' };
+	}
+	if (!findControlType(documentTypeId)) {
+		return { error: `Unknown document type: ${documentTypeId}` };
+	}
+	const usesOwnChain = body.usesOwnChain ?? existing?.usesOwnChain ?? false;
+	const approvalChain = [...(body.approvalChain ?? existing?.approvalChain ?? [])].sort(
+		(a, b) => a.order - b.order,
+	);
+	if (usesOwnChain) {
+		const chainError = validateChain(approvalChain);
+		if (chainError) {
+			return { error: chainError };
+		}
+	}
+	if (!existing) {
+		const duplicate = getControlStore().documentSubtypes.some(
+			(item) => item.documentTypeId === documentTypeId && item.key === key,
+		);
+		if (duplicate) {
+			return { error: 'Subtype key already exists for this document type' };
+		}
+	}
+	return {
+		id: existing?.id ?? randomUUID(),
+		key,
+		label,
+		description: body.description ?? existing?.description ?? '',
+		documentTypeId,
+		active: body.active ?? existing?.active ?? true,
+		requestHint: body.requestHint === undefined ? (existing?.requestHint ?? null) : body.requestHint,
+		draftScaffold:
+			body.draftScaffold === undefined ? (existing?.draftScaffold ?? null) : body.draftScaffold,
+		numberPrefix:
+			body.numberPrefix === undefined ? (existing?.numberPrefix ?? null) : body.numberPrefix,
+		usesOwnChain,
+		approvalChain,
+	};
 }

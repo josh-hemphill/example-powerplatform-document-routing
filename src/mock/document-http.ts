@@ -1,5 +1,9 @@
 import type { MockApprovalStep, MockDocumentRecord } from './seed-documents.ts';
 import { randomUUID } from 'node:crypto';
+import {
+	openAuthoritativeComments,
+	previewLastComment,
+} from '../domain/review-comments.ts';
 import { stamp } from './http.ts';
 
 export function toSummary(document: MockDocumentRecord) {
@@ -7,10 +11,13 @@ export function toSummary(document: MockDocumentRecord) {
 		id: document.id,
 		title: document.title,
 		documentType: document.documentType,
+		documentSubtypeId: document.documentSubtypeId,
 		status: document.status,
 		requesterEmail: document.requesterEmail,
 		collaboratorEmails: document.collaboratorEmails,
 		priority: document.priority,
+		openAuthoritativeCommentCount: openAuthoritativeComments(document.reviewComments).length,
+		lastReviewCommentPreview: previewLastComment(document.reviewComments),
 		currentApproverEmail: document.currentApproverEmail,
 		currentStepStatus: document.currentStepStatus,
 		currentStepDueAt: document.currentStepDueAt,
@@ -34,6 +41,7 @@ export function pushHistory(
 	actorEmail: string,
 	action: string,
 	message: string,
+	reviewCommentId?: string | null,
 ): void {
 	document.history.unshift({
 		id: randomUUID(),
@@ -41,6 +49,7 @@ export function pushHistory(
 		actorEmail,
 		action,
 		message,
+		reviewCommentId: reviewCommentId ?? null,
 	});
 	document.updatedAt = stamp();
 }

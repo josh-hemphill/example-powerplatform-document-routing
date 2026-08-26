@@ -183,6 +183,9 @@ describe('dataverse schema + provision plan', () => {
 			'document',
 			'approvalstep',
 			'historyevent',
+			'prioritylevel',
+			'documentsubtype',
+			'reviewcomment',
 		]);
 		const document = schema.tables.find((table) => table.schemaName === 'document')!;
 		expect(document.columns.some((column) => column.schemaName === 'contentrevision')).toBe(
@@ -213,6 +216,11 @@ describe('dataverse schema + provision plan', () => {
 		expect(step.columns.some((column) => column.schemaName === 'elevationsemantics')).toBe(
 			true,
 		);
+		expect(step.columns.some((column) => column.schemaName === 'authoritylevel')).toBe(true);
+		expect(document.columns.some((column) => column.schemaName === 'priorityreason')).toBe(
+			true,
+		);
+		expect(schema.tables.some((table) => table.schemaName === 'reviewcomment')).toBe(true);
 	});
 
 	it('uses publisher optionValuePrefix for choice option values', () => {
@@ -383,6 +391,13 @@ describe('control seed', () => {
 		const seed = buildControlSeedBundle('dr');
 		expect(controlSeedHasSampleIdentities(seed)).toBe(false);
 		expect(seed.sampleIdentityEmails).toEqual([]);
+		expect(seed.priorityLevels.some((row) => row.key === 'mission_critical')).toBe(true);
+		expect(seed.documentSubtypes.some((row) => row.key === 'hr' && row.documentTypeId === 'policy')).toBe(
+			true,
+		);
+		expect(seed.documentTypes.find((type) => type.id === 'policy')?.chain.some(
+			(step) => step.authorityLevel === 'authoritative',
+		)).toBe(true);
 	});
 });
 

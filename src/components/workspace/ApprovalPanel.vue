@@ -2,8 +2,9 @@
 import type { ApprovalStep, ControlChainStep, Document } from '@/client/types.gen';
 import ApprovalStepper from '@/components/ApprovalStepper.vue';
 import { DOCUMENT_STATUS_LABELS } from '@/domain/document-status';
+import { isCommentRequired } from '@/domain/review-comments';
 
-defineProps<{
+const props = defineProps<{
 	document: Document;
 	typeLabel: string;
 	approvalChainPreview: ControlChainStep[];
@@ -21,6 +22,7 @@ defineProps<{
 	isProcessingSla: boolean;
 	isWithdrawing: boolean;
 	expanded: boolean;
+	openAuthoritativeCount?: number;
 	isPrimary?: boolean;
 }>();
 const emit = defineEmits<{
@@ -32,6 +34,7 @@ const emit = defineEmits<{
 	processSla: [];
 	withdraw: [];
 	toggle: [];
+	viewFeedback: [];
 }>();
 const approvalComment = defineModel<string>('approvalComment', { required: true });
 const decisionComment = defineModel<string>('decisionComment', { required: true });
@@ -45,11 +48,30 @@ function stepPreviewTitle(step: ControlChainStep): string {
 
 function stepPreviewSubtitle(step: ControlChainStep): string {
 	const mode = step.assignmentMode === 'pool' ? 'Pool' : 'Named';
-	return `${mode} · SLA ${step.slaHours ?? '—'}h`;
+	const authority = step.authorityLevel ? ` · ${step.authorityLevel}` : '';
+	return `${mode} · SLA ${step.slaHours ?? '—'}h${authority}`;
 }
 
 function hasSteps(steps: ApprovalStep[]): boolean {
 	return steps.length > 0;
+}
+
+function activePendingStep(): ApprovalStep | undefined {
+	return props.document.approvalSteps.find((step) => step.status === 'pending');
+}
+
+function decisionCommentLabel(): string {
+	const step = activePendingStep();
+	if (!step) {
+		return 'Comment';
+	}
+	if (isCommentRequired(step, 'reject') && isCommentRequired(step, 'approve')) {
+		return 'Comment (required for approve or reject)';
+	}
+	if (isCommentRequired(step, 'reject')) {
+		return 'Comment (required when rejecting)';
+	}
+	return 'Comment (optional)';
 }
 </script>
 
@@ -120,7 +142,21 @@ function hasSteps(steps: ApprovalStep[]): boolean {
 							</v-list-item-subtitle>
 						</v-list-item>
 					</v-list>
-					<v-text-field v-model="approvalComment" label="Submission comment" class="mb-3" />
+					<p
+						v-if="(openAuthoritativeCount ?? 0) > 0"
+						class="text-body-2 text-error mb-3"
+					>
+						{{ openAuthoritativeCount }}
+						authoritative
+						{{ openAuthoritativeCount === 1 ? 'comment' : 'comments' }}
+						must be answered in Review feedback before resubmit.
+					</p>
+					<v-textarea
+						v-model="approvalComment"
+						label="Submission comment"
+						rows="2"
+						class="mb-3"
+					/>
 					<v-btn
 						color="warning"
 						:disabled="!canSubmitApproval || isSubmittingApproval"
@@ -131,13 +167,21 @@ function hasSteps(steps: ApprovalStep[]): boolean {
 					</v-btn>
 				</template>
 				<template v-else>
-					<ApprovalStepper :steps="document.approvalSteps" />
+					<ApprovalStepper
+						:steps="document.approvalSteps"
+						@view-feedback="emit('viewFeedback')"
+					/>
 					<div class="mt-4">
 						<p class="text-body-2 text-medium-emphasis mb-2">
 							Acting as signed-in principal: <strong>{{ actorEmail }}</strong>
 							(switch persona in the app bar for local demos).
 						</p>
-						<v-text-field v-model="decisionComment" label="Comment" class="mb-3" />
+						<v-textarea
+							v-model="decisionComment"
+							:label="decisionCommentLabel()"
+							rows="3"
+							class="mb-3"
+						/>
 
 						<div class="text-caption text-medium-emphasis mb-1">
 							Queue

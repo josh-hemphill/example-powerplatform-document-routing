@@ -1,13 +1,21 @@
 import type { MockHttpContext } from '../http.ts';
+import { randomUUID } from 'node:crypto';
 import { toApprovalStepInputs } from '../../config/document-types.ts';
 import {
 	canActorMutateDraft,
 } from '../../domain/document-access.ts';
 import { canActorProcessSla } from '../../domain/document-authz.ts';
+import { shortDecisionHistoryMessage } from '../../domain/history-actions.ts';
+import { canSubmitWithOpenComments } from '../../domain/review-comments.ts';
+import {
+	AUTHORITATIVE_RESPONSE_MIN_LENGTH,
+	isAuthoritativeResponseLongEnough,
+} from '../../domain/review-comments.ts';
 import {
 	claimStep,
 	createStepFromInput,
 	decideStep,
+	displayNameFromEmail,
 	processStepSla,
 	releaseStep,
 	syncCurrentApprovalFields,
@@ -68,6 +76,14 @@ export async function handleApprovalRoutes(context: MockHttpContext): Promise<bo
 			});
 			return true;
 		}
+		if (!canSubmitWithOpenComments(document.reviewComments)) {
+			sendJson(res, 400, {
+				message:
+					'Address open authoritative review comments before submitting for approval',
+				code: 'open_authoritative_comments',
+			});
+			return true;
+		}
 
 		const typeRow = findControlDocumentType(document.documentType);
 		if (!typeRow || !typeRow.active) {
@@ -113,7 +129,10 @@ export async function handleApprovalRoutes(context: MockHttpContext): Promise<bo
 				return true;
 			}
 		}
-		const materialized = materializeApprovalSteps(typeRow.id);
+		const materialized = materializeApprovalSteps(
+			typeRow.id,
+			document.documentSubtypeId,
+		);
 		const stepsInput
 			= allowOverride && isAdmin && body.steps && body.steps.length > 0
 				? body.steps
@@ -146,11 +165,29 @@ export async function handleApprovalRoutes(context: MockHttpContext): Promise<bo
 		document.submittedContentRevision = revision;
 		document.status = 'in_review';
 		syncCurrentApprovalFields(document);
+		if (body.comment?.trim()) {
+			document.reviewComments ??= [];
+			document.reviewComments.push({
+				id: randomUUID(),
+				kind: 'submission',
+				authorityLevel: 'advisory',
+				status: 'open',
+				body: body.comment.trim(),
+				actorEmail: actor,
+				actorDisplayName: displayNameFromEmail(actor),
+				role: null,
+				sourceStepId: null,
+				sourceStepOrder: null,
+				submittedContentRevision: revision,
+				inReplyTo: null,
+				createdAt: new Date().toISOString(),
+			});
+		}
 		pushHistory(
 			document,
 			actor,
 			'submitted_for_approval',
-			body.comment ?? `Submitted to approval chain (revision ${revision})`,
+			`Submitted to approval chain (revision ${revision})`,
 		);
 		sendJson(res, 200, document);
 		return true;
@@ -389,8 +426,9 @@ export async function handleApprovalRoutes(context: MockHttpContext): Promise<bo
 			(item) => item.order === step.order + 1,
 		);
 
+		let reviewCommentId: string | null = null;
 		try {
-			decideStep(
+			reviewCommentId = decideStep(
 				document,
 				step,
 				actor,
@@ -404,7 +442,7 @@ export async function handleApprovalRoutes(context: MockHttpContext): Promise<bo
 			const status
 				= code === 'forbidden'
 					? 403
-					: code === 'validation_error'
+					: code === 'comment_required' || code === 'validation_error'
 						? 400
 						: 409;
 			sendJson(res, status, {
@@ -424,12 +462,150 @@ export async function handleApprovalRoutes(context: MockHttpContext): Promise<bo
 			document,
 			actor,
 			historyAction,
-			body.comment
-			?? (body.decision === 'reject'
-				? 'Rejected in approval chain'
-				: isLastStep
-					? 'All approval steps completed'
-					: `Approved step ${step.order}`),
+			shortDecisionHistoryMessage(
+				body.decision === 'reject' ? 'reject' : 'approve',
+				step.role,
+				isLastStep,
+			),
+			reviewCommentId,
+		);
+		sendJson(res, 200, document);
+		return true;
+	}
+
+	const respondMatch = matchRoute(
+		path,
+		/^\/api\/documents\/([^/]+)\/review-comments\/([^/]+)\/respond$/,
+	);
+	if (method === 'POST' && respondMatch) {
+		const document = getDocumentStore().get(respondMatch[1]);
+		if (!document) {
+			sendJson(res, 404, { message: 'Document not found', code: 'not_found' });
+			return true;
+		}
+		if (!canActorMutateDraft(document, actor)) {
+			sendJson(res, 403, {
+				message: 'Only requester, author, or collaborators can respond to review comments',
+				code: 'forbidden',
+			});
+			return true;
+		}
+		const parent = document.reviewComments.find((item) => item.id === respondMatch[2]);
+		if (!parent) {
+			sendJson(res, 404, { message: 'Review comment not found', code: 'not_found' });
+			return true;
+		}
+		if (parent.status !== 'open' || parent.kind !== 'decision') {
+			sendJson(res, 409, {
+				message: 'Only open decision comments can be responded to',
+				code: 'invalid_state',
+			});
+			return true;
+		}
+		const body = await readJson<{ body: string }>(req);
+		const reply = body.body?.trim() ?? '';
+		if (parent.authorityLevel === 'authoritative' && !isAuthoritativeResponseLongEnough(reply)) {
+			sendJson(res, 400, {
+				message:
+					`Authoritative comments require a response of at least ${AUTHORITATIVE_RESPONSE_MIN_LENGTH} characters`,
+				code: 'response_required',
+			});
+			return true;
+		}
+		if (!reply) {
+			sendJson(res, 400, {
+				message: 'Response body is required',
+				code: 'validation_error',
+			});
+			return true;
+		}
+		const childId = randomUUID();
+		parent.status = 'addressed';
+		document.reviewComments.push({
+			id: childId,
+			kind: 'author_response',
+			authorityLevel: parent.authorityLevel,
+			status: 'addressed',
+			body: reply,
+			actorEmail: actor,
+			actorDisplayName: displayNameFromEmail(actor),
+			role: null,
+			sourceStepId: parent.sourceStepId,
+			sourceStepOrder: parent.sourceStepOrder,
+			submittedContentRevision: document.contentRevision,
+			inReplyTo: parent.id,
+			createdAt: new Date().toISOString(),
+		});
+		pushHistory(
+			document,
+			actor,
+			'review_comment_responded',
+			`Responded to ${parent.role ?? 'review'} comment`,
+			childId,
+		);
+		sendJson(res, 200, document);
+		return true;
+	}
+
+	const acknowledgeMatch = matchRoute(
+		path,
+		/^\/api\/documents\/([^/]+)\/review-comments\/([^/]+)\/acknowledge$/,
+	);
+	if (method === 'POST' && acknowledgeMatch) {
+		const document = getDocumentStore().get(acknowledgeMatch[1]);
+		if (!document) {
+			sendJson(res, 404, { message: 'Document not found', code: 'not_found' });
+			return true;
+		}
+		if (!canActorMutateDraft(document, actor)) {
+			sendJson(res, 403, {
+				message: 'Only requester, author, or collaborators can acknowledge review comments',
+				code: 'forbidden',
+			});
+			return true;
+		}
+		const parent = document.reviewComments.find((item) => item.id === acknowledgeMatch[2]);
+		if (!parent) {
+			sendJson(res, 404, { message: 'Review comment not found', code: 'not_found' });
+			return true;
+		}
+		if (parent.status !== 'open' || parent.kind !== 'decision') {
+			sendJson(res, 409, {
+				message: 'Only open decision comments can be acknowledged',
+				code: 'invalid_state',
+			});
+			return true;
+		}
+		if (parent.authorityLevel === 'authoritative') {
+			sendJson(res, 400, {
+				message: 'Authoritative comments must be responded to, not acknowledged',
+				code: 'response_required',
+			});
+			return true;
+		}
+		const ackId = randomUUID();
+		parent.status = 'acknowledged';
+		document.reviewComments.push({
+			id: ackId,
+			kind: 'acknowledgement',
+			authorityLevel: parent.authorityLevel,
+			status: 'acknowledged',
+			body: 'Acknowledged',
+			actorEmail: actor,
+			actorDisplayName: displayNameFromEmail(actor),
+			role: null,
+			sourceStepId: parent.sourceStepId,
+			sourceStepOrder: parent.sourceStepOrder,
+			submittedContentRevision: document.contentRevision,
+			inReplyTo: parent.id,
+			createdAt: new Date().toISOString(),
+		});
+		pushHistory(
+			document,
+			actor,
+			'review_comment_acknowledged',
+			`Acknowledged ${parent.role ?? 'review'} comment`,
+			ackId,
 		);
 		sendJson(res, 200, document);
 		return true;

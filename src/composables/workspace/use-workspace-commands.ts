@@ -9,6 +9,7 @@ import { ref } from 'vue';
 import { getApiErrorCode, getApiErrorMessage } from '@/api/api-error';
 import {
 	abandonSupersedeMutation,
+	acknowledgeReviewCommentMutation,
 	claimApprovalStepMutation,
 	decideApprovalStepMutation,
 	getDocumentQueryKey,
@@ -16,6 +17,7 @@ import {
 	processApprovalSlaMutation,
 	publishDocumentPdfMutation,
 	releaseApprovalStepMutation,
+	respondToReviewCommentMutation,
 	submitForApprovalMutation,
 	supersedeDocumentMutation,
 	updateDocumentDraftMutation,
@@ -83,6 +85,12 @@ export function useWorkspaceCommands(options: {
 	const { mutateAsync: withdrawAsync, isLoading: isWithdrawing } = useMutation(
 		withdrawAndReviseMutation(),
 	);
+
+	const { mutateAsync: respondCommentAsync, isLoading: isRespondingToReview }
+		= useMutation(respondToReviewCommentMutation());
+
+	const { mutateAsync: acknowledgeCommentAsync, isLoading: isAcknowledgingReview }
+		= useMutation(acknowledgeReviewCommentMutation());
 
 	const { mutateAsync: supersedeAsync, isLoading: isSuperseding } = useMutation(
 		supersedeDocumentMutation(),
@@ -363,6 +371,51 @@ export function useWorkspaceCommands(options: {
 		}
 	}
 
+	async function onRespondToReview(commentId: string, body: string): Promise<void> {
+		clearActionFeedback();
+		const id = documentId.value;
+		try {
+			await runDocumentMutation(id, async() =>
+				respondCommentAsync({
+					path: { documentId: id, commentId },
+					body: { body },
+				}), { invalidateList: false });
+			if (!isCurrentDocument(id)) {
+				return;
+			}
+			forms.clearReviewResponseDraft(commentId);
+			showSuccess('Response saved. Authoritative comments no longer block resubmit once addressed.');
+		}
+		catch(respondError) {
+			if (!isCurrentDocument(id)) {
+				return;
+			}
+			actionError.value = getApiErrorMessage(respondError, 'Failed to save response');
+		}
+	}
+
+	async function onAcknowledgeReview(commentId: string): Promise<void> {
+		clearActionFeedback();
+		const id = documentId.value;
+		try {
+			await runDocumentMutation(id, async() =>
+				acknowledgeCommentAsync({
+					path: { documentId: id, commentId },
+					body: {},
+				}), { invalidateList: false });
+			if (!isCurrentDocument(id)) {
+				return;
+			}
+			showSuccess('Comment acknowledged.');
+		}
+		catch(acknowledgeError) {
+			if (!isCurrentDocument(id)) {
+				return;
+			}
+			actionError.value = getApiErrorMessage(acknowledgeError, 'Failed to acknowledge comment');
+		}
+	}
+
 	async function onDecision(decision: 'approve' | 'reject'): Promise<void> {
 		clearActionFeedback();
 		const step = activeStep.value;
@@ -458,6 +511,8 @@ export function useWorkspaceCommands(options: {
 		isReleasing,
 		isProcessingSla,
 		isWithdrawing,
+		isRespondingToReview,
+		isAcknowledgingReview,
 		isSuperseding,
 		isAbandoningSupersede,
 		isPublishingPdf,
@@ -468,6 +523,8 @@ export function useWorkspaceCommands(options: {
 		onRelease,
 		onProcessSla,
 		onWithdrawAndRevise,
+		onRespondToReview,
+		onAcknowledgeReview,
 		onSupersede,
 		onAbandonSupersede,
 		onDecision,
