@@ -3,17 +3,20 @@ import { fileURLToPath, URL } from 'node:url';
 import { powerApps } from '@microsoft/power-apps-vite/plugin';
 import vue from '@vitejs/plugin-vue';
 import { defineConfig } from 'vite';
+import vueDevTools from 'vite-plugin-vue-devtools';
 import vuetify from 'vite-plugin-vuetify';
 import { documentRoutingMockPlugin } from './src/mock/document-routing-mock-plugin.ts';
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => ({
 	plugins: [
 		vue(),
 		vuetify({ autoImport: true }),
+		// Browser Vue DevTools overlay — serve/DEV only (not production builds).
+		command === 'serve' ? vueDevTools() : null,
 		powerApps(),
 		documentRoutingMockPlugin(),
-	],
+	].filter(Boolean),
 	resolve: {
 		alias: {
 			'@': fileURLToPath(new URL('./src', import.meta.url)),
@@ -41,4 +44,4 @@ export default defineConfig({
 			},
 		},
 	},
-});
+}));

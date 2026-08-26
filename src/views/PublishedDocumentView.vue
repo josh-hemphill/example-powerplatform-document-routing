@@ -11,6 +11,7 @@ import {
 	supersedeDocumentMutation,
 } from '@/client/@pinia/colada.gen';
 import DocumentStatusChip from '@/components/DocumentStatusChip.vue';
+import MarkdownPreview from '@/components/MarkdownPreview.vue';
 import { useConfirmDialog } from '@/composables/use-confirm-dialog';
 import { useDocumentTypeLabel } from '@/composables/use-document-type-label';
 import { usePowerAppsContext } from '@/composables/use-power-apps-context';
@@ -188,7 +189,11 @@ async function onSupersede(): Promise<void> {
 				</p>
 			</v-alert>
 
-			<pre class="markdown-preview text-body-2 mb-4">{{ document.draftBodyMarkdown || '—' }}</pre>
+			<MarkdownPreview
+				class="mb-4"
+				:source="document.draftBodyMarkdown"
+				empty-text="—"
+			/>
 
 			<div class="d-flex flex-wrap ga-2">
 				<v-btn variant="text" :to="{ name: 'library' }">
@@ -209,11 +214,5 @@ async function onSupersede(): Promise<void> {
 .published-header {
 	padding-bottom: 1rem;
 	border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.12);
-}
-
-.markdown-preview {
-	white-space: pre-wrap;
-	font-family: inherit;
-	margin: 0;
 }
 </style>

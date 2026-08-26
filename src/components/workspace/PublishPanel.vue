@@ -9,6 +9,7 @@ defineProps<{
 	canPublish: boolean;
 	isPublishing: boolean;
 	expanded: boolean;
+	isPrimary?: boolean;
 }>();
 const emit = defineEmits<{
 	publish: [];
@@ -19,7 +20,10 @@ const folderPathOverride = defineModel<string>('folderPathOverride', { required:
 </script>
 
 <template>
-	<v-card class="pa-4 mb-4">
+	<v-card
+		class="pa-4 mb-4 stage-card"
+		:class="{ 'stage-card--primary': isPrimary && !expanded }"
+	>
 		<div class="d-flex align-center justify-space-between ga-2 mb-3">
 			<button
 				type="button"
@@ -29,20 +33,34 @@ const folderPathOverride = defineModel<string>('folderPathOverride', { required:
 			>
 				4. Publish PDF to SharePoint
 			</button>
-			<v-btn
-				variant="text"
-				size="small"
-				:icon="expanded ? '$chevronUp' : '$chevronDown'"
-				:aria-label="expanded ? 'Collapse publish' : 'Expand publish'"
-				:aria-expanded="expanded"
-				@click="emit('toggle')"
-			/>
+			<div class="d-flex align-center ga-2">
+				<v-chip
+					v-if="!expanded && isPrimary"
+					size="small"
+					color="primary"
+					variant="tonal"
+				>
+					Open to continue
+				</v-chip>
+				<v-btn
+					variant="text"
+					size="small"
+					:icon="expanded ? '$chevronUp' : '$chevronDown'"
+					:aria-label="expanded ? 'Collapse publish' : 'Expand publish'"
+					:aria-expanded="expanded"
+					@click="emit('toggle')"
+				/>
+			</div>
 		</div>
 		<p
 			v-if="!expanded"
 			class="text-body-2 text-medium-emphasis mb-0"
 		>
-			{{ publishedPdfUrl ? 'Published' : canPublish ? 'Ready to publish' : 'Waiting for approval' }}
+			{{
+				isPrimary
+					? 'Open this section to choose a destination and publish.'
+					: (publishedPdfUrl ? 'Published' : canPublish ? 'Ready to publish' : 'Waiting for approval')
+			}}
 		</p>
 		<v-expand-transition>
 			<div v-if="expanded">

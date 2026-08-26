@@ -6,7 +6,10 @@ import type { DocumentRoutingRole } from '@/domain/security-roles';
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import { fetchPrincipal } from '@/api/fetch-principal';
-import { LOCAL_DEMO_PERSONAS } from '@/config/local-personas';
+import {
+	LOCAL_DEMO_PERSONAS,
+	resolvePrincipalRolesByEmail,
+} from '@/config/local-personas';
 import { resolveHostedRoles } from '@/domain/security-roles';
 
 export { LOCAL_DEMO_PERSONAS } from '@/config/local-personas';
@@ -146,6 +149,29 @@ export const useIdentityStore = defineStore('identity', () => {
 	}
 
 	/**
+	 * DEV Local Play: map host email through the local persona directory when
+	 * GET /principal is unreachable (CORS / local-network blocks).
+	 */
+	function applyDevPersonaRolesIfKnown(actorEmail: string): boolean {
+		if (!allowsDemoIdentityFallback()) {
+			return false;
+		}
+		const isKnownPersona = LOCAL_DEMO_PERSONAS.some(
+			(persona) => persona.email.toLowerCase() === actorEmail.trim().toLowerCase(),
+		);
+		if (!isKnownPersona) {
+			return false;
+		}
+		identity.value = {
+			...identity.value,
+			roles: resolvePrincipalRolesByEmail(actorEmail),
+		};
+		hostedRolesStatus.value = 'resolved';
+		error.value = null;
+		return true;
+	}
+
+	/**
 	 * Loads roles from GET /principal after host context (server-derived, not client headers).
 	 */
 	async function refreshHostedRoles(): Promise<void> {
@@ -169,6 +195,10 @@ export const useIdentityStore = defineStore('identity', () => {
 				return;
 			}
 			// Explicit empty mapping still counts as resolved (least-privilege user).
+			// In DEV, prefer the local persona directory when this email is known.
+			if (applyDevPersonaRolesIfKnown(actorEmail)) {
+				return;
+			}
 			identity.value = {
 				...identity.value,
 				roles: resolveHostedRoles(null),
@@ -176,6 +206,9 @@ export const useIdentityStore = defineStore('identity', () => {
 			hostedRolesStatus.value = 'resolved';
 		}
 		catch {
+			if (applyDevPersonaRolesIfKnown(actorEmail)) {
+				return;
+			}
 			hostedRolesStatus.value = 'failed';
 			error.value = 'Could not load security roles from the API';
 		}
@@ -212,6 +245,12 @@ export const useIdentityStore = defineStore('identity', () => {
 			const hostContext = result.context;
 			const hostEmail = hostContext.user?.userPrincipalName?.trim();
 			if (!hostEmail) {
+				// Local Play / incomplete host sometimes returns context without UPN.
+				// In DEV, honor VITE_LOCAL_DEMO_* via the primary local persona.
+				if (allowsDemoIdentityFallback()) {
+					applyStandaloneDemo(LOCAL_DEMO_PERSONAS[0]);
+					return;
+				}
 				status.value = 'failed';
 				error.value = 'Host context did not include a user principal';
 				identity.value = { roles: [] };
