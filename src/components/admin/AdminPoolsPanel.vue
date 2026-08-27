@@ -111,9 +111,6 @@ async function createPool(): Promise<void> {
 		if (!ok) {
 			return;
 		}
-		// Confirmed discard — clear dirty before selecting the new pool or the
-		// selection guard would prompt a second time on selectedId assignment.
-		markClean();
 	}
 	const email = identity.email?.trim() || 'admin@example.com';
 	const displayName = identity.userName?.trim() || email;
@@ -130,6 +127,8 @@ async function createPool(): Promise<void> {
 				members: [{ email, displayName, role: 'Approver' }],
 			},
 		});
+		// Mark clean only after create succeeds so a failed create keeps edits dirty.
+		markClean();
 		selectedId.value = created.id;
 		emit('success', 'Approver pool created. Update members and save.');
 	}
@@ -174,6 +173,7 @@ async function save(): Promise<void> {
 				item-title="name"
 				item-value="id"
 				label="Approver pool"
+				hide-details
 				class="flex-grow-1"
 				style="min-width: 12rem"
 			/>

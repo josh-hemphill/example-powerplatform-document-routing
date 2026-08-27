@@ -221,7 +221,7 @@ function toggleStage(stage: WorkspaceStageId): void {
 	const currentlyOpen = isStageExpanded(stage);
 	const primary = primaryStage.value;
 	const next: Partial<Record<WorkspaceStageId, boolean>> = {
-		...(stageOverrides.value ?? {}),
+		...stageOverrides.value,
 	};
 	// Ensure primary stays as baseline when first toggling.
 	if (!stageOverrides.value && primary) {

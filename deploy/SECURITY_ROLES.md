@@ -85,8 +85,10 @@ VITE_LOCAL_DEMO_ROLES=user,author,approver,publisher,admin
 ```
 
 Roles accept app tokens (`admin`) or Dataverse display names (`Document Routing Admin`).
-These env vars apply only to standalone Vite DEV — hosted Power Apps uses Dataverse
-security roles from `GET /principal`. Without `admin`, `#/admin` is hidden and guarded.
+In DEV Local Play, when the host UPN matches `VITE_LOCAL_DEMO_EMAIL` (or another
+demo persona), those persona roles apply even while identity status is `hosted`.
+Production / unknown emails still use Dataverse roles from `GET /principal`.
+Without `admin`, `#/admin` is hidden and guarded.
 
 ### Privileged mock checks
 

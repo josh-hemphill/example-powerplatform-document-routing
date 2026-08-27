@@ -75,8 +75,12 @@ Restart `pnpm dev` after creating or editing `.env.local` (Vite only loads env f
 
 1. Run `pa app init` / ensure `power.config.json` exists so the Local Play URL is printed.
 2. Open Local Play in the **same browser profile** signed into your Power Platform tenant.
-3. Set `VITE_LOCAL_DEMO_EMAIL` to that **same Power Apps sign-in UPN** so mock seeds, author teams, and Admin roles line up with the host user.
-4. If host context has no UPN (or `/api/principal` is blocked), DEV falls back to the primary local persona from `VITE_LOCAL_DEMO_*`.
+3. Set `VITE_LOCAL_DEMO_EMAIL` to that **same Power Apps sign-in UPN** (exact match, case-insensitive) and keep `admin` in `VITE_LOCAL_DEMO_ROLES` (or omit roles to use the default set that includes admin).
+4. Restart `pnpm dev`, then hard-refresh Local Play.
+
+Local Play usually reports identity status **`hosted`** (real host UPN). In DEV, when that UPN matches `VITE_LOCAL_DEMO_EMAIL` (or another `LOCAL_DEMO_PERSONAS` entry), the app applies those persona roles — including `admin` — instead of staying on least-privilege `user` from `/api/principal`. If the UPN does **not** match any demo persona, roles still come from `/api/principal` (often `user` only until Dataverse security roles exist).
+
+If host context has no UPN, DEV falls back to the primary local persona from `VITE_LOCAL_DEMO_*` as **standalone**.
 
 In standalone Vite, missing/slow Power Apps host context falls back to the local demo persona (DEV only). Production builds never install that fallback on host timeout. The same `VITE_LOCAL_DEMO_EMAIL` is used for mock seeds and bundled document-type `authorTeamEmails` (co-edit / needs-draft collaborators).
 

@@ -31,7 +31,7 @@ import {
 	DEFAULT_AUTHORITY_LEVEL,
 	DEFAULT_COMMENT_POLICY,
 } from '@/domain/review-comments';
-import { uniqueSlugId } from '@/utils/slugify-id';
+import { uniqueLabel, uniqueNumberPrefix, uniqueSlugId } from '@/utils/slugify-id';
 
 defineProps<{
 	canAct: boolean;
@@ -171,11 +171,17 @@ async function createType(): Promise<void> {
 		if (!ok) {
 			return;
 		}
-		// Confirmed discard — clear dirty before selecting the new type or the
-		// selection guard would prompt a second time on selectedId assignment.
-		markClean();
 	}
-	const id = uniqueSlugId('New document type', types.value.map((type) => type.id), 'type');
+	const label = uniqueLabel(
+		'New document type',
+		types.value.map((type) => type.label),
+		'type',
+	);
+	const id = uniqueSlugId(label, types.value.map((type) => type.id), 'type');
+	const numberPrefix = uniqueNumberPrefix(
+		id,
+		types.value.map((type) => type.numberPrefix ?? ''),
+	);
 	const seedPool = pools.value[0];
 	const approvalChain: ControlChainStep[] = seedPool
 		? [{
@@ -203,7 +209,7 @@ async function createType(): Promise<void> {
 		const created = await createAsync({
 			body: {
 				id,
-				label: 'New document type',
+				label,
 				description: '',
 				requestHint: 'Describe what you need.',
 				draftTemplate: '# Title\n\n## Purpose\n\n',
@@ -211,12 +217,14 @@ async function createType(): Promise<void> {
 				authorTeamEmails: [],
 				active: true,
 				defaultDestinationId: destinations.value[0]?.id ?? null,
-				numberPrefix: id.slice(0, 3).toUpperCase(),
+				numberPrefix,
 				numberPattern: '{prefix}-{yyyy}-{seq:5}',
 				nextSequence: 1,
 				approvalChain,
 			},
 		});
+		// Mark clean only after create succeeds so a failed create keeps edits dirty.
+		markClean();
 		selectedId.value = created.id;
 		emit('success', 'Document type created. Update the fields and save.');
 	}
@@ -305,6 +313,7 @@ async function save(): Promise<void> {
 				item-title="label"
 				item-value="id"
 				label="Document type"
+				hide-details
 				class="flex-grow-1"
 				style="min-width: 12rem"
 			/>
