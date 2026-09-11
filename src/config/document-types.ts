@@ -59,6 +59,24 @@ export interface DocumentSubtypeDefinition {
 	approvalChain?: ApprovalStepTemplate[];
 }
 
+export type CreateWorkflow = 'standard' | 'dispatch_to_review';
+
+export type TypeRequestFieldKind = 'select';
+
+export interface TypeRequestFieldOption {
+	value: string;
+	label: string;
+}
+
+/** Optional intake field defined on a document type (e.g. ILAR relevant systems). */
+export interface TypeRequestField {
+	key: string;
+	label: string;
+	kind: TypeRequestFieldKind;
+	required?: boolean;
+	options?: TypeRequestFieldOption[];
+}
+
 export interface DocumentTypeDefinition {
 	id: string;
 	label: string;
@@ -73,6 +91,9 @@ export interface DocumentTypeDefinition {
 	authorTeamEmails?: string[];
 	approvalChain: ApprovalStepTemplate[];
 	subtypes?: DocumentSubtypeDefinition[];
+	/** When `dispatch_to_review`, create materializes the chain and opens review. */
+	createWorkflow?: CreateWorkflow;
+	requestFields?: TypeRequestField[];
 }
 
 export const documentTypes: DocumentTypeDefinition[] = [
@@ -295,13 +316,33 @@ Who and what this policy covers.
 		id: 'ilar',
 		label: 'ILAR',
 		description:
-			'Intermediate Lesson Action Request — process-change request that becomes an official change document',
+			'Intermediate Liaison Action Request — dispatch a process-change request; reviewers turn it into the official SOP or work instruction',
 		requestHint:
-			'Describe the process gap or lesson, the change you want, who is affected, and any deadline or risk.',
+			'Describe the process gap, the change you want, who is affected, and any deadline or risk. Reviewers own the official document from here.',
+		createWorkflow: 'dispatch_to_review',
+		requestFields: [
+			{
+				key: 'relevantSystems',
+				label: 'Relevant systems',
+				kind: 'select',
+				required: true,
+				options: [
+					{ value: 'power_platform', label: 'Power Platform' },
+					{ value: 'dataverse', label: 'Dataverse' },
+					{ value: 'sharepoint', label: 'SharePoint' },
+					{ value: 'identity', label: 'Identity / Entra' },
+					{ value: 'ci_release', label: 'CI / release' },
+					{ value: 'other', label: 'Other' },
+				],
+			},
+		],
 		draftTemplate: `# {{title}}
 
-## Intermediate Lesson Action Request
+## Intermediate Liaison Action Request
 {{request}}
+
+## Relevant systems
+{{relevantSystems}}
 
 ## Current process
 - 
@@ -323,6 +364,64 @@ Who and what this policy covers.
 			localDemoUser.email,
 			'casey.author@contoso.com',
 			'jamie.engineer@contoso.com',
+		],
+		subtypes: [
+			{
+				key: 'sop',
+				label: 'SOP',
+				description:
+					'The liaison action produces an official Standard Operating Procedure.',
+				requestHint:
+					'Describe the process the SOP should capture and who must follow it.',
+				numberPrefix: 'SOP',
+				draftScaffold: `# {{title}}
+
+## Intermediate Liaison Action Request
+{{request}}
+
+## Relevant systems
+{{relevantSystems}}
+
+## Current process
+- 
+
+## Proposed SOP
+- 
+
+## Official SOP record
+- Change owner:
+- Effective date:
+- Verification:
+`,
+			},
+			{
+				key: 'work_instruction',
+				label: 'Work instruction',
+				description:
+					'The liaison action produces a work instruction or runbook.',
+				requestHint:
+					'Describe the steps operators should follow and any systems they touch.',
+				numberPrefix: 'WI',
+				draftScaffold: `# {{title}}
+
+## Intermediate Liaison Action Request
+{{request}}
+
+## Relevant systems
+{{relevantSystems}}
+
+## Current process
+- 
+
+## Proposed work instruction
+- 
+
+## Official work-instruction record
+- Change owner:
+- Effective date:
+- Verification:
+`,
+			},
 		],
 		approvalChain: [
 			{
@@ -457,10 +556,19 @@ export function buildDraftFromTemplate(
 	type: DocumentTypeDefinition,
 	title: string,
 	request: string,
+	options?: {
+		template?: string;
+		fieldValues?: Record<string, string>;
+	},
 ): string {
-	return type.draftTemplate
+	const template = options?.template ?? type.draftTemplate;
+	let body = template
 		.replaceAll('{{title}}', title)
 		.replaceAll('{{request}}', request);
+	for (const [key, value] of Object.entries(options?.fieldValues ?? {})) {
+		body = body.replaceAll(`{{${key}}}`, value);
+	}
+	return body;
 }
 
 /**

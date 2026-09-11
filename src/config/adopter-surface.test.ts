@@ -42,7 +42,13 @@ describe('document types', () => {
 		const ilar = findDocumentType('ilar');
 		expect(ilar).toBeTruthy();
 		expect(ilar!.label).toBe('ILAR');
-		expect(ilar!.description).toMatch(/Intermediate Lesson Action Request/i);
+		expect(ilar!.description).toMatch(/Intermediate Liaison Action Request/i);
+		expect(ilar!.createWorkflow).toBe('dispatch_to_review');
+		expect(ilar!.requestFields?.[0]?.key).toBe('relevantSystems');
+		expect(ilar!.subtypes?.map((subtype) => subtype.key)).toEqual([
+			'sop',
+			'work_instruction',
+		]);
 		expect(ilar!.draftTemplate).toContain('Official change record');
 		expect(ilar!.approvalChain.map((step) =>
 			step.mode === 'named' ? step.role : step.poolRole,

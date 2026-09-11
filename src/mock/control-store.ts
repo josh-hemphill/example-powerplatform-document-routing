@@ -1,4 +1,8 @@
-import type { ApprovalStepTemplate, DocumentTypeDefinition } from '../config/document-types.ts';
+import type {
+	ApprovalStepTemplate,
+	DocumentTypeDefinition,
+	TypeRequestField,
+} from '../config/document-types.ts';
 /**
  * In-memory Dataverse control-table mirror for the Vite mock.
  * Admin CRUD mutates this store; create/submit read from it (not static TS).
@@ -77,6 +81,8 @@ export interface ControlDocumentType {
 	/** Calendar year for `nextSequence`; allocation resets when the year advances. */
 	sequenceYear: number;
 	approvalChain: ControlChainStep[];
+	createWorkflow: 'standard' | 'dispatch_to_review';
+	requestFields: TypeRequestField[];
 }
 
 export interface ControlPublishDestination {
@@ -221,6 +227,8 @@ function buildSeedSnapshot(): ControlStoreSnapshot {
 		approvalChain: type.approvalChain.map((step, index) =>
 			mapSeedChain(step, index + 1, pools),
 		),
+		createWorkflow: type.createWorkflow ?? 'standard',
+		requestFields: type.requestFields ? [...type.requestFields] : [],
 	}));
 
 	const documentSubtypes: ControlDocumentSubtype[] = [];
@@ -377,6 +385,8 @@ export function toDocumentTypeDefinition(
 		folderPath: type.folderPath,
 		authorTeamEmails: type.authorTeamEmails,
 		approvalChain,
+		createWorkflow: type.createWorkflow,
+		requestFields: type.requestFields,
 	};
 }
 

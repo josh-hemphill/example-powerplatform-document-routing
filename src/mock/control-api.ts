@@ -174,6 +174,8 @@ export function handleControlApiRequest(options: {
 				approvalChain: [...(body.approvalChain ?? [])].sort(
 					(a, b) => a.order - b.order,
 				),
+				createWorkflow: body.createWorkflow ?? 'standard',
+				requestFields: body.requestFields ?? [],
 			};
 			getControlStore().documentTypes.push(created);
 			sendJson(res, 201, created);
@@ -227,6 +229,8 @@ export function handleControlApiRequest(options: {
 					approvalChain: [...(body.approvalChain ?? type.approvalChain)].sort(
 						(a, b) => a.order - b.order,
 					),
+					createWorkflow: body.createWorkflow ?? type.createWorkflow,
+					requestFields: body.requestFields ?? type.requestFields,
 				});
 				sendJson(res, 200, type);
 				return true;

@@ -47,6 +47,7 @@ const form = reactive({
 	freeformRequest: '',
 	priority: DEFAULT_PRIORITY_KEY,
 	priorityReason: '',
+	typeFieldValues: {} as Record<string, string>,
 });
 
 const requestTitleRules = titleRules('Request title');
@@ -85,10 +86,16 @@ const selectedSubtype = computed(
 		) ?? null,
 );
 
+const requestFields = computed(() => selectedType.value?.requestFields ?? []);
+const dispatchesToReview = computed(
+	() => selectedType.value?.createWorkflow === 'dispatch_to_review',
+);
+
 watch(
 	() => form.documentType,
 	() => {
 		form.documentSubtypeId = null;
+		form.typeFieldValues = {};
 	},
 );
 
@@ -165,6 +172,13 @@ async function submit(): Promise<void> {
 		formError.value = 'This document type requires a subtype.';
 		return;
 	}
+	const missingField = requestFields.value.find(
+		(field) => field.required && !form.typeFieldValues[field.key]?.trim(),
+	);
+	if (missingField) {
+		formError.value = `${missingField.label} is required.`;
+		return;
+	}
 
 	try {
 		const document = await mutateAsync({
@@ -175,6 +189,9 @@ async function submit(): Promise<void> {
 				priority: form.priority,
 				priorityReason: form.priorityReason.trim() || undefined,
 				documentSubtypeId: form.documentSubtypeId ?? undefined,
+				typeFieldValues: requestFields.value.length
+					? { ...form.typeFieldValues }
+					: undefined,
 			},
 		});
 		await router.push({ name: 'document', params: { documentId: document.id } });
@@ -191,6 +208,9 @@ async function submit(): Promise<void> {
 			Capture an unstructured request. Requester is the signed-in principal
 			(<strong>{{ context.email ?? '…' }}</strong>). The document type chooses the draft
 			scaffold, author collaboration team, default approval chain, and allowlisted publish destination.
+			<span v-if="dispatchesToReview">
+				This type goes straight to review — reviewers edit the official document from the workspace.
+			</span>
 		</p>
 
 		<v-alert
@@ -280,6 +300,23 @@ async function submit(): Promise<void> {
 						{{ selectedSubtype?.description || selectedType?.description }}
 					</p>
 				</v-col>
+				<v-col
+					v-for="field in requestFields"
+					:key="field.key"
+					cols="12"
+					md="6"
+				>
+					<v-select
+						v-if="field.kind === 'select'"
+						v-model="form.typeFieldValues[field.key]"
+						:items="field.options ?? []"
+						item-title="label"
+						item-value="value"
+						:label="field.label"
+						:rules="field.required ? [(value) => Boolean(value) || `${field.label} is required`] : []"
+						:required="Boolean(field.required)"
+					/>
+				</v-col>
 				<v-col cols="12">
 					<v-textarea
 						v-model="form.freeformRequest"
@@ -316,7 +353,7 @@ async function submit(): Promise<void> {
 					:loading="isLoading || identityLoading"
 					:disabled="!canAct || !formValid || isLoading || identityLoading"
 				>
-					Submit request
+					{{ dispatchesToReview ? 'Dispatch to review' : 'Submit request' }}
 				</v-btn>
 			</div>
 		</v-form>

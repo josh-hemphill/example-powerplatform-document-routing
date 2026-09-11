@@ -46,6 +46,18 @@ describe('document access', () => {
 		expect(canActorAccessDocument(doc, 'casey.author@contoso.com')).toBe(true);
 	});
 
+	it('lets reviewers and the author team edit dispatch-to-review drafts', () => {
+		const doc = baseDoc({
+			status: 'in_review',
+			allowReviewerDraftEdit: true,
+			currentApproverEmail: 'lee.engmgr@contoso.com',
+			currentPoolEmails: [],
+		});
+		expect(canActorEditDraft(doc, 'casey.author@contoso.com')).toBe(true);
+		expect(canActorEditDraft(doc, 'lee.engmgr@contoso.com')).toBe(true);
+		expect(canActorEditDraft(doc, 'stranger@contoso.com')).toBe(false);
+	});
+
 	it('does not grant access via elevation pool until the step is elevated', () => {
 		const doc = baseDoc({
 			status: 'in_review',

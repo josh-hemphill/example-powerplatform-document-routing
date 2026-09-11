@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { Document, PriorityLevel } from '@/client/types.gen';
+import type { Document, PriorityLevel, TypeRequestField } from '@/client/types.gen';
+import { typeFieldDisplayLabel } from '@/domain/type-request-fields';
 import { computed } from 'vue';
 import DocumentStatusChip from '@/components/DocumentStatusChip.vue';
 import PriorityChip from '@/components/PriorityChip.vue';
@@ -9,7 +10,21 @@ const props = defineProps<{
 	document: Document;
 	typeLabel: string;
 	priorityCatalog: PriorityLevel[];
+	requestFields?: TypeRequestField[];
 }>();
+
+const typeFieldChips = computed(() =>
+	(props.requestFields ?? [])
+		.map((field) => {
+			const value = props.document.typeFieldValues?.[field.key];
+			const label = typeFieldDisplayLabel(field, value);
+			if (!label) {
+				return null;
+			}
+			return { key: field.key, heading: field.label, label };
+		})
+		.filter((item): item is { key: string; heading: string; label: string } => item !== null),
+);
 
 const emit = defineEmits<{
 	refresh: [];
@@ -45,6 +60,15 @@ const openCount = computed(() => {
 						·
 					</template>
 					{{ typeLabel }} · Requested by {{ document.requesterEmail }}
+					<template v-if="typeFieldChips.length">
+						·
+						<span
+							v-for="field in typeFieldChips"
+							:key="field.key"
+						>
+							{{ field.heading }}: {{ field.label }}
+						</span>
+					</template>
 				</div>
 			</div>
 			<div class="d-flex align-center ga-2 flex-wrap">

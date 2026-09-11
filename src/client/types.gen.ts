@@ -160,6 +160,14 @@ export type CreateDocumentRequest = {
      */
     documentSubtypeId?: string;
     /**
+     * Values for optional per-type intake fields (`requestFields` on the
+     * document type). Missing required keys → 400 `type_field_required`.
+     *
+     */
+    typeFieldValues?: {
+        [key: string]: string;
+    };
+    /**
      * Ignored. Trusted publish uses allowlisted destinations only; do not
      * send free-form SharePoint URLs.
      *
@@ -309,6 +317,15 @@ export type Document = DocumentSummary & {
     publishedContentRevision?: number | null;
     priorityReason?: string | null;
     documentSubtypeId?: string | null;
+    typeFieldValues?: {
+        [key: string]: string;
+    };
+    /**
+     * When true, the current approver/pool and author team may edit
+     * draft markdown while the case is in review (dispatch-to-review types).
+     *
+     */
+    allowReviewerDraftEdit?: boolean;
     approvalSteps: Array<ApprovalStep>;
     reviewComments: Array<ReviewComment>;
     history: Array<HistoryEvent>;
@@ -389,6 +406,27 @@ export type ControlDocumentType = {
      * Active (or all, for Admin) subtypes belonging to this type
      */
     subtypes?: Array<DocumentSubtype>;
+    /**
+     * `dispatch_to_review` materializes the approval chain on create so
+     * reviewers own the official document immediately.
+     *
+     */
+    createWorkflow?: 'standard' | 'dispatch_to_review';
+    /**
+     * Optional intake fields collected on create (e.g. relevant systems)
+     */
+    requestFields?: Array<TypeRequestField>;
+};
+
+export type TypeRequestField = {
+    key: string;
+    label: string;
+    kind: 'select';
+    required?: boolean;
+    options?: Array<{
+        value: string;
+        label: string;
+    }>;
 };
 
 export type ControlDocumentTypeWrite = {
@@ -419,6 +457,8 @@ export type ControlDocumentTypeWrite = {
      */
     sequenceYear?: number;
     approvalChain: Array<ControlChainStep>;
+    createWorkflow?: 'standard' | 'dispatch_to_review';
+    requestFields?: Array<TypeRequestField>;
 };
 
 export type ControlApproverPool = {

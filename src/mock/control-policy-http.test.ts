@@ -29,16 +29,18 @@ function jsonReq(payload: unknown): IncomingMessage {
 function captureResponse(): {
 	res: ServerResponse;
 	status: () => number;
-	body: () => { message?: string; code?: string };
+	body: () => Record<string, unknown> & { message?: string; code?: string };
 } {
 	let statusCode = 0;
-	let parsed: { message?: string; code?: string } = {};
+	let parsed: Record<string, unknown> & { message?: string; code?: string } = {};
 	const res = {
 		statusCode: 0,
 		setHeader() {},
 		end(raw?: string) {
 			statusCode = this.statusCode;
-			parsed = raw ? JSON.parse(raw) as { message?: string; code?: string } : {};
+			parsed = raw
+				? JSON.parse(raw) as Record<string, unknown> & { message?: string; code?: string }
+				: {};
 		},
 	};
 	return {
@@ -85,7 +87,7 @@ describe('control policy HTTP', () => {
 		expect(captured.body().code).toBe('subtype_required');
 	});
 
-	it('creates ILAR without a subtype', async() => {
+	it('rejects ILAR create without a subtype', async() => {
 		const captured = await postDocument({
 			title: 'Standardize hotfix rollback checklist',
 			documentType: 'ilar',
@@ -93,7 +95,44 @@ describe('control policy HTTP', () => {
 				'Hotfixes skip rollback rehearsal. Please open an ILAR for an official process change.',
 			priority: 'normal',
 		});
+		expect(captured.status()).toBe(400);
+		expect(captured.body().code).toBe('subtype_required');
+	});
+
+	it('dispatches ILAR to review with a subtype and relevant system', async() => {
+		const captured = await postDocument({
+			title: 'Standardize hotfix rollback checklist',
+			documentType: 'ilar',
+			documentSubtypeId: 'sop',
+			typeFieldValues: { relevantSystems: 'ci_release' },
+			freeformRequest:
+				'Hotfixes skip rollback rehearsal. Please open an ILAR for an official process change.',
+			priority: 'normal',
+		});
 		expect(captured.status()).toBe(201);
+		expect(captured.body().status).toBe('in_review');
+		expect(captured.body().documentSubtypeId).toBe('sop');
+		expect(
+			(captured.body().typeFieldValues as { relevantSystems?: string } | undefined)
+				?.relevantSystems,
+		).toBe('ci_release');
+		expect(captured.body().allowReviewerDraftEdit).toBe(true);
+		expect(captured.body().currentApproverEmail).toBe('lee.engmgr@contoso.com');
+		expect(captured.body().draftBodyMarkdown).toContain('Intermediate Liaison Action Request');
+		expect(captured.body().draftBodyMarkdown).toContain('CI / release');
+	});
+
+	it('rejects ILAR create without a relevant system', async() => {
+		const captured = await postDocument({
+			title: 'Standardize hotfix rollback checklist',
+			documentType: 'ilar',
+			documentSubtypeId: 'sop',
+			freeformRequest:
+				'Hotfixes skip rollback rehearsal. Please open an ILAR for an official process change.',
+			priority: 'normal',
+		});
+		expect(captured.status()).toBe(400);
+		expect(captured.body().code).toBe('type_field_required');
 	});
 
 	it('creates Announcement without a subtype', async() => {

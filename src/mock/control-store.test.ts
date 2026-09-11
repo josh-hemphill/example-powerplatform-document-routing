@@ -73,11 +73,16 @@ describe('control store', () => {
 		expect(mission?.minReasonLength).toBe(20);
 	});
 
-	it('requires subtypes for policy but not announcement', () => {
+	it('requires subtypes for policy and ILAR but not announcement', () => {
 		expect(activeSubtypesForType('policy').map((item) => item.key)).toEqual([
 			'corporate',
 			'hr',
 		]);
+		expect(activeSubtypesForType('ilar').map((item) => item.key)).toEqual([
+			'sop',
+			'work_instruction',
+		]);
+		expect(findControlDocumentType('ilar')?.createWorkflow).toBe('dispatch_to_review');
 		expect(activeSubtypesForType('announcement')).toEqual([]);
 	});
 

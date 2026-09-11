@@ -85,6 +85,11 @@ export function useDocumentFormState(input: {
 	function buildDraftState(document: Document): DraftFormState {
 		const fallback = input.fallbackType(document.documentType);
 		const live = input.types.value?.find((item) => item.id === document.documentType);
+		const subtypeScaffold = live?.subtypes?.find(
+			(subtype) =>
+				subtype.key === document.documentSubtypeId
+				|| subtype.id === document.documentSubtypeId,
+		)?.draftScaffold;
 		const body
 			= document.draftBodyMarkdown
 				?? buildDraftFromTemplate(
@@ -97,6 +102,10 @@ export function useDocumentFormState(input: {
 						: fallback,
 					document.title,
 					document.freeformRequest,
+					{
+						template: subtypeScaffold || live?.draftTemplate || fallback.draftTemplate,
+						fieldValues: document.typeFieldValues ?? undefined,
+					},
 				);
 		return {
 			title: document.title,

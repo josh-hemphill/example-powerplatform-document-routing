@@ -10,11 +10,17 @@ import {
 } from '../../api/form-rules.ts';
 import { INBOX_PERSONAS, matchesInboxPersona } from '../../config/inbox-personas.ts';
 import { resolvePrincipalRolesByEmail } from '../../config/local-personas.ts';
+import { buildDraftFromTemplate } from '../../config/document-types.ts';
 import {
 	canActorAccessDocument,
+	canActorEditDraft,
 	canActorMutateDraft,
-	isDraftEditableStatus,
 } from '../../domain/document-access.ts';
+import {
+	typeFieldTemplateValues,
+	validateTypeFieldValues,
+} from '../../domain/type-request-fields.ts';
+import { dispatchDocumentToReview } from '../dispatch-to-review.ts';
 import {
 	findControlDocumentSubtype,
 	findControlDocumentType,
@@ -107,6 +113,7 @@ export async function handleDocumentRoutes(context: MockHttpContext): Promise<bo
 			priority?: string;
 			priorityReason?: string | null;
 			documentSubtypeId?: string | null;
+			typeFieldValues?: Record<string, string>;
 			requestedPublishSiteUrl?: string;
 			requestedLibraryName?: string;
 		}>(req);
@@ -170,6 +177,24 @@ export async function handleDocumentRoutes(context: MockHttpContext): Promise<bo
 		}
 		const priorityRow = findPriorityLevel(priorityKey);
 
+		const typeFieldError = validateTypeFieldValues(
+			typeRow.requestFields,
+			body.typeFieldValues,
+		);
+		if (typeFieldError) {
+			sendJson(res, 400, {
+				message: typeFieldError.message,
+				code: typeFieldError.code,
+			});
+			return true;
+		}
+		const typeFieldValues = Object.fromEntries(
+			(typeRow.requestFields ?? []).map((field) => [
+				field.key,
+				(body.typeFieldValues?.[field.key] ?? '').trim(),
+			]),
+		);
+
 		const id = randomUUID();
 		const createdAt = stamp();
 		const collaboratorEmails = uniqueEmails([
@@ -188,6 +213,8 @@ export async function handleDocumentRoutes(context: MockHttpContext): Promise<bo
 				? (body.priorityReason ?? '').trim()
 				: (body.priorityReason?.trim() || null),
 			documentSubtypeId,
+			typeFieldValues,
+			allowReviewerDraftEdit: typeRow.createWorkflow === 'dispatch_to_review',
 			reviewComments: [],
 			currentApproverEmail: null,
 			currentStepStatus: null,
@@ -223,6 +250,32 @@ export async function handleDocumentRoutes(context: MockHttpContext): Promise<bo
 			'requested',
 			'Freeform request submitted',
 		);
+		if (typeRow.createWorkflow === 'dispatch_to_review') {
+			const subtype = documentSubtypeId
+				? findControlDocumentSubtype(documentSubtypeId, type.id)
+				: undefined;
+			document.draftBodyMarkdown = buildDraftFromTemplate(
+				type,
+				document.title,
+				document.freeformRequest,
+				{
+					template: subtype?.draftScaffold ?? type.draftTemplate,
+					fieldValues: typeFieldTemplateValues(typeRow.requestFields, typeFieldValues),
+				},
+			);
+			document.contentRevision = 1;
+			document.authorEmail = actor;
+			try {
+				dispatchDocumentToReview(document, actor);
+			}
+			catch(error) {
+				sendJson(res, 400, {
+					message: error instanceof Error ? error.message : 'Failed to dispatch to review',
+					code: 'validation_error',
+				});
+				return true;
+			}
+		}
 		getDocumentStore().set(id, document);
 		sendJson(res, 201, document);
 		return true;
@@ -302,17 +355,16 @@ export async function handleDocumentRoutes(context: MockHttpContext): Promise<bo
 			sendJson(res, 404, { message: 'Document not found', code: 'not_found' });
 			return true;
 		}
-		if (!isDraftEditableStatus(document.status)) {
-			sendJson(res, 409, {
-				message: 'Draft can only be edited while requested or drafting',
-				code: 'invalid_state',
-			});
-			return true;
-		}
-		if (!canActorMutateDraft(document, actor)) {
+		if (!canActorEditDraft(document, actor)) {
+			if (document.status === 'in_review' && !document.allowReviewerDraftEdit) {
+				sendJson(res, 409, {
+					message: 'Draft can only be edited while requested or drafting',
+					code: 'invalid_state',
+				});
+				return true;
+			}
 			sendJson(res, 403, {
-				message:
-					'Only shared authors/requesters can edit drafts in requested/drafting',
+				message: 'Only shared authors or current reviewers can edit this draft',
 				code: 'forbidden',
 			});
 			return true;
