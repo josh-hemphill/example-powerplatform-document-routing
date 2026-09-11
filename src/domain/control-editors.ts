@@ -1,7 +1,12 @@
 /**
  * Helpers for Admin structured chain/member editors and JSON escape hatches.
  */
-import type { Approver, ControlChainStep, DocumentSubtype } from '@/client/types.gen';
+import type {
+	Approver,
+	ControlChainStep,
+	DocumentSubtype,
+	TypeRequestField,
+} from '@/client/types.gen';
 
 let nextEditorRowKey = 1;
 const editorRowKeys = new WeakMap<object, number>();
@@ -104,6 +109,29 @@ export function parseMembersJson(raw: string): ParseResult<Approver[]> {
  */
 export function createEmptyMember(): Approver {
 	return { email: '', displayName: '' };
+}
+
+/**
+ * Creates a blank select intake field for the Admin type editor.
+ */
+export function createEmptyRequestField(key = 'newField'): TypeRequestField {
+	return {
+		key,
+		label: 'New field',
+		kind: 'select',
+		required: false,
+		options: [{ value: 'option_1', label: 'Option 1' }],
+	};
+}
+
+/**
+ * Creates a blank select option row for an intake field.
+ */
+export function createEmptyRequestFieldOption(
+	value = 'option',
+	label = 'Option',
+): { value: string; label: string } {
+	return { value, label };
 }
 
 /**

@@ -194,6 +194,129 @@ describe('control policy HTTP', () => {
 		expect(captured.status()).toBe(201);
 	});
 
+	it('rejects an unknown create workflow on type update', async() => {
+		const captured = captureResponse();
+		await handleControlApiRequest({
+			method: 'PUT',
+			path: '/api/control/document-types/ilar',
+			actor: 'admin@contoso.com',
+			isAdmin: true,
+			req: jsonReq({
+				id: 'ilar',
+				label: 'ILAR',
+				description: 'Liaison',
+				requestHint: 'Describe the change.',
+				draftTemplate: '# Title',
+				active: true,
+				approvalChain: [{
+					order: 1,
+					role: 'Engineering Manager',
+					assignmentMode: 'named',
+					assignee: { email: 'lee.engmgr@contoso.com', displayName: 'Lee' },
+					slaHours: 24,
+				}],
+				createWorkflow: 'queued',
+			}),
+			res: captured.res,
+			readJson,
+			sendJson,
+			matchRoute,
+		});
+		expect(captured.status()).toBe(400);
+		expect(captured.body().code).toBe('invalid_create_workflow');
+	});
+
+	it('rejects invalid request field definitions on type update', async() => {
+		const captured = captureResponse();
+		await handleControlApiRequest({
+			method: 'PUT',
+			path: '/api/control/document-types/ilar',
+			actor: 'admin@contoso.com',
+			isAdmin: true,
+			req: jsonReq({
+				id: 'ilar',
+				label: 'ILAR',
+				description: 'Liaison',
+				requestHint: 'Describe the change.',
+				draftTemplate: '# Title',
+				active: true,
+				approvalChain: [{
+					order: 1,
+					role: 'Engineering Manager',
+					assignmentMode: 'named',
+					assignee: { email: 'lee.engmgr@contoso.com', displayName: 'Lee' },
+					slaHours: 24,
+				}],
+				createWorkflow: 'dispatch_to_review',
+				requestFields: [{
+					key: 'relevantSystems',
+					label: 'Relevant systems',
+					kind: 'select',
+					required: true,
+					options: [],
+				}],
+			}),
+			res: captured.res,
+			readJson,
+			sendJson,
+			matchRoute,
+		});
+		expect(captured.status()).toBe(400);
+		expect(captured.body().code).toBe('invalid_request_field_options');
+	});
+
+	it('saves create workflow and request fields on a type', async() => {
+		const captured = captureResponse();
+		await handleControlApiRequest({
+			method: 'PUT',
+			path: '/api/control/document-types/policy',
+			actor: 'admin@contoso.com',
+			isAdmin: true,
+			req: jsonReq({
+				id: 'policy',
+				label: 'Policy',
+				description: 'Policies',
+				requestHint: 'Describe the policy.',
+				draftTemplate: '# Title',
+				active: true,
+				approvalChain: [{
+					order: 1,
+					role: 'Approver',
+					assignmentMode: 'named',
+					assignee: { email: 'pat.policy@contoso.com', displayName: 'Pat' },
+					slaHours: 24,
+				}],
+				createWorkflow: 'dispatch_to_review',
+				requestFields: [{
+					key: 'audience',
+					label: 'Audience',
+					kind: 'select',
+					required: true,
+					options: [
+						{ value: 'internal', label: ' Internal ' },
+						{ value: 'external', label: 'External' },
+					],
+				}],
+			}),
+			res: captured.res,
+			readJson,
+			sendJson,
+			matchRoute,
+		});
+		expect(captured.status()).toBe(200);
+		expect(captured.body().createWorkflow).toBe('dispatch_to_review');
+		expect(captured.body().requestFields).toEqual([{
+			key: 'audience',
+			label: 'Audience',
+			kind: 'select',
+			required: true,
+			options: [
+				{ value: 'internal', label: 'Internal' },
+				{ value: 'external', label: 'External' },
+			],
+		}]);
+	});
+
 	it('forbids non-admin priority catalog writes', async() => {
 		const captured = captureResponse();
 		await handleControlApiRequest({

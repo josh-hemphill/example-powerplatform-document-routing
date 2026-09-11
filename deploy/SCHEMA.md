@@ -30,7 +30,7 @@ queue, merge elevation members, start a new activate window once. See
 | ------------------------------------- | -------------------------------------------------------------- |
 | `publishdestination`                  | Allowlisted SharePoint site / library / folder roots           |
 | `approverpool` / `approverpoolmember` | Named pools + members (email/UPN denormalized)                 |
-| `documenttype`                        | Type metadata, draft scaffold, policy version, author team id  |
+| `documenttype`                        | Type metadata, scaffold, policy version, create workflow, request fields JSON |
 | `approvalchainstep`                   | Ordered template steps (named or pool + SLA + elevation)       |
 | `appsetting`                          | Feature flags (`allowApproverOverride`, collaboration mode, …) |
 | `prioritylevel`                       | Admin catalog of priority keys (`low`/`normal`/`high`/`mission_critical`) |
@@ -78,7 +78,7 @@ publish races fail closed instead of last-write-wins.
 | ---------------------------------------------- | ------------------------------------------------------------------------- |
 | Two pool members claim the same queued step    | First wins; second → **409** (`Only queued pool steps can be claimed`)    |
 | Double decide on the same pending step         | First wins; second → **409** (`invalid_state`)                            |
-| Stale draft PUT after withdraw / status change | **409** (`invalid_state`) when status is no longer `requested`/`drafting` |
+| Stale draft PUT after withdraw / status change | **409** (`invalid_state`) when draft edit is not allowed for that status  |
 
 UI surfaces these via `getApiErrorMessage` (Phase 6). Do not silently overwrite local dirty drafts on unrelated refetch (Phase 6 form state).
 
@@ -119,3 +119,16 @@ authenticated Document Routing users. Number allocation is server/Flow only.
 - **`reviewcomment`** is the human-feedback store. `historyevent.message` stays a short audit line (`Rejected by Compliance`). Comments are written at decide-time so withdraw cannot lose them.
 - **`document.priority`** is a **string key** matching `prioritylevel.key` (not a closed choice). Existing orgs that still have a Dataverse choice column should **dual-read** until migrated; new provision uses string. `document.priorityreason` is required when the catalog row has `requiresReason`.
 - **`documentsubtype`** is optional per type. If a type has any active subtype, create requires one. Chain/scaffold/hint/number-prefix may override per subtype; otherwise inherit the type. In-flight cases keep the chain captured at submit.
+
+## Create workflow and type request fields
+
+Optional intake fields and create-time dispatch live on the type and are snapshotted onto the case. JSON memos keep v1 aligned with the OpenAPI `TypeRequestField` / `typeFieldValues` shapes (no general EAV table).
+
+| Field / table                         | Purpose                                                                 |
+| ------------------------------------- | ----------------------------------------------------------------------- |
+| `documenttype.createworkflow`         | Choice: `standard` or `dispatch_to_review`. Missing → treat as standard |
+| `documenttype.requestfieldsjson`      | JSON array of `{ key, label, kind, required, options }`                 |
+| `document.typefieldvaluesjson`        | JSON object of create-time answers keyed by field `key`                 |
+| `document.allowreviewerdraftedit`     | Boolean set at create from `dispatch_to_review`; not retroactive        |
+
+Admin Types edits workflow and request fields; `pnpm provision` seeds ILAR as dispatch + Relevant systems. Hosted create should validate `typefieldvaluesjson` against `requestfieldsjson`, and when `createworkflow` is `dispatch_to_review` materialize the chain, set status `in_review`, and set `allowreviewerdraftedit`. Draft PATCH in that state must not move status back to `drafting`. `on-submit-guard` still runs when status becomes `in_review`.

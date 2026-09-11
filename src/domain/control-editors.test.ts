@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	createEmptyChainStep,
+	createEmptyRequestField,
 	createEmptySubtype,
 	editorRowKey,
 	moveChainStep,
@@ -36,6 +37,13 @@ describe('control editors helpers', () => {
 		const step = createEmptyChainStep(1);
 		expect(step.authorityLevel).toBe('standard');
 		expect(step.commentPolicy).toBe('required_on_reject');
+	});
+
+	it('creates a select intake field with one starter option', () => {
+		const field = createEmptyRequestField('relevantSystems');
+		expect(field.kind).toBe('select');
+		expect(field.key).toBe('relevantSystems');
+		expect(field.options?.length).toBe(1);
 	});
 
 	it('creates a client-only subtype id until POST', () => {
