@@ -291,6 +291,110 @@ Who and what this policy covers.
 			},
 		],
 	},
+	{
+		id: 'ilar',
+		label: 'ILAR',
+		description:
+			'Intermediate Lesson Action Request — process-change request that becomes an official change document',
+		requestHint:
+			'Describe the process gap or lesson, the change you want, who is affected, and any deadline or risk.',
+		draftTemplate: `# {{title}}
+
+## Intermediate Lesson Action Request
+{{request}}
+
+## Current process
+- 
+
+## Proposed process change
+- 
+
+## Impact and rollout
+- 
+
+## Official change record
+- Change owner:
+- Effective date:
+- Systems / SOPs affected:
+- Verification:
+`,
+		folderPath: '/Process-Changes',
+		authorTeamEmails: [
+			localDemoUser.email,
+			'casey.author@contoso.com',
+			'jamie.engineer@contoso.com',
+		],
+		approvalChain: [
+			{
+				mode: 'named',
+				displayName: 'Lee Engineering',
+				email: 'lee.engmgr@contoso.com',
+				role: 'Engineering Manager',
+				slaHours: 16,
+				authorityLevel: 'authoritative',
+				commentPolicy: 'required_on_reject',
+				elevationPool: [
+					{
+						displayName: 'Dana Director of Engineering',
+						email: 'dana.director@contoso.com',
+						role: 'Elevated Engineering Manager',
+					},
+				],
+			},
+			{
+				mode: 'pool',
+				poolRole: 'Lead Engineers',
+				slaHours: 24,
+				authorityLevel: 'standard',
+				commentPolicy: 'required_on_reject',
+				pool: [
+					{
+						displayName: 'Quinn Lead',
+						email: 'quinn.lead@contoso.com',
+					},
+					{
+						displayName: 'Reese Lead',
+						email: 'reese.lead@contoso.com',
+					},
+					{
+						displayName: localDemoUser.userName,
+						email: localDemoUser.email,
+					},
+				],
+				elevationPool: [
+					{
+						displayName: 'Sasha Principal',
+						email: 'sasha.principal@contoso.com',
+						role: 'Elevated Lead Engineer',
+					},
+				],
+			},
+			{
+				mode: 'pool',
+				poolRole: 'Assigned Engineers',
+				slaHours: 48,
+				authorityLevel: 'standard',
+				commentPolicy: 'required_on_reject',
+				pool: [
+					{
+						displayName: 'Casey Author',
+						email: 'casey.author@contoso.com',
+					},
+					{
+						displayName: 'Jamie Engineer',
+						email: 'jamie.engineer@contoso.com',
+					},
+				],
+				elevationPool: [
+					{
+						displayName: 'Quinn Lead',
+						email: 'quinn.lead@contoso.com',
+						role: 'Elevated Assigned Engineer',
+					},
+				],
+			},
+		],
+	},
 ];
 
 export const DEFAULT_DOCUMENT_TYPE_ID = documentTypes[0].id;

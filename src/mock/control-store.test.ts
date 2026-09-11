@@ -15,8 +15,21 @@ describe('control store', () => {
 	it('seeds document types and pools from the TS mirror', () => {
 		const store = getControlStore();
 		expect(store.documentTypes.some((type) => type.id === 'policy')).toBe(true);
+		expect(store.documentTypes.some((type) => type.id === 'ilar')).toBe(true);
 		expect(store.approverPools.length).toBeGreaterThan(0);
 		expect(store.settings.allowApproverOverride).toBe(false);
+	});
+
+	it('materializes ILAR as manager then lead engineers then assigned engineers', () => {
+		const steps = materializeApprovalSteps('ilar');
+		expect(steps?.map((step) => step.role)).toEqual([
+			'Engineering Manager',
+			'Lead Engineers',
+			'Assigned Engineers',
+		]);
+		expect(steps?.[0]?.assignmentMode).toBe('named');
+		expect(steps?.[1]?.assignmentMode).toBe('pool');
+		expect(steps?.[2]?.assignmentMode).toBe('pool');
 	});
 
 	it('materializes submit steps from live pool membership', () => {

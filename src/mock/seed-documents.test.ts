@@ -60,6 +60,38 @@ describe('createSeedDocuments', () => {
 		).toBe(true);
 	});
 
+	it('includes ILAR process-change seeds through manager then lead assignment', () => {
+		const docs = createSeedDocuments();
+		const ilars = docs.filter((document) => document.documentType === 'ilar');
+		expect(ilars.length).toBeGreaterThanOrEqual(3);
+		expect(ilars.some((document) => document.status === 'requested')).toBe(true);
+
+		const pendingManager = ilars.find(
+			(document) =>
+				document.status === 'in_review'
+				&& document.currentApproverEmail === 'lee.engmgr@contoso.com',
+		);
+		expect(pendingManager).toBeTruthy();
+		expect(pendingManager!.approvalSteps.map((step) => step.role)).toEqual([
+			'Engineering Manager',
+			'Lead Engineers',
+			'Assigned Engineers',
+		]);
+		expect(pendingManager!.approvalSteps[0]?.authorityLevel).toBe('authoritative');
+
+		const leadQueued = ilars.find(
+			(document) =>
+				document.status === 'in_review'
+				&& document.currentStepStatus === 'queued'
+				&& document.approvalSteps[0]?.status === 'approved',
+		);
+		expect(leadQueued).toBeTruthy();
+		expect(leadQueued!.currentPoolEmails).toContain(
+			appConfig.localDemoUser.email,
+		);
+		expect(leadQueued!.draftBodyMarkdown).toContain('Official change record');
+	});
+
 	it('keeps Gift Policy Amendment reviewer body on reviewComments and a short history message', () => {
 		const gift = createSeedDocuments().find(
 			(document) => document.title === 'Gift Policy Amendment',

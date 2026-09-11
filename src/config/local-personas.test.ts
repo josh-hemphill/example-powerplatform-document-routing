@@ -19,6 +19,14 @@ describe('resolvePrincipalRolesByEmail', () => {
 			'user',
 			'approver',
 		]);
+		expect(resolvePrincipalRolesByEmail('lee.engmgr@contoso.com')).toEqual([
+			'user',
+			'approver',
+		]);
+		expect(resolvePrincipalRolesByEmail('quinn.lead@contoso.com')).toEqual([
+			'user',
+			'approver',
+		]);
 	});
 
 	it('defaults unknown emails to user-only', () => {

@@ -85,6 +85,17 @@ describe('control policy HTTP', () => {
 		expect(captured.body().code).toBe('subtype_required');
 	});
 
+	it('creates ILAR without a subtype', async() => {
+		const captured = await postDocument({
+			title: 'Standardize hotfix rollback checklist',
+			documentType: 'ilar',
+			freeformRequest:
+				'Hotfixes skip rollback rehearsal. Please open an ILAR for an official process change.',
+			priority: 'normal',
+		});
+		expect(captured.status()).toBe(201);
+	});
+
 	it('creates Announcement without a subtype', async() => {
 		const captured = await postDocument({
 			title: 'Org announcement',

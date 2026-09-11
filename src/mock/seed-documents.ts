@@ -129,6 +129,40 @@ const COMPLIANCE_ELEVATION: ApproverPerson[] = [
 	},
 ];
 
+const LEAD_ENGINEER_POOL: ApproverPerson[] = [
+	{ displayName: 'Quinn Lead', email: 'quinn.lead@contoso.com' },
+	{ displayName: 'Reese Lead', email: 'reese.lead@contoso.com' },
+];
+
+const LEAD_ENGINEER_ELEVATION: ApproverPerson[] = [
+	{
+		displayName: 'Sasha Principal',
+		email: 'sasha.principal@contoso.com',
+		role: 'Elevated Lead Engineer',
+	},
+];
+
+const ASSIGNED_ENGINEER_POOL: ApproverPerson[] = [
+	{ displayName: 'Casey Author', email: 'casey.author@contoso.com' },
+	{ displayName: 'Jamie Engineer', email: 'jamie.engineer@contoso.com' },
+];
+
+const ASSIGNED_ENGINEER_ELEVATION: ApproverPerson[] = [
+	{
+		displayName: 'Quinn Lead',
+		email: 'quinn.lead@contoso.com',
+		role: 'Elevated Assigned Engineer',
+	},
+];
+
+const ENG_MANAGER_ELEVATION: ApproverPerson[] = [
+	{
+		displayName: 'Dana Director of Engineering',
+		email: 'dana.director@contoso.com',
+		role: 'Elevated Engineering Manager',
+	},
+];
+
 /**
  * Seeds demo documents across workflow states so local Vite play can exercise
  * every inbox persona and approval path (claim, decide, elevate, publish, supersede).
@@ -850,6 +884,360 @@ Draft abandoned.
 		requestedLibraryName: publishLibrary,
 	};
 
+	const ilarLeadPool: ApproverPerson[] = [
+		...LEAD_ENGINEER_POOL,
+		{ displayName: appConfig.localDemoUser.userName, email: demoEmail },
+	];
+	const ilarEngineerCollab = [
+		demoEmail,
+		'casey.author@contoso.com',
+		'jamie.engineer@contoso.com',
+	];
+	const ilarChangeDraft = `# Standardize hotfix rollback checklist
+
+## Intermediate Lesson Action Request
+Hotfixes skip the rollback rehearsal used for planned releases. Capture the lesson as an official process change.
+
+## Current process
+- Hotfix owners post in Slack and ship from \`main\` when severity is high.
+- Rollback steps live in individual runbooks and are often skipped.
+
+## Proposed process change
+- Require the same rollback checklist as planned releases before any hotfix merge.
+- Record owner, rehearsal time, and go/no-go in the official change record.
+
+## Impact and rollout
+- Applies to all production services.
+- Lead engineers assign an individual engineer to finish the official change document.
+
+## Official change record
+- Change owner: Casey Author
+- Effective date: pending assignment
+- Systems / SOPs affected: release SOP, on-call runbooks
+- Verification: one hotfix dry-run using the new checklist
+`;
+
+	const ilarRequested: MockDocumentRecord = {
+		id: randomUUID(),
+		title: 'Standardize hotfix rollback checklist',
+		documentType: 'ilar',
+		status: 'requested',
+		requesterEmail: 'alex.requester@contoso.com',
+		collaboratorEmails: [...ilarEngineerCollab],
+		priority: 'high',
+		priorityReason: null,
+		documentSubtypeId: null,
+		reviewComments: [],
+		currentApproverEmail: null,
+		currentStepStatus: null,
+		currentStepDueAt: null,
+		currentStepElevated: null,
+		currentPoolEmails: [],
+		createdAt,
+		updatedAt: createdAt,
+		freeformRequest:
+			'Hotfixes skip the rollback rehearsal used for planned releases. Please open an ILAR so engineering can turn this lesson into an official process change.',
+		draftBodyMarkdown: null,
+		draftSummary: null,
+		authorEmail: null,
+		contentRevision: 0,
+		submittedContentRevision: null,
+		publishedContentRevision: null,
+		documentNumber: null,
+		documentVersion: null,
+		supersedesDocumentId: null,
+		supersededByDocumentId: null,
+		publishedAt: null,
+		approvalSteps: [],
+		history: [
+			{
+				id: randomUUID(),
+				at: createdAt,
+				actorEmail: 'alex.requester@contoso.com',
+				action: 'requested',
+				message: 'ILAR submitted — routes to the engineering manager first',
+			},
+		],
+		publishedPdfUrl: null,
+		sharePointItemId: null,
+		requestedPublishSiteUrl: publishSite,
+		requestedLibraryName: publishLibrary,
+	};
+
+	const ilarPendingManager: MockDocumentRecord = {
+		id: randomUUID(),
+		title: 'Require pairing for production schema changes',
+		documentType: 'ilar',
+		status: 'in_review',
+		requesterEmail: 'alex.requester@contoso.com',
+		collaboratorEmails: [...ilarEngineerCollab],
+		priority: 'high',
+		priorityReason: null,
+		documentSubtypeId: null,
+		reviewComments: [],
+		currentApproverEmail: 'lee.engmgr@contoso.com',
+		currentStepStatus: 'pending',
+		currentStepDueAt: futureDueAt,
+		currentStepElevated: false,
+		currentPoolEmails: [],
+		createdAt,
+		updatedAt: createdAt,
+		freeformRequest:
+			'A solo schema migrate locked checkout for 40 minutes. Request a process change that requires pairing plus a documented rollback before production schema work.',
+		draftBodyMarkdown: `# Require pairing for production schema changes
+
+## Intermediate Lesson Action Request
+A solo schema migrate locked checkout for 40 minutes. Require pairing plus a documented rollback before production schema work.
+
+## Current process
+- An on-call engineer can apply schema changes alone.
+
+## Proposed process change
+- Pairing required for production schema changes.
+- Official change record must list rollback owner before migrate.
+
+## Impact and rollout
+- Database platform and checkout services.
+
+## Official change record
+- Change owner:
+- Effective date:
+- Systems / SOPs affected: schema migrate SOP
+- Verification:
+`,
+		draftSummary: 'ILAR: pair on production schema changes',
+		authorEmail: 'casey.author@contoso.com',
+		contentRevision: 2,
+		submittedContentRevision: 2,
+		publishedContentRevision: null,
+		documentNumber: null,
+		documentVersion: null,
+		supersedesDocumentId: null,
+		supersededByDocumentId: null,
+		publishedAt: null,
+		approvalSteps: [
+			{
+				id: randomUUID(),
+				order: 1,
+				assignmentMode: 'named',
+				approverEmail: 'lee.engmgr@contoso.com',
+				approverDisplayName: 'Lee Engineering',
+				role: 'Engineering Manager',
+				status: 'pending',
+				pool: [
+					{
+						displayName: 'Lee Engineering',
+						email: 'lee.engmgr@contoso.com',
+					},
+				],
+				elevationPool: [...ENG_MANAGER_ELEVATION],
+				slaHours: 16,
+				activateDueAt: futureDueAt,
+				dueAt: futureDueAt,
+				claimedAt: createdAt,
+				elevated: false,
+				elevatedAt: null,
+				authorityLevel: 'authoritative',
+				commentPolicy: DEFAULT_COMMENT_POLICY,
+				comment: null,
+				decidedAt: null,
+				submittedRevision: 2,
+				approvedRevision: null,
+			},
+			{
+				id: randomUUID(),
+				order: 2,
+				assignmentMode: 'pool',
+				approverEmail: null,
+				approverDisplayName: null,
+				role: 'Lead Engineers',
+				status: 'waiting',
+				pool: [...ilarLeadPool],
+				elevationPool: [...LEAD_ENGINEER_ELEVATION],
+				slaHours: 24,
+				activateDueAt: null,
+				dueAt: null,
+				claimedAt: null,
+				elevated: false,
+				elevatedAt: null,
+				authorityLevel: seedAuthorityForRole('Lead Engineers'),
+				commentPolicy: DEFAULT_COMMENT_POLICY,
+				comment: null,
+				decidedAt: null,
+				submittedRevision: 2,
+				approvedRevision: null,
+			},
+			{
+				id: randomUUID(),
+				order: 3,
+				assignmentMode: 'pool',
+				approverEmail: null,
+				approverDisplayName: null,
+				role: 'Assigned Engineers',
+				status: 'waiting',
+				pool: [...ASSIGNED_ENGINEER_POOL],
+				elevationPool: [...ASSIGNED_ENGINEER_ELEVATION],
+				slaHours: 48,
+				activateDueAt: null,
+				dueAt: null,
+				claimedAt: null,
+				elevated: false,
+				elevatedAt: null,
+				authorityLevel: seedAuthorityForRole('Assigned Engineers'),
+				commentPolicy: DEFAULT_COMMENT_POLICY,
+				comment: null,
+				decidedAt: null,
+				submittedRevision: 2,
+				approvedRevision: null,
+			},
+		],
+		history: [
+			{
+				id: randomUUID(),
+				at: createdAt,
+				actorEmail: 'casey.author@contoso.com',
+				action: 'submitted_for_approval',
+				message: 'Submitted — waiting on engineering manager before lead assignment',
+			},
+		],
+		publishedPdfUrl: null,
+		sharePointItemId: null,
+		requestedPublishSiteUrl: publishSite,
+		requestedLibraryName: publishLibrary,
+	};
+
+	const ilarLeadQueued: MockDocumentRecord = {
+		id: randomUUID(),
+		title: 'Retire ad-hoc deploy Slack channel',
+		documentType: 'ilar',
+		status: 'in_review',
+		requesterEmail: 'alex.requester@contoso.com',
+		collaboratorEmails: [...ilarEngineerCollab],
+		priority: 'normal',
+		priorityReason: null,
+		documentSubtypeId: null,
+		reviewComments: [],
+		currentApproverEmail: null,
+		currentStepStatus: 'queued',
+		currentStepDueAt: futureDueAt,
+		currentStepElevated: false,
+		currentPoolEmails: [
+			'quinn.lead@contoso.com',
+			'reese.lead@contoso.com',
+			demoEmail,
+		],
+		createdAt,
+		updatedAt: createdAt,
+		freeformRequest:
+			'Ad-hoc deploys are still coordinated in Slack. Turn the lesson into an official change that routes every production deploy through the change record.',
+		draftBodyMarkdown: ilarChangeDraft.replace(
+			'Standardize hotfix rollback checklist',
+			'Retire ad-hoc deploy Slack channel',
+		).replace(
+			'Hotfixes skip the rollback rehearsal used for planned releases. Capture the lesson as an official process change.',
+			'Ad-hoc deploys are still coordinated in Slack. Route every production deploy through the official change record.',
+		),
+		draftSummary: 'ILAR: official change for production deploys',
+		authorEmail: demoEmail,
+		contentRevision: 3,
+		submittedContentRevision: 3,
+		publishedContentRevision: null,
+		documentNumber: null,
+		documentVersion: null,
+		supersedesDocumentId: null,
+		supersededByDocumentId: null,
+		publishedAt: null,
+		approvalSteps: [
+			{
+				id: randomUUID(),
+				order: 1,
+				assignmentMode: 'named',
+				approverEmail: 'lee.engmgr@contoso.com',
+				approverDisplayName: 'Lee Engineering',
+				role: 'Engineering Manager',
+				status: 'approved',
+				pool: [
+					{
+						displayName: 'Lee Engineering',
+						email: 'lee.engmgr@contoso.com',
+					},
+				],
+				elevationPool: [...ENG_MANAGER_ELEVATION],
+				slaHours: 16,
+				activateDueAt: createdAt,
+				dueAt: createdAt,
+				claimedAt: createdAt,
+				elevated: false,
+				elevatedAt: null,
+				authorityLevel: 'authoritative',
+				commentPolicy: DEFAULT_COMMENT_POLICY,
+				comment: 'Scoped — lead engineers should assign an owner to finish the official change.',
+				decidedAt: createdAt,
+				submittedRevision: 3,
+				approvedRevision: 3,
+			},
+			{
+				id: randomUUID(),
+				order: 2,
+				assignmentMode: 'pool',
+				approverEmail: null,
+				approverDisplayName: null,
+				role: 'Lead Engineers',
+				status: 'queued',
+				pool: [...ilarLeadPool],
+				elevationPool: [...LEAD_ENGINEER_ELEVATION],
+				slaHours: 24,
+				activateDueAt: futureDueAt,
+				dueAt: futureDueAt,
+				claimedAt: null,
+				elevated: false,
+				elevatedAt: null,
+				authorityLevel: seedAuthorityForRole('Lead Engineers'),
+				commentPolicy: DEFAULT_COMMENT_POLICY,
+				comment: null,
+				decidedAt: null,
+				submittedRevision: 3,
+				approvedRevision: null,
+			},
+			{
+				id: randomUUID(),
+				order: 3,
+				assignmentMode: 'pool',
+				approverEmail: null,
+				approverDisplayName: null,
+				role: 'Assigned Engineers',
+				status: 'waiting',
+				pool: [...ASSIGNED_ENGINEER_POOL],
+				elevationPool: [...ASSIGNED_ENGINEER_ELEVATION],
+				slaHours: 48,
+				activateDueAt: null,
+				dueAt: null,
+				claimedAt: null,
+				elevated: false,
+				elevatedAt: null,
+				authorityLevel: seedAuthorityForRole('Assigned Engineers'),
+				commentPolicy: DEFAULT_COMMENT_POLICY,
+				comment: null,
+				decidedAt: null,
+				submittedRevision: 3,
+				approvedRevision: null,
+			},
+		],
+		history: [
+			{
+				id: randomUUID(),
+				at: createdAt,
+				actorEmail: 'lee.engmgr@contoso.com',
+				action: 'approved',
+				message: 'Engineering manager approved — lead engineer pool can assign an owner',
+			},
+		],
+		publishedPdfUrl: null,
+		sharePointItemId: null,
+		requestedPublishSiteUrl: publishSite,
+		requestedLibraryName: publishLibrary,
+	};
+
 	const giftStep = rejected.approvalSteps[0]!;
 	const giftCommentId = randomUUID();
 	const giftCommentBody = 'Need manager attestation language before approval';
@@ -888,6 +1276,8 @@ Draft abandoned.
 	syncCurrentApprovalFields(elevatedPool);
 	syncCurrentApprovalFields(readyToPublish);
 	syncCurrentApprovalFields(rejected);
+	syncCurrentApprovalFields(ilarPendingManager);
+	syncCurrentApprovalFields(ilarLeadQueued);
 
 	const seeded = [
 		requested,
@@ -901,6 +1291,9 @@ Draft abandoned.
 		supersedeDraft,
 		abandonedSuccessor,
 		myRequest,
+		ilarRequested,
+		ilarPendingManager,
+		ilarLeadQueued,
 	];
 	for (const document of seeded) {
 		for (const step of document.approvalSteps) {
@@ -910,6 +1303,9 @@ Draft abandoned.
 	}
 	// Gift Policy rejection is authoritative Compliance feedback (do not infer-overwrite).
 	rejected.approvalSteps[0]!.authorityLevel = 'authoritative';
+	// ILAR engineering-manager intake is authoritative (do not infer-overwrite).
+	ilarPendingManager.approvalSteps[0]!.authorityLevel = 'authoritative';
+	ilarLeadQueued.approvalSteps[0]!.authorityLevel = 'authoritative';
 
 	return seeded;
 }
