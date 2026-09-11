@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { appConfig } from './app.config.ts';
 import {
+	demoPersonaSwitcherItems,
 	isKnownLocalDemoEmail,
 	LOCAL_DEMO_PERSONAS,
 	resolvePrincipalRolesByEmail,
@@ -38,6 +39,28 @@ describe('resolvePrincipalRolesByEmail', () => {
 		expect(isKnownLocalDemoEmail('  casey.author@contoso.com  ')).toBe(true);
 		expect(isKnownLocalDemoEmail('stranger@contoso.com')).toBe(false);
 		expect(isKnownLocalDemoEmail('')).toBe(false);
+	});
+
+	it('prepends an unknown hosted UPN to the Acting as list', () => {
+		const items = demoPersonaSwitcherItems({
+			email: 'pat@contoso.com',
+			userName: 'Pat Hosted',
+			roles: ['user'],
+		});
+		expect(items[0]).toMatchObject({
+			email: 'pat@contoso.com',
+			label: 'Pat Hosted (host)',
+		});
+		expect(items.slice(1)).toEqual(LOCAL_DEMO_PERSONAS);
+	});
+
+	it('does not duplicate a hosted UPN that is already a demo persona', () => {
+		const items = demoPersonaSwitcherItems({
+			email: appConfig.localDemoUser.email,
+			userName: appConfig.localDemoUser.userName,
+			roles: appConfig.localDemoUser.roles,
+		});
+		expect(items).toEqual(LOCAL_DEMO_PERSONAS);
 	});
 
 	it('defaults unknown emails to user-only', () => {

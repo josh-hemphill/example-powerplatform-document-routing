@@ -10,6 +10,10 @@ import {
 	listLibraryDocumentsQuery,
 } from '@/client/@pinia/colada.gen';
 import DocumentStatusChip from '@/components/DocumentStatusChip.vue';
+import {
+	mergeAccumulatedPage,
+	shouldReplaceListPage,
+} from '@/composables/accumulated-list-page';
 import { useDocumentTypeLabel } from '@/composables/use-document-type-label';
 
 const { mdAndUp } = useDisplay();
@@ -74,7 +78,6 @@ watch(
 	[typeFilter, debouncedQ, includeSuperseded],
 	() => {
 		cursor.value = undefined;
-		accumulated.value = [];
 		nextCursor.value = null;
 	},
 );
@@ -82,20 +85,14 @@ watch(
 watch(
 	[data, isPending],
 	([page, pending]) => {
-		if (pending || !page) {
+		if (!shouldReplaceListPage(pending, page) || !page) {
 			return;
 		}
-		const pageItems = page.items ?? [];
-		if (cursor.value) {
-			const existing = new Set(accumulated.value.map((item) => item.id));
-			accumulated.value = [
-				...accumulated.value,
-				...pageItems.filter((item) => !existing.has(item.id)),
-			];
-		}
-		else {
-			accumulated.value = pageItems;
-		}
+		accumulated.value = mergeAccumulatedPage(
+			accumulated.value,
+			page.items ?? [],
+			cursor.value,
+		);
 		nextCursor.value = page.nextCursor ?? null;
 	},
 	{ immediate: true },
@@ -103,7 +100,9 @@ watch(
 
 const items = computed(() => accumulated.value);
 
-const showInitialLoader = computed(() => isPending.value && accumulated.value.length === 0);
+const showInitialLoader = computed(
+	() => isPending.value && items.value.length === 0 && !cursor.value,
+);
 const loadingMore = computed(() => isPending.value && Boolean(cursor.value));
 
 function loadMore(): void {

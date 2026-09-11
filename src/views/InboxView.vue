@@ -9,8 +9,18 @@ import { getApiErrorMessage } from '@/api/api-error';
 import { listDocumentsQuery, listDocumentTypesQuery, listPriorityLevelsQuery } from '@/client/@pinia/colada.gen';
 import DocumentStatusChip from '@/components/DocumentStatusChip.vue';
 import PriorityChip from '@/components/PriorityChip.vue';
+import {
+	mergeAccumulatedPage,
+	shouldReplaceListPage,
+} from '@/composables/accumulated-list-page';
 import { useDocumentTypeLabel } from '@/composables/use-document-type-label';
 import { usePowerAppsContext } from '@/composables/use-power-apps-context';
+import {
+	inboxDocumentsQueryActorKey,
+	readInboxPersonaPreference,
+	resolveStoredInboxPersona,
+	writeInboxPersonaPreference,
+} from '@/config/inbox-persona-preference';
 import {
 	INBOX_PERSONAS,
 	matchesInboxPersona,
@@ -87,15 +97,18 @@ const queryInput = computed(() => ({
 	},
 }));
 
-const { data, isPending, error, refetch } = useQuery(() =>
-	listDocumentsQuery(queryInput.value),
-);
+const { data, isPending, error, refetch } = useQuery(() => {
+	const options = listDocumentsQuery(queryInput.value);
+	return {
+		...options,
+		key: [...options.key, inboxDocumentsQueryActorKey(context.value.email)] as const,
+	};
+});
 
 watch(
-	[statusFilter, typeFilter, debouncedQ, persona],
+	[statusFilter, typeFilter, debouncedQ, persona, () => context.value.email],
 	() => {
 		cursor.value = undefined;
-		accumulated.value = [];
 		nextCursor.value = null;
 	},
 );
@@ -103,20 +116,14 @@ watch(
 watch(
 	[data, isPending],
 	([page, pending]) => {
-		if (pending || !page) {
+		if (!shouldReplaceListPage(pending, page) || !page) {
 			return;
 		}
-		const pageItems = page.items ?? [];
-		if (cursor.value) {
-			const existing = new Set(accumulated.value.map((item) => item.id));
-			accumulated.value = [
-				...accumulated.value,
-				...pageItems.filter((item) => !existing.has(item.id)),
-			];
-		}
-		else {
-			accumulated.value = pageItems;
-		}
+		accumulated.value = mergeAccumulatedPage(
+			accumulated.value,
+			page.items ?? [],
+			cursor.value,
+		);
 		nextCursor.value = page.nextCursor ?? null;
 	},
 	{ immediate: true },
@@ -133,7 +140,9 @@ const items = computed(() =>
 	),
 );
 
-const showInitialLoader = computed(() => isPending.value && accumulated.value.length === 0);
+const showInitialLoader = computed(
+	() => isPending.value && items.value.length === 0 && !cursor.value,
+);
 const loadingMore = computed(() => isPending.value && Boolean(cursor.value));
 
 const filtersActive = computed(
@@ -170,12 +179,37 @@ function refreshList(): void {
 }
 
 watch(
-	[() => context.value.email, accumulated],
-	([email, list]) => {
+	() => context.value.email,
+	(email) => {
 		if (!email) {
 			return;
 		}
-		// One-shot per signed-in identity — list refetches must not override a manual chip.
+		const stored = resolveStoredInboxPersona(email, readInboxPersonaPreference());
+		if (stored) {
+			persona.value = stored;
+			autoSelectedForEmail.value = email;
+		}
+	},
+	{ immediate: true },
+);
+
+watch(
+	[persona, () => context.value.email],
+	([nextPersona, email]) => {
+		if (email) {
+			writeInboxPersonaPreference(email, nextPersona);
+		}
+	},
+);
+
+watch(
+	accumulated,
+	(list) => {
+		const email = context.value.email;
+		if (!email) {
+			return;
+		}
+		// One-shot per actor after that actor's list arrives — not on Acting-as alone.
 		if (autoSelectedForEmail.value === email) {
 			return;
 		}

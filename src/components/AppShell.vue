@@ -7,9 +7,9 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import SetupBanner from '@/components/SetupBanner.vue';
 import { usePowerAppsContext } from '@/composables/use-power-apps-context';
 import { appConfig } from '@/config/app.config';
+import { demoPersonaSwitcherItems } from '@/config/local-personas';
 import {
 	allowsDemoIdentityFallback,
-	LOCAL_DEMO_PERSONAS,
 	useIdentityStore,
 } from '@/stores/identity';
 
@@ -44,8 +44,13 @@ const pageSubtitle = computed(() => {
 });
 const showPageHeading = computed(() => !route.meta.hidePageHeading);
 
-const showPersonaSwitcher = computed(
-	() => allowsDemoIdentityFallback() && status.value === 'standalone',
+const showPersonaSwitcher = computed(() => allowsDemoIdentityFallback());
+const personaSwitcherItems = computed(() =>
+	demoPersonaSwitcherItems({
+		email: identityStore.hostActor?.email,
+		userName: identityStore.hostActor?.userName,
+		roles: identityStore.hostActor?.roles,
+	}),
 );
 const hostChipLabel = computed(() => {
 	if (status.value === 'hosted') {
@@ -164,7 +169,7 @@ watch(
 			>
 				<v-select
 					:model-value="context.email"
-					:items="LOCAL_DEMO_PERSONAS"
+					:items="personaSwitcherItems"
 					item-title="label"
 					item-value="email"
 					density="compact"
@@ -245,7 +250,7 @@ watch(
 			<v-select
 				v-if="showPersonaSwitcher"
 				:model-value="context.email"
-				:items="LOCAL_DEMO_PERSONAS"
+				:items="personaSwitcherItems"
 				item-title="label"
 				item-value="email"
 				density="compact"

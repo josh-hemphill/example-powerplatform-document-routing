@@ -230,6 +230,73 @@ describe('identity store', () => {
 		vi.unstubAllEnvs();
 	});
 
+	it('overlays a demo persona in hosted DEV without dropping host status', async() => {
+		getContext.mockResolvedValue({
+			user: {
+				userPrincipalName: 'pat@contoso.com',
+				fullName: 'Pat Hosted',
+			},
+			app: { environmentId: 'env-1' },
+		});
+
+		const store = useIdentityStore();
+		await store.ensureLoaded();
+		expect(store.hostActor?.email).toBe('pat@contoso.com');
+
+		store.switchLocalPersona('developer@example.com');
+		expect(store.status).toBe('hosted');
+		expect(store.email).toBe('developer@example.com');
+		expect(store.hasRole('admin')).toBe(true);
+		expect(store.identity.environmentId).toBe('env-1');
+		expect(store.hostActor?.email).toBe('pat@contoso.com');
+		expect(store.hostActor?.userName).toBe('Pat Hosted');
+
+		store.switchLocalPersona('jordan.legal@contoso.com');
+		expect(store.email).toBe('jordan.legal@contoso.com');
+		expect(store.identity.roles).toEqual(['user', 'approver']);
+		expect(store.hasRole('admin')).toBe(false);
+
+		store.switchLocalPersona('pat@contoso.com');
+		expect(store.status).toBe('hosted');
+		expect(store.email).toBe('pat@contoso.com');
+		expect(store.identity.userName).toBe('Pat Hosted');
+		expect(store.identity.roles).toEqual(['user']);
+		expect(store.identity.environmentId).toBe('env-1');
+	});
+
+	it('does not switch personas when DEV fallback is off', async() => {
+		vi.stubEnv('DEV', false);
+		getContext.mockResolvedValue({
+			user: {
+				userPrincipalName: 'pat@contoso.com',
+				fullName: 'Pat Hosted',
+			},
+			app: { environmentId: 'env-1' },
+		});
+
+		const store = useIdentityStore();
+		await store.ensureLoaded();
+		store.switchLocalPersona('jordan.legal@contoso.com');
+
+		expect(store.status).toBe('hosted');
+		expect(store.email).toBe('pat@contoso.com');
+		expect(store.identity.roles).toEqual(['user']);
+		vi.unstubAllEnvs();
+	});
+
+	it('still switches standalone demo personas in DEV', async() => {
+		getContext.mockRejectedValue(new Error('plugin missing'));
+
+		const store = useIdentityStore();
+		await store.ensureLoaded();
+		expect(store.status).toBe('standalone');
+
+		store.switchLocalPersona('alex.requester@contoso.com');
+		expect(store.status).toBe('standalone');
+		expect(store.email).toBe('alex.requester@contoso.com');
+		expect(store.hasRole('admin')).toBe(false);
+	});
+
 	it('does not install demo identity on timeout when DEV fallback is off', async() => {
 		vi.stubEnv('DEV', false);
 		vi.useFakeTimers();
