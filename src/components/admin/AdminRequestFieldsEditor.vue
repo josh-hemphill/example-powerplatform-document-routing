@@ -14,6 +14,7 @@ import {
 const fields = defineModel<TypeRequestField[]>({ required: true });
 const expandedRow = ref<number | null>(null);
 const keyHint = 'Identifier used in {{fieldKey}} templates';
+const fieldKeyPlaceholder = '{{fieldKey}}';
 const unlockedFields = new WeakSet<TypeRequestField>();
 
 const fieldsError = computed(() => validateRequestFields(fields.value)?.message ?? null);
@@ -80,7 +81,7 @@ function toggleExpand(field: TypeRequestField): void {
 		</div>
 		<p class="text-body-2 text-medium-emphasis mb-3">
 			Optional dropdowns collected on create. Use
-			<code>{{ '{{fieldKey}}' }}</code>
+			<code>{{ fieldKeyPlaceholder }}</code>
 			in the draft scaffold to insert the selected label. Keys stay fixed after save so in-flight cases keep their answers.
 		</p>
 		<v-alert
