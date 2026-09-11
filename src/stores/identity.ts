@@ -7,6 +7,7 @@ import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import { fetchPrincipal } from '@/api/fetch-principal';
 import {
+	isKnownLocalDemoEmail,
 	LOCAL_DEMO_PERSONAS,
 	resolvePrincipalRolesByEmail,
 } from '@/config/local-personas';
@@ -44,17 +45,32 @@ export function allowsDemoIdentityFallback(): boolean {
 	return Boolean(import.meta.env.DEV);
 }
 
+type HostUserContext = {
+	objectId?: string;
+	fullName?: string;
+	userPrincipalName?: string;
+	email?: string;
+};
+
 type HostContextResult
 	= | { kind: 'context'; context: {
-		user?: {
-			objectId?: string;
-			fullName?: string;
-			userPrincipalName?: string;
-		};
+		user?: HostUserContext;
 		app?: { environmentId?: string };
 	}; }
 	| { kind: 'timeout' }
 	| { kind: 'error'; error: unknown };
+
+/**
+ * Prefers the Power Apps UPN, then a host `email` field if a host only sends that.
+ */
+export function hostActorEmail(user: HostUserContext | undefined): string | undefined {
+	const upn = user?.userPrincipalName?.trim();
+	if (upn) {
+		return upn;
+	}
+	const email = user?.email?.trim();
+	return email || undefined;
+}
 
 export type HostedRolesStatus = 'idle' | 'loading' | 'resolved' | 'failed';
 
@@ -158,10 +174,7 @@ export const useIdentityStore = defineStore('identity', () => {
 		if (!allowsDemoIdentityFallback()) {
 			return false;
 		}
-		const isKnownPersona = LOCAL_DEMO_PERSONAS.some(
-			(persona) => persona.email.toLowerCase() === actorEmail.trim().toLowerCase(),
-		);
-		if (!isKnownPersona) {
+		if (!isKnownLocalDemoEmail(actorEmail)) {
 			return false;
 		}
 		identity.value = {
@@ -246,7 +259,7 @@ export const useIdentityStore = defineStore('identity', () => {
 			}
 
 			const hostContext = result.context;
-			const hostEmail = hostContext.user?.userPrincipalName?.trim();
+			const hostEmail = hostActorEmail(hostContext.user);
 			if (!hostEmail) {
 				// Local Play / incomplete host sometimes returns context without UPN.
 				// In DEV, honor VITE_LOCAL_DEMO_* via the primary local persona.

@@ -53,6 +53,20 @@ export const LOCAL_DEMO_PERSONAS: LocalDemoPersona[] = [
 ];
 
 /**
+ * True when `email` matches a local demo persona (case-insensitive).
+ * Used so DEV Local Play can grant `.env.local` admin roles to the host UPN.
+ */
+export function isKnownLocalDemoEmail(email: string | null | undefined): boolean {
+	const normalized = email?.trim().toLowerCase();
+	if (!normalized) {
+		return false;
+	}
+	return LOCAL_DEMO_PERSONAS.some(
+		(persona) => persona.email.toLowerCase() === normalized,
+	);
+}
+
+/**
  * Resolves mock/server-side roles for an actor email (ignores client role headers).
  * Unknown emails receive user-only — least privilege until Dataverse mapping exists.
  */

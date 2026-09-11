@@ -32,16 +32,21 @@ function trimOrUndefined(value: unknown): string | undefined {
 	return trimmed.length > 0 ? trimmed : undefined;
 }
 
-function readViteEnv(key: string): string | undefined {
-	try {
-		const meta = import.meta as ImportMeta & {
-			env?: Record<string, string | undefined>;
-		};
-		return trimOrUndefined(meta.env?.[key]);
-	}
-	catch {
-		return undefined;
-	}
+function readViteEnv(): Pick<
+	RuntimeHostConfig,
+	| 'documentApiBaseUrl'
+	| 'sharePointSiteUrl'
+	| 'sharePointLibraryName'
+	| 'sharePointFolderPath'
+	| 'dataverseEnvironmentUrl'
+> {
+	return {
+		documentApiBaseUrl: trimOrUndefined(import.meta.env?.VITE_DOCUMENT_API_BASE_URL),
+		sharePointSiteUrl: trimOrUndefined(import.meta.env?.VITE_SHAREPOINT_SITE_URL),
+		sharePointLibraryName: trimOrUndefined(import.meta.env?.VITE_SHAREPOINT_LIBRARY_NAME),
+		sharePointFolderPath: trimOrUndefined(import.meta.env?.VITE_SHAREPOINT_FOLDER_PATH),
+		dataverseEnvironmentUrl: trimOrUndefined(import.meta.env?.VITE_DATAVERSE_ENVIRONMENT_URL),
+	};
 }
 
 /**
@@ -60,13 +65,7 @@ export function resolveRuntimeHostConfig(): RuntimeHostConfig {
 		};
 	}
 
-	const fromVite = {
-		documentApiBaseUrl: readViteEnv('VITE_DOCUMENT_API_BASE_URL'),
-		sharePointSiteUrl: readViteEnv('VITE_SHAREPOINT_SITE_URL'),
-		sharePointLibraryName: readViteEnv('VITE_SHAREPOINT_LIBRARY_NAME'),
-		sharePointFolderPath: readViteEnv('VITE_SHAREPOINT_FOLDER_PATH'),
-		dataverseEnvironmentUrl: readViteEnv('VITE_DATAVERSE_ENVIRONMENT_URL'),
-	};
+	const fromVite = readViteEnv();
 
 	const hasVite = Object.values(fromVite).some(Boolean);
 	return {

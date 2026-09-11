@@ -45,25 +45,12 @@ export interface AppConfig {
 	};
 }
 
-type AppEnvKey
-	= | 'VITE_SHAREPOINT_SITE_URL'
-		| 'VITE_SHAREPOINT_LIBRARY_NAME'
-		| 'VITE_SHAREPOINT_FOLDER_PATH'
-		| 'VITE_DATAVERSE_ENVIRONMENT_URL';
-
-function env(key: AppEnvKey): string | undefined {
-	try {
-		const meta = import.meta as ImportMeta & {
-			env?: Partial<Record<AppEnvKey, string>>;
-		};
-		const value = meta.env?.[key];
-		return typeof value === 'string' && value.trim().length > 0
-			? value.trim()
-			: undefined;
-	}
-	catch {
-		return undefined;
-	}
+/**
+ * Vite only inlines `import.meta.env.VITE_*` on static property access.
+ */
+function nonEmptyEnv(value: string | undefined): string | undefined {
+	const trimmed = value?.trim();
+	return trimmed && trimmed.length > 0 ? trimmed : undefined;
 }
 
 export const appConfig: AppConfig = {
@@ -75,13 +62,13 @@ export const appConfig: AppConfig = {
 		// Sample only — replace via .env (VITE_SHAREPOINT_SITE_URL) or edit here.
 		// Any HTTPS host is valid; do not assume *.sharepoint.com.
 		siteUrl:
-      env('VITE_SHAREPOINT_SITE_URL')
-      ?? 'https://docs.example.com/sites/Policies',
+			nonEmptyEnv(import.meta.env?.VITE_SHAREPOINT_SITE_URL)
+			?? 'https://docs.example.com/sites/Policies',
 		libraryName:
-      env('VITE_SHAREPOINT_LIBRARY_NAME') ?? 'Published Documents',
-		folderPath: env('VITE_SHAREPOINT_FOLDER_PATH') ?? '/Policies',
+			nonEmptyEnv(import.meta.env?.VITE_SHAREPOINT_LIBRARY_NAME) ?? 'Published Documents',
+		folderPath: nonEmptyEnv(import.meta.env?.VITE_SHAREPOINT_FOLDER_PATH) ?? '/Policies',
 	},
-	dataverseEnvironmentUrl: env('VITE_DATAVERSE_ENVIRONMENT_URL'),
+	dataverseEnvironmentUrl: nonEmptyEnv(import.meta.env?.VITE_DATAVERSE_ENVIRONMENT_URL),
 	localDemoUser,
 	features: {
 		showSetupBanner: true,

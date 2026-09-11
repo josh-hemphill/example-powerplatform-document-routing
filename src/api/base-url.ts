@@ -44,14 +44,6 @@ export function assertProductionApiBaseUrl(
 }
 
 function readViteDocumentApiBaseUrl(): string | undefined {
-	try {
-		const meta = import.meta as ImportMeta & {
-			env?: Record<string, string | undefined>;
-		};
-		const value = meta.env?.VITE_DOCUMENT_API_BASE_URL?.trim();
-		return value || undefined;
-	}
-	catch {
-		return undefined;
-	}
+	const value = import.meta.env?.VITE_DOCUMENT_API_BASE_URL?.trim();
+	return value || undefined;
 }
