@@ -21,6 +21,7 @@
 		"scripts/**/*.ts",
 		"src/mock/**/*.ts",
 		"src/provisioning/**/*.ts",
+		"src/vite-env.d.ts",
 		"src/config/document-types.ts",
 		"src/config/sample-identities.ts",
 		"src/publishing/sharepoint-paths.ts",

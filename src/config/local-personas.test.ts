@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { appConfig } from './app.config.ts';
 import {
+	isKnownLocalDemoEmail,
 	LOCAL_DEMO_PERSONAS,
 	resolvePrincipalRolesByEmail,
 } from './local-personas.ts';
@@ -27,6 +28,16 @@ describe('resolvePrincipalRolesByEmail', () => {
 			'user',
 			'approver',
 		]);
+	});
+
+	it('recognizes demo persona emails case-insensitively', () => {
+		expect(isKnownLocalDemoEmail(appConfig.localDemoUser.email)).toBe(true);
+		expect(isKnownLocalDemoEmail(appConfig.localDemoUser.email.toUpperCase())).toBe(
+			true,
+		);
+		expect(isKnownLocalDemoEmail('  casey.author@contoso.com  ')).toBe(true);
+		expect(isKnownLocalDemoEmail('stranger@contoso.com')).toBe(false);
+		expect(isKnownLocalDemoEmail('')).toBe(false);
 	});
 
 	it('defaults unknown emails to user-only', () => {

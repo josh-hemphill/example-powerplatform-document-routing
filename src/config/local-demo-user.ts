@@ -16,11 +16,6 @@ export interface LocalDemoUser {
 	roles: DocumentRoutingRole[];
 }
 
-type LocalDemoEnvKey
-	= | 'VITE_LOCAL_DEMO_EMAIL'
-		| 'VITE_LOCAL_DEMO_USER_NAME'
-		| 'VITE_LOCAL_DEMO_ROLES';
-
 const DEFAULT_LOCAL_DEMO_ROLES: DocumentRoutingRole[] = [
 	'user',
 	'author',
@@ -29,19 +24,14 @@ const DEFAULT_LOCAL_DEMO_ROLES: DocumentRoutingRole[] = [
 	'admin',
 ];
 
-function env(key: LocalDemoEnvKey): string | undefined {
-	try {
-		const meta = import.meta as ImportMeta & {
-			env?: Partial<Record<LocalDemoEnvKey, string>>;
-		};
-		const value = meta.env?.[key];
-		return typeof value === 'string' && value.trim().length > 0
-			? value.trim()
-			: undefined;
-	}
-	catch {
-		return undefined;
-	}
+/**
+ * Vite only inlines `import.meta.env.VITE_*` when those names appear as static
+ * property access. Copying `import.meta` into a variable and reading `env[key]`
+ * stays empty in the browser bundle, so `.env.local` would never grant admin.
+ */
+function nonEmptyEnv(value: string | undefined): string | undefined {
+	const trimmed = value?.trim();
+	return trimmed && trimmed.length > 0 ? trimmed : undefined;
 }
 
 /**
@@ -63,10 +53,10 @@ export function parseLocalDemoRoles(
  */
 export function resolveLocalDemoUser(): LocalDemoUser {
 	return {
-		userName: env('VITE_LOCAL_DEMO_USER_NAME') ?? 'Local Developer',
-		email: env('VITE_LOCAL_DEMO_EMAIL') ?? 'developer@example.com',
+		userName: nonEmptyEnv(import.meta.env?.VITE_LOCAL_DEMO_USER_NAME) ?? 'Local Developer',
+		email: nonEmptyEnv(import.meta.env?.VITE_LOCAL_DEMO_EMAIL) ?? 'developer@example.com',
 		roles:
-			parseLocalDemoRoles(env('VITE_LOCAL_DEMO_ROLES'))
+			parseLocalDemoRoles(nonEmptyEnv(import.meta.env?.VITE_LOCAL_DEMO_ROLES))
 			?? [...DEFAULT_LOCAL_DEMO_ROLES],
 	};
 }

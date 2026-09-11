@@ -1,6 +1,7 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+	hostActorEmail,
 	resetIdentityLoadStateForTests,
 	useIdentityStore,
 } from './identity.ts';
@@ -28,6 +29,18 @@ describe('identity store', () => {
 
 	afterEach(() => {
 		vi.useRealTimers();
+		vi.unstubAllEnvs();
+	});
+
+	it('prefers userPrincipalName over a host email field', () => {
+		expect(
+			hostActorEmail({
+				userPrincipalName: 'upn@contoso.com',
+				email: 'mail@contoso.com',
+			}),
+		).toBe('upn@contoso.com');
+		expect(hostActorEmail({ email: 'mail@contoso.com' })).toBe('mail@contoso.com');
+		expect(hostActorEmail({ fullName: 'No Email' })).toBeUndefined();
 	});
 
 	it('defaults hosted principals to user-only when principal lookup fails', async() => {
@@ -157,6 +170,23 @@ describe('identity store', () => {
 		expect(store.email).toBeTruthy();
 		expect(store.hasRole('admin')).toBe(true);
 		expect(fetchPrincipal).not.toHaveBeenCalled();
+	});
+
+	it('uses host email when userPrincipalName is missing in DEV', async() => {
+		getContext.mockResolvedValue({
+			user: {
+				email: 'developer@example.com',
+				fullName: 'Local Developer',
+			},
+			app: { environmentId: 'env-1' },
+		});
+
+		const store = useIdentityStore();
+		await store.ensureLoaded();
+
+		expect(store.status).toBe('hosted');
+		expect(store.email).toBe('developer@example.com');
+		expect(store.hasRole('admin')).toBe(true);
 	});
 
 	it('applies local persona roles in DEV when hosted UPN matches a demo persona', async() => {

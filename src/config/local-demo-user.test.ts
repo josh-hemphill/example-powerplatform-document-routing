@@ -1,3 +1,5 @@
+/// <reference types="node" />
+import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parseLocalDemoRoles } from './local-demo-user.ts';
 
@@ -53,5 +55,14 @@ describe('vite local demo email override', () => {
 				type.authorTeamEmails?.map((email) => email.toLowerCase()),
 			).not.toContain('developer@example.com');
 		}
+	});
+
+	it('reads VITE_LOCAL_DEMO_* via static import.meta.env access so Vite inlines .env.local', () => {
+		const source = readFileSync('src/config/local-demo-user.ts', 'utf8');
+		expect(source).toContain('import.meta.env?.VITE_LOCAL_DEMO_EMAIL');
+		expect(source).toContain('import.meta.env?.VITE_LOCAL_DEMO_USER_NAME');
+		expect(source).toContain('import.meta.env?.VITE_LOCAL_DEMO_ROLES');
+		expect(source).not.toMatch(/import\.meta\.env\?\.\[/);
+		expect(source).not.toMatch(/\benv\?\.\[key\]/);
 	});
 });

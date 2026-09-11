@@ -61,13 +61,17 @@ For **local Vite** (`pnpm dev`, standalone / no Power Apps host):
 
 ```bash
 cp .env.example .env.local
-# edit:
-# VITE_LOCAL_DEMO_EMAIL=you@contoso.com
-# VITE_LOCAL_DEMO_USER_NAME=Your Name
-# VITE_LOCAL_DEMO_ROLES=user,author,approver,publisher,admin
 ```
 
-Restart `pnpm dev` after creating or editing `.env.local` (Vite only loads env files at startup).
+Uncomment and set (a leading `#` means Vite ignores the line):
+
+```bash
+VITE_LOCAL_DEMO_EMAIL=you@contoso.com
+VITE_LOCAL_DEMO_USER_NAME=Your Name
+VITE_LOCAL_DEMO_ROLES=user,author,approver,publisher,admin
+```
+
+Restart `pnpm dev` after creating or editing `.env.local` (Vite only loads env files at startup). Leave the `VITE_LOCAL_DEMO_*` names uncommented — a leading `#` means Vite ignores the line.
 
 `VITE_LOCAL_DEMO_*` drives standalone Vite play and mock seeds. Without `admin` in `VITE_LOCAL_DEMO_ROLES`, `#/admin` stays hidden and returns you to Inbox.
 
