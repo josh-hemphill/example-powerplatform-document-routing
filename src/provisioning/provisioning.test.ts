@@ -398,6 +398,13 @@ describe('control seed', () => {
 		expect(seed.documentTypes.find((type) => type.id === 'policy')?.chain.some(
 			(step) => step.authorityLevel === 'authoritative',
 		)).toBe(true);
+		expect(seed.documentTypes.find((type) => type.id === 'ilar')?.chain.map(
+			(step) => step.role,
+		)).toEqual([
+			'Engineering Manager',
+			'Lead Engineers',
+			'Assigned Engineers',
+		]);
 	});
 });
 

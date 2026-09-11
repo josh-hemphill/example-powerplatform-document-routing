@@ -35,6 +35,35 @@ describe('document types', () => {
 			expect(type.authorTeamEmails).toContain(localDemoUser.email);
 		}
 	});
+
+	it('seeds an ILAR process-change type with manager then lead then engineer chain', async() => {
+		const { findDocumentType } = await import('@/config/document-types');
+		const { localDemoUser } = await import('@/config/local-demo-user');
+		const ilar = findDocumentType('ilar');
+		expect(ilar).toBeTruthy();
+		expect(ilar!.label).toBe('ILAR');
+		expect(ilar!.description).toMatch(/Intermediate Lesson Action Request/i);
+		expect(ilar!.draftTemplate).toContain('Official change record');
+		expect(ilar!.approvalChain.map((step) =>
+			step.mode === 'named' ? step.role : step.poolRole,
+		)).toEqual([
+			'Engineering Manager',
+			'Lead Engineers',
+			'Assigned Engineers',
+		]);
+		const [manager, leads, engineers] = ilar!.approvalChain;
+		expect(manager?.mode).toBe('named');
+		if (manager?.mode === 'named') {
+			expect(manager.email).toBe('lee.engmgr@contoso.com');
+		}
+		expect(leads?.mode).toBe('pool');
+		if (leads?.mode === 'pool') {
+			expect(leads.pool.some((member) => member.email === localDemoUser.email)).toBe(
+				true,
+			);
+		}
+		expect(engineers?.mode).toBe('pool');
+	});
 });
 
 describe('inbox personas', () => {
@@ -156,6 +185,13 @@ describe('publishing helpers', () => {
 		});
 		expect(targets.siteUrl).toBe(appConfig.sharePoint.siteUrl);
 		expect(targets.folderPath).toBe('/Policies');
+		expect(resolvePublishTargets({
+			id: '2',
+			title: 'ILAR',
+			documentType: 'ilar',
+			freeformRequest: 'x',
+			requesterEmail: 'a@contoso.com',
+		}).folderPath).toBe('/Process-Changes');
 	});
 
 	it('renders HTML that includes title and brand', () => {

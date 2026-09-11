@@ -50,6 +50,18 @@ export const LOCAL_DEMO_PERSONAS: LocalDemoPersona[] = [
 		userName: 'Sam Compliance',
 		roles: ['user', 'approver'],
 	},
+	{
+		label: 'Lee Eng Manager (named)',
+		email: 'lee.engmgr@contoso.com',
+		userName: 'Lee Engineering',
+		roles: ['user', 'approver'],
+	},
+	{
+		label: 'Quinn Lead (pool)',
+		email: 'quinn.lead@contoso.com',
+		userName: 'Quinn Lead',
+		roles: ['user', 'approver'],
+	},
 ];
 
 /**
