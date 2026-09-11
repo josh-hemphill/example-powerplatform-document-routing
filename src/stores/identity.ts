@@ -98,6 +98,8 @@ export const useIdentityStore = defineStore('identity', () => {
 	const identity = ref<IdentityState>({
 		roles: ['user'],
 	});
+	/** Host principal captured before a DEV Acting-as overlay (Local Play). */
+	const hostedIdentitySnapshot = ref<IdentityState | null>(null);
 
 	const isLoading = computed(() => status.value === 'loading');
 	const isReady = computed(
@@ -116,6 +118,18 @@ export const useIdentityStore = defineStore('identity', () => {
 	const rolesUnresolved = computed(
 		() => status.value === 'hosted' && hostedRolesStatus.value === 'failed',
 	);
+	/**
+	 * Signed-in Power Apps host, even while Acting as a demo persona.
+	 */
+	const hostActor = computed(() => {
+		if (hostedIdentitySnapshot.value) {
+			return hostedIdentitySnapshot.value;
+		}
+		if (status.value === 'hosted') {
+			return identity.value;
+		}
+		return null;
+	});
 
 	/**
 	 * Loads host context once; subsequent callers await the same promise.
@@ -146,6 +160,7 @@ export const useIdentityStore = defineStore('identity', () => {
 		loadPromise = null;
 		status.value = 'loading';
 		error.value = null;
+		hostedIdentitySnapshot.value = null;
 		await ensureLoaded();
 	}
 
@@ -234,6 +249,7 @@ export const useIdentityStore = defineStore('identity', () => {
 		status.value = 'loading';
 		error.value = null;
 		hostedRolesStatus.value = 'idle';
+		hostedIdentitySnapshot.value = null;
 
 		try {
 			const result = await raceHostContext();
@@ -297,6 +313,7 @@ export const useIdentityStore = defineStore('identity', () => {
 	}
 
 	function applyStandaloneDemo(persona: (typeof LOCAL_DEMO_PERSONAS)[number]): void {
+		hostedIdentitySnapshot.value = null;
 		identity.value = {
 			userName: persona.userName,
 			email: persona.email,
@@ -308,16 +325,93 @@ export const useIdentityStore = defineStore('identity', () => {
 	}
 
 	/**
-	 * DEV/standalone only: switch the mock principal without spoofing per-request bodies.
+	 * Remembers the hosted principal once so Acting as can restore it.
 	 */
-	function switchLocalPersona(emailAddress: string): void {
-		if (!allowsDemoIdentityFallback() || status.value === 'hosted') {
+	function snapshotHostedIdentity(): void {
+		if (hostedIdentitySnapshot.value || status.value !== 'hosted') {
 			return;
 		}
+		hostedIdentitySnapshot.value = {
+			userId: identity.value.userId,
+			userName: identity.value.userName,
+			email: identity.value.email,
+			environmentId: identity.value.environmentId,
+			roles: [...identity.value.roles],
+		};
+	}
+
+	/**
+	 * Overlays a demo persona on hosted DEV identity without dropping host status.
+	 */
+	function applyHostedDemoPersona(persona: (typeof LOCAL_DEMO_PERSONAS)[number]): void {
+		snapshotHostedIdentity();
+		identity.value = {
+			...identity.value,
+			userName: persona.userName,
+			email: persona.email,
+			roles: [...persona.roles],
+		};
+		hostedRolesStatus.value = 'resolved';
+		error.value = null;
+	}
+
+	/**
+	 * Restores the Power Apps host principal after a DEV Acting-as overlay.
+	 */
+	function restoreHostedIdentitySnapshot(): boolean {
+		const snapshot = hostedIdentitySnapshot.value;
+		if (!snapshot) {
+			return false;
+		}
+		identity.value = {
+			...snapshot,
+			roles: [...snapshot.roles],
+		};
+		hostedRolesStatus.value = 'resolved';
+		error.value = null;
+		return true;
+	}
+
+	function hostedActorEmail(): string | undefined {
+		const snapshotEmail = hostedIdentitySnapshot.value?.email?.trim().toLowerCase();
+		if (snapshotEmail) {
+			return snapshotEmail;
+		}
+		if (status.value === 'hosted') {
+			return identity.value.email?.trim().toLowerCase();
+		}
+		return undefined;
+	}
+
+	/**
+	 * DEV only: switch the mock principal without spoofing per-request bodies.
+	 * Hosted Local Play keeps `hosted` status and overlays the demo email/roles.
+	 */
+	function switchLocalPersona(emailAddress: string): void {
+		if (!allowsDemoIdentityFallback()) {
+			return;
+		}
+		const normalized = emailAddress.trim().toLowerCase();
+		if (!normalized) {
+			return;
+		}
+
+		const hostEmail = hostedActorEmail();
+		if (hostEmail && hostEmail === normalized) {
+			if (hostedIdentitySnapshot.value) {
+				restoreHostedIdentitySnapshot();
+			}
+			return;
+		}
+
 		const persona = LOCAL_DEMO_PERSONAS.find(
-			(item) => item.email.toLowerCase() === emailAddress.toLowerCase(),
+			(item) => item.email.toLowerCase() === normalized,
 		);
 		if (!persona) {
+			return;
+		}
+		if (status.value === 'hosted' || hostedIdentitySnapshot.value) {
+			applyHostedDemoPersona(persona);
 			return;
 		}
 		applyStandaloneDemo(persona);
@@ -340,6 +434,7 @@ export const useIdentityStore = defineStore('identity', () => {
 		canAct,
 		rolesResolved,
 		rolesUnresolved,
+		hostActor,
 		ensureLoaded,
 		retryLoad,
 		switchLocalPersona,

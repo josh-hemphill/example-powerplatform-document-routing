@@ -79,6 +79,31 @@ export function isKnownLocalDemoEmail(email: string | null | undefined): boolean
 }
 
 /**
+ * Persona switcher rows: demo directory plus the hosted UPN when it is not already listed.
+ */
+export function demoPersonaSwitcherItems(host?: {
+	email?: string;
+	userName?: string;
+	roles?: readonly DocumentRoutingRole[];
+}): LocalDemoPersona[] {
+	const hostEmail = host?.email?.trim();
+	if (!hostEmail || isKnownLocalDemoEmail(hostEmail)) {
+		return [...LOCAL_DEMO_PERSONAS];
+	}
+	const hostName = host?.userName?.trim() || hostEmail;
+	const hostRoles = host?.roles?.length ? [...host.roles] : (['user'] as const);
+	return [
+		{
+			label: `${hostName} (host)`,
+			email: hostEmail,
+			userName: hostName,
+			roles: [...hostRoles],
+		},
+		...LOCAL_DEMO_PERSONAS,
+	];
+}
+
+/**
  * Resolves mock/server-side roles for an actor email (ignores client role headers).
  * Unknown emails receive user-only — least privilege until Dataverse mapping exists.
  */

@@ -82,7 +82,9 @@ Restart `pnpm dev` after creating or editing `.env.local` (Vite only loads env f
 3. Set `VITE_LOCAL_DEMO_EMAIL` to that **same Power Apps sign-in UPN** (exact match, case-insensitive) and keep `admin` in `VITE_LOCAL_DEMO_ROLES` (or omit roles to use the default set that includes admin).
 4. Restart `pnpm dev`, then hard-refresh Local Play.
 
-Local Play usually reports identity status **`hosted`** (real host UPN). In DEV, when that UPN matches `VITE_LOCAL_DEMO_EMAIL` (or another `LOCAL_DEMO_PERSONAS` entry), the app applies those persona roles — including `admin` — instead of staying on least-privilege `user` from `/api/principal`. If the UPN does **not** match any demo persona, roles still come from `/api/principal` (often `user` only until Dataverse security roles exist).
+Local Play usually reports identity status **`hosted`** (real host UPN). In DEV, the **Acting as** switcher stays available so you can use **Local developer (Admin)** and the other demo personas without leaving Local Play. Switching overlays the demo email and roles; the Power Apps host chip and environment id stay. Choose the host UPN (or **Local developer** when that is the host) to restore the signed-in principal.
+
+When the host UPN matches `VITE_LOCAL_DEMO_EMAIL` (or another `LOCAL_DEMO_PERSONAS` entry), the app also applies those persona roles — including `admin` — instead of staying on least-privilege `user` from `/api/principal`. If the UPN does **not** match any demo persona, roles still come from `/api/principal` (often `user` only until Dataverse security roles exist) until you Acting-as a demo persona.
 
 If host context has no UPN, DEV falls back to the primary local persona from `VITE_LOCAL_DEMO_*` as **standalone**.
 
@@ -122,7 +124,7 @@ pnpm generate:api
 pnpm dev
 ```
 
-Walk the seeded inbox: request → draft → approvals → publish. Demo cases live in `src/mock/seed-documents.ts` (mock/DEV only — not used by hosted Dataverse). Use the persona switcher; only the **Local developer** persona (or your `VITE_LOCAL_DEMO_*` override with `admin`) can open Admin. See **Local Admin in Dev** above.
+Walk the seeded inbox: request → draft → approvals → publish. Demo cases live in `src/mock/seed-documents.ts` (mock/DEV only — not used by hosted Dataverse). Use the **Acting as** switcher (DEV standalone and Power Apps Local Play); only the **Local developer** persona (or your `VITE_LOCAL_DEMO_*` override with `admin`) can open Admin. See **Local Admin in Dev** above.
 
 ## 5. Provision Dataverse + connect SharePoint
 
