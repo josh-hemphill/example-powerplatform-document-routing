@@ -5,6 +5,7 @@ import vue from '@vitejs/plugin-vue';
 import { defineConfig } from 'vite';
 import vueDevTools from 'vite-plugin-vue-devtools';
 import vuetify from 'vite-plugin-vuetify';
+import { cleanDevServerExitPlugin } from './src/dev/clean-dev-server-exit.ts';
 import { documentRoutingMockPlugin } from './src/mock/document-routing-mock-plugin.ts';
 
 // https://vite.dev/config/
@@ -16,6 +17,7 @@ export default defineConfig(({ command }) => ({
 		command === 'serve' ? vueDevTools() : null,
 		powerApps(),
 		documentRoutingMockPlugin(),
+		cleanDevServerExitPlugin(),
 	].filter(Boolean),
 	resolve: {
 		alias: {
