@@ -169,6 +169,9 @@ const stageGuide = computed(() => {
 		case 'draft':
 			return 'Next: expand Author / draft to edit and save, then submit from Approvals.';
 		case 'approval':
+			if (document.value?.allowReviewerDraftEdit) {
+				return 'This request was dispatched to review. Expand Author / draft to edit the official document, then claim or decide on the approval chain.';
+			}
 			return 'Next: expand Approval chain to submit, claim, or decide.';
 		case 'publish':
 			return 'Next: expand Publish to choose a destination and publish the PDF.';
@@ -186,6 +189,14 @@ watch(
 );
 
 function isStageExpanded(stage: WorkspaceStageId): boolean {
+	if (
+		stage === 'draft'
+		&& document.value?.allowReviewerDraftEdit
+		&& document.value.status === 'in_review'
+		&& !(stageOverrides.value && 'draft' in stageOverrides.value)
+	) {
+		return true;
+	}
 	if (stageOverrides.value && stage in stageOverrides.value) {
 		return Boolean(stageOverrides.value[stage]);
 	}
@@ -397,6 +408,7 @@ async function handleAbandonSupersede(): Promise<void> {
 				:document="document"
 				:type-label="typeLabel"
 				:priority-catalog="priorityData?.items ?? []"
+				:request-fields="documentType?.requestFields ?? []"
 				@refresh="() => refetch()"
 				@open-feedback="scrollToFeedback"
 			/>

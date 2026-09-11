@@ -1,4 +1,9 @@
-import type { ApprovalStepTemplate, DocumentTypeDefinition } from '../config/document-types.ts';
+import type {
+	ApprovalStepTemplate,
+	CreateWorkflow,
+	DocumentTypeDefinition,
+	TypeRequestField,
+} from '../config/document-types.ts';
 import type { AuthorityLevel, CommentPolicy } from '../domain/review-comments.ts';
 /**
  * Builds Dataverse control-table seed rows from the local document-types demo config.
@@ -64,6 +69,8 @@ export interface SeedDocumentType {
 	draftScaffold: string;
 	defaultFolderPath?: string;
 	policyVersion: number;
+	createWorkflow: CreateWorkflow;
+	requestFields: TypeRequestField[];
 	chain: SeedChainStep[];
 }
 
@@ -254,6 +261,8 @@ export function buildControlSeedBundle(
 			draftScaffold: type.draftTemplate,
 			defaultFolderPath: type.folderPath,
 			policyVersion: 1,
+			createWorkflow: type.createWorkflow ?? 'standard',
+			requestFields: type.requestFields ? structuredClone(type.requestFields) : [],
 			chain: type.approvalChain.map((step, index) => {
 				const mapped = mapChainStep(step, index + 1);
 				if (includeDemoIdentities) {

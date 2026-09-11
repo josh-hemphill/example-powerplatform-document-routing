@@ -4,6 +4,7 @@ import type {
 	ControlChainStep,
 	ControlDocumentType,
 	DocumentSubtype,
+	TypeRequestField,
 } from '@/client';
 import { useMutation, useQuery, useQueryCache } from '@pinia/colada';
 import { computed, reactive, watch } from 'vue';
@@ -20,6 +21,7 @@ import {
 	updateDocumentSubtypeMutation,
 	updateDocumentTypeMutation,
 } from '@/client/@pinia/colada.gen';
+import AdminRequestFieldsEditor from '@/components/admin/AdminRequestFieldsEditor.vue';
 import AdminStickySave from '@/components/admin/AdminStickySave.vue';
 import AdminSubtypesEditor from '@/components/admin/AdminSubtypesEditor.vue';
 import ApprovalChainEditor from '@/components/admin/ApprovalChainEditor.vue';
@@ -31,6 +33,7 @@ import {
 	DEFAULT_AUTHORITY_LEVEL,
 	DEFAULT_COMMENT_POLICY,
 } from '@/domain/review-comments';
+import { validateRequestFields } from '@/domain/type-request-fields';
 import { uniqueLabel, uniqueNumberPrefix, uniqueSlugId } from '@/utils/slugify-id';
 
 defineProps<{
@@ -68,7 +71,14 @@ const form = reactive({
 	nextSequence: 1,
 	approvalChain: [] as ControlChainStep[],
 	subtypes: [] as DocumentSubtype[],
+	createWorkflow: 'standard' as ControlDocumentType['createWorkflow'],
+	requestFields: [] as TypeRequestField[],
 });
+
+const createWorkflowItems = [
+	{ title: 'Standard (request → draft → submit)', value: 'standard' },
+	{ title: 'Dispatch to review on create', value: 'dispatch_to_review' },
+];
 
 function snapshot(): string {
 	return JSON.stringify({
@@ -85,6 +95,8 @@ function snapshot(): string {
 		nextSequence: form.nextSequence,
 		approvalChain: form.approvalChain,
 		subtypes: form.subtypes,
+		createWorkflow: form.createWorkflow,
+		requestFields: form.requestFields,
 	});
 }
 
@@ -104,6 +116,8 @@ function hydrate(type: ControlDocumentType): void {
 	form.nextSequence = type.nextSequence ?? 1;
 	form.approvalChain = structuredClone(type.approvalChain);
 	form.subtypes = structuredClone(type.subtypes ?? []);
+	form.createWorkflow = type.createWorkflow ?? 'standard';
+	form.requestFields = structuredClone(type.requestFields ?? []);
 	captureBaseline();
 }
 
@@ -221,6 +235,8 @@ async function createType(): Promise<void> {
 				numberPattern: '{prefix}-{yyyy}-{seq:5}',
 				nextSequence: 1,
 				approvalChain,
+				createWorkflow: 'standard',
+				requestFields: [],
 			},
 		});
 		// Mark clean only after create succeeds so a failed create keeps edits dirty.
@@ -246,6 +262,11 @@ async function save(): Promise<void> {
 		emit('error', 'Next sequence must be an integer greater than or equal to 1.');
 		return;
 	}
+	const fieldsError = validateRequestFields(form.requestFields);
+	if (fieldsError) {
+		emit('error', fieldsError.message);
+		return;
+	}
 	try {
 		await saveAsync({
 			path: { typeId: selectedId.value },
@@ -266,6 +287,8 @@ async function save(): Promise<void> {
 				numberPattern,
 				nextSequence,
 				approvalChain: form.approvalChain,
+				createWorkflow: form.createWorkflow ?? 'standard',
+				requestFields: form.requestFields,
 			},
 		});
 		for (const subtype of form.subtypes) {
@@ -376,6 +399,17 @@ async function save(): Promise<void> {
 			label="Draft scaffold"
 			rows="6"
 			class="mb-4"
+		/>
+		<v-select
+			v-model="form.createWorkflow"
+			:items="createWorkflowItems"
+			label="Create workflow"
+			hint="Dispatch sends the case straight to review so reviewers own the official document."
+			persistent-hint
+			class="mb-4"
+		/>
+		<AdminRequestFieldsEditor
+			v-model="form.requestFields"
 		/>
 		<ApprovalChainEditor
 			v-model="form.approvalChain"

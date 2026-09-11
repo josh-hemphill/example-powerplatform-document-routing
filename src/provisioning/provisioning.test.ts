@@ -204,6 +204,26 @@ describe('dataverse schema + provision plan', () => {
 		expect(typeTable?.columns.some((column) => column.schemaName === 'nextsequence')).toBe(
 			true,
 		);
+		expect(typeTable?.columns.some((column) => column.schemaName === 'createworkflow')).toBe(
+			true,
+		);
+		expect(
+			typeTable?.columns.some((column) => column.schemaName === 'requestfieldsjson'),
+		).toBe(true);
+		expect(
+			document.columns.some((column) => column.schemaName === 'typefieldvaluesjson'),
+		).toBe(true);
+		expect(
+			document.columns.some((column) => column.schemaName === 'allowreviewerdraftedit'),
+		).toBe(true);
+		const createWorkflow = typeTable?.columns.find(
+			(column) => column.schemaName === 'createworkflow',
+		);
+		expect(createWorkflow?.type).toBe('choice');
+		expect(createWorkflow?.options?.map((option) => option.label)).toEqual([
+			'standard',
+			'dispatch_to_review',
+		]);
 		expect(document.columns.some((column) => column.schemaName === 'publishdestination')).toBe(
 			true,
 		);
@@ -264,6 +284,30 @@ describe('dataverse schema + provision plan', () => {
 		expect(plan.apiRoot).toBe('https://data.fabrikam.internal/api/data/v9.2');
 		expect(plan.tableLogicalNames).toContain('dr_document');
 		expect(plan.tableLogicalNames).toContain('dr_documenttype');
+		expect(plan.requests.some((request) =>
+			request.kind === 'attribute'
+			&& String((request.body as { SchemaName?: string }).SchemaName ?? '')
+				.toLowerCase()
+				.endsWith('_createworkflow'),
+		)).toBe(true);
+		expect(plan.requests.some((request) =>
+			request.kind === 'attribute'
+			&& String((request.body as { SchemaName?: string }).SchemaName ?? '')
+				.toLowerCase()
+				.endsWith('_requestfieldsjson'),
+		)).toBe(true);
+		expect(plan.requests.some((request) =>
+			request.kind === 'attribute'
+			&& String((request.body as { SchemaName?: string }).SchemaName ?? '')
+				.toLowerCase()
+				.endsWith('_typefieldvaluesjson'),
+		)).toBe(true);
+		expect(plan.requests.some((request) =>
+			request.kind === 'attribute'
+			&& String((request.body as { SchemaName?: string }).SchemaName ?? '')
+				.toLowerCase()
+				.endsWith('_allowreviewerdraftedit'),
+		)).toBe(true);
 		expect(plan.requests.some((request) => request.path === '/EntityDefinitions')).toBe(
 			true,
 		);
@@ -405,6 +449,12 @@ describe('control seed', () => {
 			'Lead Engineers',
 			'Assigned Engineers',
 		]);
+		const ilar = seed.documentTypes.find((type) => type.id === 'ilar');
+		expect(ilar?.createWorkflow).toBe('dispatch_to_review');
+		expect(ilar?.requestFields.map((field) => field.key)).toEqual(['relevantSystems']);
+		expect(seed.documentTypes.find((type) => type.id === 'policy')?.createWorkflow).toBe(
+			'standard',
+		);
 	});
 });
 

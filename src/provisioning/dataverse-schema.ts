@@ -96,6 +96,7 @@ function buildChoiceSets(optionValuePrefix: number): {
 	reviewCommentKinds: DataverseChoiceOption[];
 	reviewCommentStatuses: DataverseChoiceOption[];
 	priorityColors: DataverseChoiceOption[];
+	createWorkflows: DataverseChoiceOption[];
 } {
 	return {
 		documentStatuses: choiceOptionsFromPrefix(optionValuePrefix, [
@@ -161,6 +162,10 @@ function buildChoiceSets(optionValuePrefix: number): {
 			{ offset: 102, label: 'warning' },
 			{ offset: 103, label: 'error' },
 		]),
+		createWorkflows: choiceOptionsFromPrefix(optionValuePrefix, [
+			{ offset: 110, label: 'standard' },
+			{ offset: 111, label: 'dispatch_to_review' },
+		]),
 	};
 }
 
@@ -183,6 +188,7 @@ export function buildDataverseSchema(
 		reviewCommentKinds,
 		reviewCommentStatuses,
 		priorityColors,
+		createWorkflows,
 	} = buildChoiceSets(optionValuePrefix);
 
 	const tables: DataverseTableDefinition[] = [
@@ -409,6 +415,22 @@ export function buildDataverseSchema(
 					type: 'integer',
 					required: true,
 				},
+				{
+					schemaName: 'createworkflow',
+					displayName: 'Create Workflow',
+					description:
+						'standard: request → draft → submit. dispatch_to_review: materialize the chain on create',
+					type: 'choice',
+					options: createWorkflows,
+				},
+				{
+					schemaName: 'requestfieldsjson',
+					displayName: 'Request Fields JSON',
+					description:
+						'JSON array of TypeRequestField (key, label, kind, required, options) collected on create',
+					type: 'memo',
+					maxLength: 50_000,
+				},
 			],
 		},
 		{
@@ -603,6 +625,21 @@ export function buildDataverseSchema(
 					description: 'Required when the catalog row requiresReason (e.g. mission_critical)',
 					type: 'memo',
 					maxLength: 10_000,
+				},
+				{
+					schemaName: 'typefieldvaluesjson',
+					displayName: 'Type Field Values JSON',
+					description:
+						'JSON object of intake values keyed by documenttype.requestfieldsjson field keys',
+					type: 'memo',
+					maxLength: 20_000,
+				},
+				{
+					schemaName: 'allowreviewerdraftedit',
+					displayName: 'Allow Reviewer Draft Edit',
+					description:
+						'When true, author team and current reviewers may edit the draft while in_review (set from createworkflow at create)',
+					type: 'boolean',
 				},
 				{
 					schemaName: 'documentsubtypeid',

@@ -21,7 +21,7 @@ Connector that starts a flow.
 | [`sla-sweeper.json`](./sla-sweeper.json)           | Recurrence (e.g. every 15 min)                              | Finds overdue active steps; elevates / requeues; writes `{prefix}_historyevent` |
 | [`notify-approval.json`](./notify-approval.json)   | When `{prefix}_approvalstep` is created/updated             | Email/Teams to assignee or pool                                                 |
 | [`publish-approved.json`](./publish-approved.json) | When `{prefix}_document.status` → `approved` **or** Publish | HTML→PDF→SharePoint (Phase 5 fills binary steps)                                |
-| [`on-submit-guard.json`](./on-submit-guard.json)   | When status → `in_review`                                   | Optional double-check that chain rows exist                                     |
+| [`on-submit-guard.json`](./on-submit-guard.json)   | When status → `in_review`                                   | Optional double-check that chain rows exist (also fires for dispatch-on-create) |
 
 ## Elevation semantics (locked for this example)
 

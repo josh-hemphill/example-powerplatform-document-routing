@@ -41,12 +41,12 @@ Dataverse tables (publisher prefix default `dr` — substitute your `publisher.p
 
 - `{prefix}_publishdestination` — allowlisted SharePoint publish roots
 - `{prefix}_approverpool` / `{prefix}_approverpoolmember` — pools + members
-- `{prefix}_documenttype` / `{prefix}_approvalchainstep` — types, scaffolds, policy version, chain templates
+- `{prefix}_documenttype` / `{prefix}_approvalchainstep` — types, scaffolds, create workflow, request fields JSON, policy version, chain templates
 - `{prefix}_appsetting` — feature flags
 
 **Case**
 
-- `{prefix}_document` — case + collaborative draft + revision + publish destination lookup
+- `{prefix}_document` — case + collaborative draft + type field values + reviewer-draft-edit flag + revision + publish destination lookup
 - `{prefix}_approvalstep` — runtime steps with immutable `activatedueat` SLA
 - `{prefix}_historyevent` — audit trail
 

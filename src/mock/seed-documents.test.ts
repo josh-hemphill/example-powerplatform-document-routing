@@ -64,7 +64,13 @@ describe('createSeedDocuments', () => {
 		const docs = createSeedDocuments();
 		const ilars = docs.filter((document) => document.documentType === 'ilar');
 		expect(ilars.length).toBeGreaterThanOrEqual(3);
-		expect(ilars.some((document) => document.status === 'requested')).toBe(true);
+		expect(ilars.some((document) => document.documentSubtypeId === 'sop')).toBe(true);
+		expect(ilars.some((document) => document.documentSubtypeId === 'work_instruction')).toBe(
+			true,
+		);
+		expect(
+			ilars.every((document) => document.draftBodyMarkdown?.includes('Lesson') !== true),
+		).toBe(true);
 
 		const pendingManager = ilars.find(
 			(document) =>

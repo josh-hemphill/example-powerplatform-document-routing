@@ -62,6 +62,8 @@ export interface MockDocumentRecord {
 	priority: string;
 	priorityReason: string | null;
 	documentSubtypeId: string | null;
+	typeFieldValues?: Record<string, string>;
+	allowReviewerDraftEdit?: boolean;
 	currentApproverEmail: string | null;
 	currentStepStatus: MockApprovalStep['status'] | null;
 	currentStepDueAt: string | null;
@@ -895,8 +897,8 @@ Draft abandoned.
 	];
 	const ilarChangeDraft = `# Standardize hotfix rollback checklist
 
-## Intermediate Lesson Action Request
-Hotfixes skip the rollback rehearsal used for planned releases. Capture the lesson as an official process change.
+## Intermediate Liaison Action Request
+Hotfixes skip the rollback rehearsal used for planned releases. Capture the gap as an official process change.
 
 ## Current process
 - Hotfix owners post in Slack and ship from \`main\` when severity is high.
@@ -926,7 +928,9 @@ Hotfixes skip the rollback rehearsal used for planned releases. Capture the less
 		collaboratorEmails: [...ilarEngineerCollab],
 		priority: 'high',
 		priorityReason: null,
-		documentSubtypeId: null,
+		documentSubtypeId: 'sop',
+		typeFieldValues: { relevantSystems: 'ci_release' },
+		allowReviewerDraftEdit: true,
 		reviewComments: [],
 		currentApproverEmail: null,
 		currentStepStatus: null,
@@ -936,7 +940,7 @@ Hotfixes skip the rollback rehearsal used for planned releases. Capture the less
 		createdAt,
 		updatedAt: createdAt,
 		freeformRequest:
-			'Hotfixes skip the rollback rehearsal used for planned releases. Please open an ILAR so engineering can turn this lesson into an official process change.',
+			'Hotfixes skip the rollback rehearsal used for planned releases. Please open an ILAR so engineering can turn this into an official process change.',
 		draftBodyMarkdown: null,
 		draftSummary: null,
 		authorEmail: null,
@@ -973,7 +977,9 @@ Hotfixes skip the rollback rehearsal used for planned releases. Capture the less
 		collaboratorEmails: [...ilarEngineerCollab],
 		priority: 'high',
 		priorityReason: null,
-		documentSubtypeId: null,
+		documentSubtypeId: 'sop',
+		typeFieldValues: { relevantSystems: 'dataverse' },
+		allowReviewerDraftEdit: true,
 		reviewComments: [],
 		currentApproverEmail: 'lee.engmgr@contoso.com',
 		currentStepStatus: 'pending',
@@ -986,7 +992,7 @@ Hotfixes skip the rollback rehearsal used for planned releases. Capture the less
 			'A solo schema migrate locked checkout for 40 minutes. Request a process change that requires pairing plus a documented rollback before production schema work.',
 		draftBodyMarkdown: `# Require pairing for production schema changes
 
-## Intermediate Lesson Action Request
+## Intermediate Liaison Action Request
 A solo schema migrate locked checkout for 40 minutes. Require pairing plus a documented rollback before production schema work.
 
 ## Current process
@@ -1115,7 +1121,9 @@ A solo schema migrate locked checkout for 40 minutes. Require pairing plus a doc
 		collaboratorEmails: [...ilarEngineerCollab],
 		priority: 'normal',
 		priorityReason: null,
-		documentSubtypeId: null,
+		documentSubtypeId: 'work_instruction',
+		typeFieldValues: { relevantSystems: 'ci_release' },
+		allowReviewerDraftEdit: true,
 		reviewComments: [],
 		currentApproverEmail: null,
 		currentStepStatus: 'queued',
@@ -1129,12 +1137,12 @@ A solo schema migrate locked checkout for 40 minutes. Require pairing plus a doc
 		createdAt,
 		updatedAt: createdAt,
 		freeformRequest:
-			'Ad-hoc deploys are still coordinated in Slack. Turn the lesson into an official change that routes every production deploy through the change record.',
+			'Ad-hoc deploys are still coordinated in Slack. Turn that into an official change that routes every production deploy through the change record.',
 		draftBodyMarkdown: ilarChangeDraft.replace(
 			'Standardize hotfix rollback checklist',
 			'Retire ad-hoc deploy Slack channel',
 		).replace(
-			'Hotfixes skip the rollback rehearsal used for planned releases. Capture the lesson as an official process change.',
+			'Hotfixes skip the rollback rehearsal used for planned releases. Capture the gap as an official process change.',
 			'Ad-hoc deploys are still coordinated in Slack. Route every production deploy through the official change record.',
 		),
 		draftSummary: 'ILAR: official change for production deploys',

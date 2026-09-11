@@ -19,6 +19,8 @@ export interface AccessibleDocument {
 		/** Elevation-pool members only gain access after SLA elevation. */
 		elevated?: boolean | null;
 	}>;
+	/** Dispatch-to-review types keep the official document editable during review. */
+	allowReviewerDraftEdit?: boolean | null;
 }
 
 const DRAFT_EDITABLE_STATUSES = new Set(['requested', 'drafting']);
@@ -109,13 +111,40 @@ export function canActorMutateDraft(
 }
 
 /**
- * True when the actor may edit draft content (requested/drafting only).
+ * True when the actor is the current named approver or a current pool member.
+ */
+export function isCurrentReviewParticipant(
+	document: Pick<AccessibleDocument, 'currentApproverEmail' | 'currentPoolEmails'>,
+	actorEmail: string,
+): boolean {
+	const email = actorEmail.trim().toLowerCase();
+	if (!email) {
+		return false;
+	}
+	if (document.currentApproverEmail?.toLowerCase() === email) {
+		return true;
+	}
+	return document.currentPoolEmails.some((member) => member.toLowerCase() === email);
+}
+
+/**
+ * True when the actor may edit draft content.
+ * Requested/drafting: author team. In-review dispatch types: author team or current reviewers.
  */
 export function canActorEditDraft(
 	document: AccessibleDocument,
 	actorEmail: string,
 ): boolean {
-	return isDraftEditableStatus(document.status) && canActorMutateDraft(document, actorEmail);
+	if (isDraftEditableStatus(document.status)) {
+		return canActorMutateDraft(document, actorEmail);
+	}
+	if (document.status !== 'in_review' || !document.allowReviewerDraftEdit) {
+		return false;
+	}
+	return (
+		canActorMutateDraft(document, actorEmail)
+		|| isCurrentReviewParticipant(document, actorEmail)
+	);
 }
 
 export interface SupersedeEligibleDocument {

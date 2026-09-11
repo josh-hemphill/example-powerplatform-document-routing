@@ -12,6 +12,12 @@ import type {
 import { randomUUID } from 'node:crypto';
 import { DEFAULT_COMMENT_POLICY, seedAuthorityForRole } from '../domain/review-comments.ts';
 import {
+	isCreateWorkflow,
+	normalizeRequestFields,
+	validateCreateWorkflow,
+	validateRequestFields,
+} from '../domain/type-request-fields.ts';
+import {
 	findControlDocumentSubtype,
 	findDestinationById,
 	findPoolById,
@@ -154,6 +160,16 @@ export function handleControlApiRequest(options: {
 				sendJson(res, 400, { message: chainError, code: 'validation_error' });
 				return true;
 			}
+			const workflowError = validateCreateWorkflow(body.createWorkflow);
+			if (workflowError) {
+				sendJson(res, 400, workflowError);
+				return true;
+			}
+			const fieldsError = validateRequestFields(body.requestFields);
+			if (fieldsError) {
+				sendJson(res, 400, fieldsError);
+				return true;
+			}
 			const created: ControlDocumentType = {
 				id: body.id.trim(),
 				label: body.label.trim(),
@@ -174,6 +190,12 @@ export function handleControlApiRequest(options: {
 				approvalChain: [...(body.approvalChain ?? [])].sort(
 					(a, b) => a.order - b.order,
 				),
+				createWorkflow: isCreateWorkflow(body.createWorkflow)
+					? body.createWorkflow
+					: 'standard',
+				requestFields: body.requestFields
+					? normalizeRequestFields(body.requestFields)
+					: [],
 			};
 			getControlStore().documentTypes.push(created);
 			sendJson(res, 201, created);
@@ -205,6 +227,16 @@ export function handleControlApiRequest(options: {
 					sendJson(res, 400, { message: chainError, code: 'validation_error' });
 					return true;
 				}
+				const workflowError = validateCreateWorkflow(body.createWorkflow);
+				if (workflowError) {
+					sendJson(res, 400, workflowError);
+					return true;
+				}
+				const fieldsError = validateRequestFields(body.requestFields);
+				if (fieldsError) {
+					sendJson(res, 400, fieldsError);
+					return true;
+				}
 				Object.assign(type, {
 					label: body.label ?? type.label,
 					description: body.description ?? type.description,
@@ -227,6 +259,12 @@ export function handleControlApiRequest(options: {
 					approvalChain: [...(body.approvalChain ?? type.approvalChain)].sort(
 						(a, b) => a.order - b.order,
 					),
+					createWorkflow: isCreateWorkflow(body.createWorkflow)
+						? body.createWorkflow
+						: type.createWorkflow,
+					requestFields: body.requestFields
+						? normalizeRequestFields(body.requestFields)
+						: type.requestFields,
 				});
 				sendJson(res, 200, type);
 				return true;
