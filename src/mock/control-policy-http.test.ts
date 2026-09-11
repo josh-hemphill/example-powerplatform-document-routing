@@ -120,6 +120,31 @@ describe('control policy HTTP', () => {
 		expect(captured.body().currentApproverEmail).toBe('lee.engmgr@contoso.com');
 		expect(captured.body().draftBodyMarkdown).toContain('Intermediate Liaison Action Request');
 		expect(captured.body().draftBodyMarkdown).toContain('CI / release');
+
+		const documentId = captured.body().id as string;
+		const draftSave = captureResponse();
+		await handleDocumentRoutes({
+			method: 'PUT',
+			path: `/api/documents/${documentId}/draft`,
+			url: new URL(`http://localhost/api/documents/${documentId}/draft`),
+			actor: 'lee.engmgr@contoso.com',
+			actorRoles: ['user', 'approver'],
+			isAdmin: false,
+			req: jsonReq({
+				title: 'Standardize hotfix rollback checklist',
+				bodyMarkdown: `${captured.body().draftBodyMarkdown as string}\n\n- Manager scoped the SOP.`,
+				expectedContentRevision: captured.body().contentRevision,
+			}),
+			res: draftSave.res,
+			readJson,
+			sendJson,
+			matchRoute,
+			stamp,
+			uniqueEmails,
+		});
+		expect(draftSave.status()).toBe(200);
+		expect(draftSave.body().status).toBe('in_review');
+		expect(draftSave.body().contentRevision).toBe(2);
 	});
 
 	it('rejects ILAR create without a relevant system', async() => {

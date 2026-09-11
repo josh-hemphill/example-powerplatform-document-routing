@@ -417,7 +417,9 @@ export async function handleDocumentRoutes(context: MockHttpContext): Promise<bo
 		document.draftBodyMarkdown = body.bodyMarkdown.trim();
 		document.draftSummary = body.summary?.trim() ? body.summary.trim() : null;
 		document.authorEmail = document.authorEmail ?? actor;
-		document.status = 'drafting';
+		if (document.status === 'requested') {
+			document.status = 'drafting';
+		}
 		document.contentRevision += 1;
 		pushHistory(
 			document,
